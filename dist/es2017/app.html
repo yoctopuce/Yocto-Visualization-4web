@@ -1,0 +1,77 @@
+<!DOCTYPE html/>
+<html lang = 'en' >
+<head >
+  <title>Yocto-Visualization (for web) demo</title>
+  <meta charset = 'UTF-8' >
+</head >
+<body>
+<H1 style="font-family: Arial,sans-serif">Yocto-Visualization (for web) demo</H1>
+
+
+<textarea id = 'xmldata' style = 'visibility:hidden' >
+<?xml version="1.0" ?>
+  <!--
+     **************************************************
+     Yocto-Visualization (for web)  configuration file
+     **************************************************
+  -->
+<ROOT version='2.1'>
+<!-- in 2.1 version, floating point values are saved in CultureInfo.InvariantCulture form -->
+<Config>
+  <UseUSB value="TRUE"/>
+  <UseVirtualHub value="FALSE"/>
+  <Hubs>
+    <Hub protocol="ws" addr="127.0.0.1" />
+  </Hubs>
+  <Colors>
+    <Color value="Blue"/>
+    <Color value="RGB:FF00FF01"/>
+    <Color value="RGB:FFF70001"/>
+    <Color value="HSL:64000000"/>
+    <Color value="HSL:64000033"/>
+    <Color value="HSL:64000066"/>
+    <Color value="HSL:64000099"/>
+    <Color value="HSL:640000CC"/>
+    <Color value="HSL:640000FF"/>
+    <Color value="HSL:6400FF7F"/>
+    <Color value="HSL:642AFF7F"/>
+    <Color value="HSL:6455FF7F"/>
+    <Color value="HSL:6460FF7F"/>
+    <Color value="HSL:647FFF7F"/>
+    <Color value="HSL:64AAFF7F"/>
+  </Colors>
+  <MemoryUsage>
+    <maxPointsPerGraphSerie value= "0"/>
+    <maxDataRecordsPerSensor value= "0"/>
+    <maxPointsPerDataloggerSerie value= "0"/>
+    <deviceListValidity value= "3600"/>
+  </MemoryUsage>
+  <Capture>
+    <Target value= "ToFile"/>
+    <Type value= "PNG"/>
+    <Size value= "Keep"/>
+    <Resolution value= "70"/>
+    <Folder value= ""/>
+    <Width value= "1024"/>
+    <Height value= "1024"/>
+  </Capture>
+  <Updates>
+    <checkForUpdate  value = "True"/>
+    <ignoreBuild  value = "0"/>
+  </Updates>
+  <UI>
+    <VerticalDragZoom value= "False"/>
+    <DbleClickContextMenu value= "False"/>
+  </UI>
+</Config>
+</ROOT></textarea>
+</body>
+<Script type='module'>
+  import { YWebPage }  from './yv4web-full.js';
+  let xmlConfigData = document.getElementById('xmldata').value
+  YWebPage.run(xmlConfigData,null, YWebPage.Dummysave);
+</Script>
+<script nomodule >
+  document.write("<p style='font-family: sans-serif; text-align:center'>Yocto-Visualization (for web) cannot run on this browser. Sorry.<br>Consider using a more recent browser, or <a href='https://www.yoctopuce.com/EN/tools.php'>the native version</a>. </p>")
+</script>
+</html>

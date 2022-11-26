@@ -1,0 +1,17 @@
+<html>
+
+<body>
+<div id="ColorContainer" style="position:absolute;top:20px;left:5px;width:300px;height:300px;border: 1px solid red;background-color:#f0f0f0"></div>
+
+
+
+</body>
+<script type="module">
+import * as YDataRendering from './Renderer/YDataRendererFull.d.ts';
+import * as YoctoVisualization from './YoctoVisualizationFull.d.ts';
+
+let  editor = new  YoctoVisualization.colorEditor(document.getElementById('ColorContainer'),12, YDataRendering.YColor.Yellow,null);
+editor.setTabIndex(1)
+
+</script>
+</html>

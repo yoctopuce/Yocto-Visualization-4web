@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<i>results are shown in the browser console</i>
+</body>
+<script  type='module' src="./pako_original.js"></script>
+<script type="module">
+
+
+    
+import * as YPAKO  from './pako/Pako_full.js';
+import {tester} from './pako/_testTools.js';
+
+
+const samples = await tester.loadSamples();
+
+
+tester.mainrun('ArrayBuffer', async() => {
+
+
+    const sample = await tester.LoadFile('pako/fixtures/samples/lorem_utf_100k.txt')
+    const deflated = YPAKO.Pako_Deflate.deflate(sample);
+
+    tester.run('Deflate ArrayBuffer', () => {
+        tester.assertEqual(deflated, YPAKO.Pako_Deflate.deflate(sample.buffer));
+    });
+
+    const inflated = YPAKO.Pako_Inflate.inflate(deflated.buffer);
+
+    tester.run('Inflate ArrayBuffer', () => {
+        tester.assertEqual(sample, inflated);
+    });
+});
+
+
+console.log("Done.")
+/*-------------------------------------------*/
+
+
+</script>
+
+</html>
+

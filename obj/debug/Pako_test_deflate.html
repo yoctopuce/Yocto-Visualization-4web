@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<i>results are shown in the browser console</i>
+</body>
+<script  type='module' src="./pako_original.js"></script>
+<script type="module">
+
+
+    
+import * as YPAKO  from './pako/Pako_full.js';
+import {tester} from './pako/_testTools.js';
+
+
+const samples = await tester.loadSamples();
+
+
+tester.mainrun('Deflate defaults', () => {
+
+    tester.run('deflate, no options', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, {});
+    });
+
+    tester.run('deflate raw, no options', () => {
+        tester.testSamples(window.pako.deflateRaw, YPAKO.Pako_Deflate.deflateRaw, samples, {});
+    });
+
+    // OS code in header can vary. Use hack flag to ignore it.
+    tester.run('gzip, no options', () => {
+        tester.testSamples(window.pako.gzip,  YPAKO.Pako_Deflate.gzip, samples, { ignore_os: true });
+    });
+});
+
+
+tester.mainrun('Deflate levels', () => {
+
+    tester.run('level 9', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { level: 9 });
+    });
+    tester.run('level 8', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { level: 8 });
+    });
+    tester.run('level 7', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { level: 7 });
+    });
+    tester.run('level 6', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { level: 6 });
+    });
+    tester.run('level 5', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { level: 5 });
+    });
+    tester.run('level 4', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { level: 4 });
+    });
+    tester.run('level 3', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { level: 3 });
+    });
+    tester.run('level 2', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { level: 2 });
+    });
+    tester.run('level 1', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { level: 1 });
+    });
+    tester.skip('level 0', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { level: 0 });
+    });
+    tester.run('level -1 (implicit default)', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { level: -1 });
+    });
+});
+
+
+tester.mainrun('Deflate windowBits', () => {
+
+    tester.run('windowBits 15', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { windowBits: 15 });
+    });
+    tester.run('windowBits 14', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { windowBits: 14 });
+    });
+    tester.run('windowBits 13', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { windowBits: 13 });
+    });
+    tester.run('windowBits 12', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { windowBits: 12 });
+    });
+    tester.run('windowBits 11', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { windowBits: 11 });
+    });
+    tester.run('windowBits 10', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { windowBits: 10 });
+    });
+    tester.run('windowBits 9', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { windowBits: 9 });
+    });
+    tester.run('windowBits 8', () => {
+        tester.testSamples(window.pako.deflate,YPAKO.Pako_Deflate.deflate, samples, { windowBits: 8 });
+    });
+    tester.run('windowBits -15 (implicit raw)', () => {
+        tester.testSamples(window.pako.deflateRaw, YPAKO.Pako_Deflate.deflate, samples, { windowBits: -15 });
+    });
+
+});
+
+
+tester.mainrun('Deflate memLevel', () => {
+
+    tester.run('memLevel 9', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { memLevel: 9 });
+    });
+    tester.run('memLevel 8', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { memLevel: 8 });
+    });
+    tester.run('memLevel 7', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { memLevel: 7 });
+    });
+    tester.run('memLevel 6', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { memLevel: 6 });
+    });
+    tester.run('memLevel 5', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { memLevel: 5 });
+    });
+    tester.run('memLevel 4', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { memLevel: 4 });
+    });
+    tester.run('memLevel 3', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { memLevel: 3 });
+    });
+    tester.run('memLevel 2', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { memLevel: 2 });
+    });
+    tester.run('memLevel 1', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { memLevel: 1 });
+    });
+
+});
+
+
+tester.mainrun('Deflate strategy', () => {
+
+    tester.run('Z_DEFAULT_STRATEGY', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { strategy: 0 });
+    });
+    tester.run('Z_FILTERED', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { strategy: 1 });
+    });
+    tester.run('Z_HUFFMAN_ONLY', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { strategy: 2 });
+    });
+    tester.run('Z_RLE', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { strategy: 3 });
+    });
+    tester.run('Z_FIXED', () => {
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { strategy: 4 });
+    });
+
+});
+
+
+tester.mainrun('Deflate RAW', () => {
+    // Since difference is only in rwapper, test for store/fast/slow methods are enough
+    tester.run('level 4', () => {
+        tester.testSamples(window.pako.deflateRaw, YPAKO.Pako_Deflate.deflateRaw, samples, { level: 4 });
+    });
+    tester.run('level 1', () => {
+        tester.testSamples(window.pako.deflateRaw, YPAKO.Pako_Deflate.deflateRaw, samples, { level: 1 });
+    });
+    tester.skip('level 0', () => {
+        tester.testSamples(window.pako.deflateRaw, YPAKO.Pako_Deflate.deflateRaw, samples, { level: 0 });
+    });
+
+});
+
+
+tester.mainrun('Deflate dictionary', () => {
+
+    tester.run('trivial dictionary', () => {
+        const dict = tester.Buffer_from_string('abcdefghijklmnoprstuvwxyz');
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { dictionary: dict });
+    });
+
+    tester.run('spdy dictionary', async() => {
+        const spdyDict =  await tester.LoadFile ( 'pako/fixtures/spdy_dict.txt');
+
+        tester.testSamples(window.pako.deflate, YPAKO.Pako_Deflate.deflate, samples, { dictionary: spdyDict });
+    });
+
+    tester.run('handles multiple pushes', () => {
+        const dict = tester.Buffer_from_string('abcd');
+        const deflate = new YPAKO.Pako_Deflate({ dictionary: dict });
+
+        deflate.push(tester.Buffer_from_string('hello'), false);
+        deflate.push(tester.Buffer_from_string('hello'), false);
+        deflate.push(tester.Buffer_from_string(' world'), true);
+
+        if (deflate.err) { throw new Error(deflate.err); }
+
+        const uncompressed = YPAKO.Pako_Inflate.inflate(deflate.result, { dictionary: dict });
+
+        tester.assertEqual(
+            new Uint8Array(tester.Buffer_from_string('hellohello world')),
+            uncompressed
+        );
+    });
+});
+
+
+tester.mainrun('Deflate issues', () => {
+
+    tester.run('#78', async() => {
+        const data = await tester.LoadFile ( 'pako/fixtures/issue_78.bin');
+        const deflatedPakoData = YPAKO.Pako_Deflate.deflate(data, { memLevel: 1 });
+        const inflatedPakoData = YPAKO.Pako_Inflate.inflate(deflatedPakoData);
+
+        tester.assertEqual(data.length, inflatedPakoData.length);
+    });
+});
+console.log("Done.")
+</script>
+
+</html>
+

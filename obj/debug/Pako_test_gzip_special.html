@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<i>results are shown in the browser console</i>
+</body>
+<script  type='module' src="./pako_original.js"></script>
+<script type="module">
+
+
+    
+import * as YPAKO  from './pako/Pako_full.js';
+import {tester} from './pako/_testTools.js';
+
+
+
+tester.mainrun('Gzip special cases', () => {
+
+    tester.run('Read custom headers',async  () => {
+        const data = await tester.LoadFile( 'pako/fixtures/gzip-headers.gz');
+        const inflator = new YPAKO.Pako_Inflate();
+        inflator.push(data);
+
+        tester.assertEqual(inflator.header.name, 'test name');
+        tester.assertEqual(inflator.header.comment, 'test comment');
+        tester.assertEqual(tester.a2s(inflator.header.extra), 'test extra');
+    });
+
+    tester.run('Write custom headers', () => {
+        const data = '           ';
+
+        const deflator = new YPAKO.Pako_Deflate({
+            gzip: true,
+            header: {
+                hcrc: true,
+                time: 1234567,
+                os: 15,
+                name: 'test name',
+                comment: 'test comment',
+                extra: [ 4, 5, 6 ]
+            }
+        });
+        deflator.push(data, true);
+
+        const inflator = new pako.Inflate({ to: 'string' });
+        inflator.push(deflator.result);
+
+        tester.assertEqual(inflator.err, 0);
+        tester.assertEqual(inflator.result, data);
+
+        const header = inflator.header;
+        tester.assertEqual(header.time, 1234567);
+        tester.assertEqual(header.os, 15);
+        tester.assertEqual(header.name, 'test name');
+        tester.assertEqual(header.comment, 'test comment');
+        tester.assertEqual(header.extra, new Uint8Array([ 4, 5, 6 ]));
+    });
+
+    tester.run('Read stream with SYNC marks (multistream source, file 1)',async () => {
+        const data =  await tester.LoadFile( 'pako/fixtures/gzip-joined.gz');
+
+        tester.assertEqual(
+            YPAKO.Pako_Inflate.ungzip(data),
+            new Uint8Array(window.pako.ungzip(data))
+        );
+    });
+
+    tester.skip('Read stream with SYNC marks (multistream source, file 2)',async () => {
+        const data =  await tester.LoadFile('pako/fixtures/gzip-joined-bgzip.gz');
+
+        assert.deepStrictEqual(
+            // Currently fails with this chunk size
+            YPAKO.Pako_Inflate.ungzip(data, { chunkSize: 16384 }),
+            new Uint8Array(window.pako.ungzip(data))
+        );
+    });
+
+    tester.run('Write with Z_SYNC_FLUSH', () => {
+        const deflator = new pako.Deflate({ gzip: true });
+
+        let count = 0;
+
+        deflator.onData = function (chunk) {
+            this.chunks.push(chunk);
+            count++;
+        };
+
+        deflator.push('12345', YPAKO.zlib_constants.Z_SYNC_FLUSH);
+        deflator.push('67890', true);
+
+        const flushed = deflator.result;
+        const normal = YPAKO.Pako_Deflate.gzip('1234567890');
+
+        tester.assertEqual(count, 2);
+
+        tester.assertEqual(YPAKO.Pako_Inflate.ungzip(flushed), YPAKO.Pako_Inflate.ungzip(normal));
+        tester.assert(flushed.length > normal.length);
+    });
+
+});
+console.log("Done.")
+
+
+
+</script>
+
+</html>
+

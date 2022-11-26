@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=0.86, maximum-scale=5.0, minimum-scale=0.86">
+</head>
+<body></body>
+<script type="module">
+  import { YWebPage, YoctoHubFileHandler }  from './yv4web-full.min.js';
+  let filehandler = new YoctoHubFileHandler();
+  YWebPage.run(filehandler.xmlConfigData, filehandler.configChangeCallbackFct, filehandler.saveFct );
+
+</script>
+<script nomodule="">
+  document.write("<p style='font-family: sans-serif; text-align:center'>Yocto-Visualization (for web) cannot run on this browser. Sorry.<br>Consider using a more recent browser, or <a href='https://www.yoctopuce.com/EN/tools.php'>the native version</a>. </p>")
+</script>
+</html>

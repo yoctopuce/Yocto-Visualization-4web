@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+
+
+<script>
+    function log(st) {console.log(st);}
+</script>
+<body>
+<canvas width="400" height="200" id="cnvs" style="border:1px solid black"></canvas>
+<script type="module">
+    import * as YDataRendering from "./Renderer/YDataRendererFull.d.ts";
+    function formatDisplay(src,d)
+    { return d.toFixed(2);
+    }
+
+    let canvas = document.getElementById("cnvs");
+    var renderer = new YDataRendering.TestRenderer(canvas,log);
+    renderer.valueFormater = formatDisplay;
+    renderer.AllowRedraw() ;
+    let start =  performance.now();
+    setInterval( ()=>{ renderer.value = 50+50*Math.sin((performance.now() - start) /1000.0) ;} ,10)
+
+</script>
+
+</body>
+</html>

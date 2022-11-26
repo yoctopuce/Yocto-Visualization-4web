@@ -1,0 +1,18 @@
+<!DOCTYPE html/>
+<html lang = 'en' >
+<head >
+  <meta charset = 'UTF-8' >
+  <title>Yocto-Visualization (for web) installer</title>
+</head >
+<body>
+<p style="font-family: Arial;text-align:center;margin-top:50px">
+This is just a simple page showing how to invoke the installer UI and install Yocto-Visualization (for web) on a YoctoHub such as  YoctoHub-Ethernet,  YoctoHub-Wireless, YoctoHub-Cloud and even VirtualHub.
+</p>
+<div id="installerDiv" style="position:absolute; top:50%;left:50%;transform: translate(-50%,-50%);Width:550px; height:360px;border:1px solid grey;font-family:courier"></div>
+</body>
+<Script type='module'>
+  import { YV4W_installer }  from './installer_rw.js';
+  new YV4W_installer(document.getElementById("installerDiv"));
+</Script>
+
+</html>

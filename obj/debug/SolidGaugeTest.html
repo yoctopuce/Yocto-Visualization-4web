@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+
+<script>
+    function log(st) {console.log(st);}
+</script>
+<body>
+<canvas width="200" height="200" id="cnvs1" style="border:1px solid black"></canvas>&nbsp;&nbsp;
+<canvas width="200" height="200" id="cnvs2" style="border:1px solid black"></canvas><br><br>
+<canvas width="200" height="200" id="cnvs3" style="border:1px solid black"></canvas>&nbsp;&nbsp;
+<canvas width="200" height="200" id="cnvs4" style="border:1px solid black;"></canvas>
+
+
+
+<script type="module">
+    import * as YDataRendering from "./Renderer/YDataRendererFull.d.ts";
+    function formatDisplay(src,d)
+    { return d.toFixed(2);
+    }
+
+    let canvas1 = document.getElementById("cnvs1");
+    var renderer1 = new YDataRendering.YSolidGauge(canvas1,YDataRendering.YSolidGauge.DisplayMode.DISPLAY90,log);
+    renderer1.value=0;
+    renderer1.color1= new YDataRendering.YColor(false,255,255,0,0)
+    renderer1.color2= new  YDataRendering.YColor(false,255,0,255,0)
+    renderer1.valueFormater = formatDisplay;
+    renderer1.AllowRedraw() ;
+
+
+    let canvas2 = document.getElementById("cnvs2");
+    var renderer2 = new YDataRendering.YSolidGauge(canvas2,YDataRendering.YSolidGauge.DisplayMode.DISPLAY180,log);
+    renderer2.value=0;
+    renderer2.color1= new YDataRendering.YColor(false,255,255,0,0)
+    renderer2.color2= new  YDataRendering.YColor(false,255,0,255,0)
+    renderer2.valueFormater = formatDisplay;
+    renderer2.AllowRedraw() ;
+
+    let canvas3 = document.getElementById("cnvs3");
+    var renderer3 = new YDataRendering.YSolidGauge(canvas3,YDataRendering.YSolidGauge.DisplayMode.DISPLAY270,log);
+    renderer3.value=0;
+    renderer3.color1= new YDataRendering.YColor(false,255,255,0,0)
+    renderer3.color2= new  YDataRendering.YColor(false,255,0,255,0)
+    renderer3.valueFormater = formatDisplay;
+    renderer3.AllowRedraw() ;
+
+    let canvas4 = document.getElementById("cnvs4");
+    var renderer4 = new YDataRendering.YSolidGauge(canvas4,YDataRendering.YSolidGauge.DisplayMode.DISPLAY360,log);
+    renderer4.value=0;
+    renderer4.color1= new YDataRendering.YColor(false,255,255,0,0)
+    renderer4.color2= new  YDataRendering.YColor(false,255,0,255,0)
+    renderer4.valueFormater = formatDisplay;
+    renderer4.AllowRedraw() ;
+
+
+
+
+    let start =  performance.now();
+    setInterval( ()=>{
+        let value =   50+50*Math.sin((performance.now() - start) /1000.0);
+        renderer1.value = value;
+         renderer2.value = value;
+        renderer3.value = value;
+        renderer4.value = value;
+        } ,40)
+
+</script>
+
+</body>
+</html>

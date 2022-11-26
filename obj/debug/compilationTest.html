@@ -1,0 +1,556 @@
+<!DOCTYPE html/>
+
+<html lang = 'en' >
+<head >
+<meta charset = 'UTF-8' >
+ </head >
+<body>
+<div id="div1" style="position:absolute; top:50px;left:250px;Width:300px; height:200px;border:1px solid #ff0000;font-family:courier">ID="div1"</div>
+<div id="div2" style="position:absolute;top:300px;left:300px;Width:300px; height:300px;border:1px solid #ff0000;font-family:courier">ID="div2"</div>
+<div id="div3" style="position:absolute;left:50%;top:50%;transform:translate(-50%, -50%) rotate(0deg);width:20%;height:20%;;border:1px solid #ff0000;font-family:courier">ID="div3"</div>
+
+
+<textarea id = 'xmldata' style = 'visibility:hidden' >
+<?xml version="1.0" ?>
+  <!--
+     **************************************************
+     Yocto-Visualization (for web)  configuration file
+     **************************************************
+  -->
+<ROOT version='2.1'>
+<!-- in 2.1 version, floating point values are saved in CultureInfo.InvariantCulture form -->
+<Config>
+  <UseUSB value="TRUE"/>
+  <UseVirtualHub value="FALSE"/>
+  <Hubs>
+    <Hub protocol="ws" addr="127.0.0.1" />
+  </Hubs>
+  <Colors>
+    <Color value="Blue"/>
+    <Color value="RGB:FF00FF01"/>
+    <Color value="RGB:FFF70001"/>
+    <Color value="HSL:64000000"/>
+    <Color value="HSL:64000033"/>
+    <Color value="HSL:64000066"/>
+    <Color value="HSL:64000099"/>
+    <Color value="HSL:640000CC"/>
+    <Color value="HSL:640000FF"/>
+    <Color value="HSL:6400FF7F"/>
+    <Color value="HSL:642AFF7F"/>
+    <Color value="HSL:6455FF7F"/>
+    <Color value="HSL:6460FF7F"/>
+    <Color value="HSL:647FFF7F"/>
+    <Color value="HSL:64AAFF7F"/>
+  </Colors>
+  <MemoryUsage>
+    <maxPointsPerGraphSerie value= "0"/>
+    <maxDataRecordsPerSensor value= "0"/>
+    <maxPointsPerDataloggerSerie value= "0"/>
+    <deviceListValidity value= "3600"/>
+  </MemoryUsage>
+  <Capture>
+    <Target value= "ToFile"/>
+    <Type value= "PNG"/>
+    <Size value= "Keep"/>
+    <Resolution value= "70"/>
+    <Folder value= ""/>
+    <Width value= "1024"/>
+    <Height value= "1024"/>
+  </Capture>
+  <Updates>
+    <checkForUpdate  value = "True"/>
+    <ignoreBuild  value = "0"/>
+  </Updates>
+  <UI>
+    <VerticalDragZoom value= "False"/>
+    <DbleClickContextMenu value= "False"/>
+  </UI>
+</Config>
+<GraphForm>
+  <location x='0' y='0'/>
+  <size     w='960' h='460'  state='Normal'/>
+  <relativeCoord x='0' y='0' w='100' h='100' active='True'/>
+  <container id='div3'/>
+  <Graph_series0>
+    <DataSource_source value="LIGHTMK2-956EB.lightSensor"/>
+    <DataSource_datatype value="0"/>
+    <thickness value="2"/>
+    <legend value=""/>
+    <color value="Tomato"/>
+    <yAxisIndex value="0"/>
+  </Graph_series0>
+  <Graph_series1>
+    <DataSource_source value="NULL"/>
+    <DataSource_datatype value="0"/>
+    <thickness value="2"/>
+    <legend value=""/>
+    <color value="DodgerBlue"/>
+    <yAxisIndex value="0"/>
+  </Graph_series1>
+  <Graph_series2>
+    <DataSource_source value="NULL"/>
+    <DataSource_datatype value="0"/>
+    <thickness value="2"/>
+    <legend value=""/>
+    <color value="SeaGreen"/>
+    <yAxisIndex value="0"/>
+  </Graph_series2>
+  <Graph_series3>
+    <DataSource_source value="NULL"/>
+    <DataSource_datatype value="0"/>
+    <thickness value="2"/>
+    <legend value=""/>
+    <color value="Gold"/>
+    <yAxisIndex value="0"/>
+  </Graph_series3>
+  <Graph_showRecordedData value="FALSE"/>
+  <Graph_borderColor value="LightGray"/>
+  <Graph_borderThickness value="1"/>
+  <Graph_bgColor1 value="Gainsboro"/>
+  <Graph_bgColor2 value="RGB:37F0F0F0"/>
+  <Graph_resizeRule value="FIXED"/>
+  <Graph_xAxis>
+    <initialZoom value="60"/>
+    <position value="BOTTOM"/>
+    <timeReference value="ABSOLUTE"/>
+    <overflowHandling value="SCROLL"/>
+    <color value="RGB:FF7F7F7F"/>
+    <thickness value="1"/>
+    <showGrid value="FALSE"/>
+    <gridColor value="RGB:32000000"/>
+    <gridThickness value="1"/>
+    <font>
+      <name value="Arial"/>
+      <size value="10"/>
+      <color value="Black"/>
+      <italic value="FALSE"/>
+      <bold value="FALSE"/>
+    </font>
+    <legend>
+      <title value=""/>
+      <font>
+        <name value="Arial"/>
+        <size value="12"/>
+        <color value="Black"/>
+        <italic value="FALSE"/>
+        <bold value="TRUE"/>
+      </font>
+    </legend>
+    <markers0>
+      <enabled value="FALSE"/>
+      <text value="Marker 1"/>
+      <textAlign value="CENTER"/>
+      <positionOnXAxis value="1612075370.52" relative="False"/>
+      <yposition value="95"/>
+      <bgColor value="RGB:C8FFFFC0"/>
+      <borderColor value="DarkRed"/>
+      <borderthickness value="1"/>
+      <padding value="5"/>
+      <font>
+        <name value="Arial"/>
+        <size value="7"/>
+        <color value="Black"/>
+        <italic value="FALSE"/>
+        <bold value="FALSE"/>
+      </font>
+    </markers0>
+    <markers1>
+      <enabled value="FALSE"/>
+      <text value="Marker 2"/>
+      <textAlign value="CENTER"/>
+      <positionOnXAxis value="1612075370.52" relative="False"/>
+      <yposition value="95"/>
+      <bgColor value="RGB:C8FFFFC0"/>
+      <borderColor value="DarkRed"/>
+      <borderthickness value="1"/>
+      <padding value="5"/>
+      <font>
+        <name value="Arial"/>
+        <size value="7"/>
+        <color value="Black"/>
+        <italic value="FALSE"/>
+        <bold value="FALSE"/>
+      </font>
+    </markers1>
+    <markers2>
+      <enabled value="FALSE"/>
+      <text value="Marker 3"/>
+      <textAlign value="CENTER"/>
+      <positionOnXAxis value="1612075370.52" relative="False"/>
+      <yposition value="95"/>
+      <bgColor value="RGB:C8FFFFC0"/>
+      <borderColor value="DarkRed"/>
+      <borderthickness value="1"/>
+      <padding value="5"/>
+      <font>
+        <name value="Arial"/>
+        <size value="7"/>
+        <color value="Black"/>
+        <italic value="FALSE"/>
+        <bold value="FALSE"/>
+      </font>
+    </markers2>
+    <markers3>
+      <enabled value="FALSE"/>
+      <text value="Marker 4"/>
+      <textAlign value="CENTER"/>
+      <positionOnXAxis value="1612075370.52" relative="False"/>
+      <yposition value="95"/>
+      <bgColor value="RGB:C8FFFFC0"/>
+      <borderColor value="DarkRed"/>
+      <borderthickness value="1"/>
+      <padding value="5"/>
+      <font>
+        <name value="Arial"/>
+        <size value="7"/>
+        <color value="Black"/>
+        <italic value="FALSE"/>
+        <bold value="FALSE"/>
+      </font>
+    </markers3>
+    <markers4>
+      <enabled value="FALSE"/>
+      <text value="Marker 5"/>
+      <textAlign value="CENTER"/>
+      <positionOnXAxis value="1612075370.52" relative="False"/>
+      <yposition value="95"/>
+      <bgColor value="RGB:C8FFFFC0"/>
+      <borderColor value="DarkRed"/>
+      <borderthickness value="1"/>
+      <padding value="5"/>
+      <font>
+        <name value="Arial"/>
+        <size value="7"/>
+        <color value="Black"/>
+        <italic value="FALSE"/>
+        <bold value="FALSE"/>
+      </font>
+    </markers4>
+    <markers5>
+      <enabled value="FALSE"/>
+      <text value="Marker 6"/>
+      <textAlign value="CENTER"/>
+      <positionOnXAxis value="1612075370.52" relative="False"/>
+      <yposition value="95"/>
+      <bgColor value="RGB:C8FFFFC0"/>
+      <borderColor value="DarkRed"/>
+      <borderthickness value="1"/>
+      <padding value="5"/>
+      <font>
+        <name value="Arial"/>
+        <size value="7"/>
+        <color value="Black"/>
+        <italic value="FALSE"/>
+        <bold value="FALSE"/>
+      </font>
+    </markers5>
+    <markers6>
+      <enabled value="FALSE"/>
+      <text value="Marker 7"/>
+      <textAlign value="CENTER"/>
+      <positionOnXAxis value="1612075370.52" relative="False"/>
+      <yposition value="95"/>
+      <bgColor value="RGB:C8FFFFC0"/>
+      <borderColor value="DarkRed"/>
+      <borderthickness value="1"/>
+      <padding value="5"/>
+      <font>
+        <name value="Arial"/>
+        <size value="7"/>
+        <color value="Black"/>
+        <italic value="FALSE"/>
+        <bold value="FALSE"/>
+      </font>
+    </markers6>
+    <markers7>
+      <enabled value="FALSE"/>
+      <text value="Marker 8"/>
+      <textAlign value="CENTER"/>
+      <positionOnXAxis value="1612075370.52" relative="False"/>
+      <yposition value="95"/>
+      <bgColor value="RGB:C8FFFFC0"/>
+      <borderColor value="DarkRed"/>
+      <borderthickness value="1"/>
+      <padding value="5"/>
+      <font>
+        <name value="Arial"/>
+        <size value="7"/>
+        <color value="Black"/>
+        <italic value="FALSE"/>
+        <bold value="FALSE"/>
+      </font>
+    </markers7>
+  </Graph_xAxis>
+  <Graph_yAxes0>
+    <visible value="TRUE"/>
+    <position value="LEFT"/>
+    <min value="NaN"/>
+    <max value="NaN"/>
+    <step value="NaN"/>
+    <color value="RGB:FF7F7F7F"/>
+    <thickness value="1"/>
+    <showGrid value="TRUE"/>
+    <gridColor value="RGB:FFD2D2D2"/>
+    <gridThickness value="1"/>
+    <font>
+      <name value="Arial"/>
+      <size value="10"/>
+      <color value="Black"/>
+      <italic value="FALSE"/>
+      <bold value="FALSE"/>
+    </font>
+    <legend>
+      <title value=""/>
+      <font>
+        <name value="Arial"/>
+        <size value="12"/>
+        <color value="Black"/>
+        <italic value="FALSE"/>
+        <bold value="TRUE"/>
+      </font>
+    </legend>
+    <zones0>
+      <visible value="FALSE"/>
+      <min value="0"/>
+      <max value="50"/>
+      <color value="LightGreen"/>
+    </zones0>
+    <zones1>
+      <visible value="FALSE"/>
+      <min value="50"/>
+      <max value="80"/>
+      <color value="Yellow"/>
+    </zones1>
+    <zones2>
+      <visible value="FALSE"/>
+      <min value="80"/>
+      <max value="100"/>
+      <color value="Red"/>
+    </zones2>
+  </Graph_yAxes0>
+  <Graph_yAxes1>
+    <visible value="FALSE"/>
+    <position value="RIGHT"/>
+    <min value="NaN"/>
+    <max value="NaN"/>
+    <step value="NaN"/>
+    <color value="RGB:FF7F7F7F"/>
+    <thickness value="1"/>
+    <showGrid value="FALSE"/>
+    <gridColor value="RGB:FFD2D2D2"/>
+    <gridThickness value="1"/>
+    <font>
+      <name value="Arial"/>
+      <size value="10"/>
+      <color value="Black"/>
+      <italic value="FALSE"/>
+      <bold value="FALSE"/>
+    </font>
+    <legend>
+      <title value=""/>
+      <font>
+        <name value="Arial"/>
+        <size value="12"/>
+        <color value="Black"/>
+        <italic value="FALSE"/>
+        <bold value="TRUE"/>
+      </font>
+    </legend>
+    <zones0>
+      <visible value="FALSE"/>
+      <min value="0"/>
+      <max value="50"/>
+      <color value="LightGreen"/>
+    </zones0>
+    <zones1>
+      <visible value="FALSE"/>
+      <min value="50"/>
+      <max value="80"/>
+      <color value="Yellow"/>
+    </zones1>
+    <zones2>
+      <visible value="FALSE"/>
+      <min value="80"/>
+      <max value="100"/>
+      <color value="Red"/>
+    </zones2>
+  </Graph_yAxes1>
+  <Graph_yAxes2>
+    <visible value="FALSE"/>
+    <position value="RIGHT"/>
+    <min value="NaN"/>
+    <max value="NaN"/>
+    <step value="NaN"/>
+    <color value="RGB:FF7F7F7F"/>
+    <thickness value="1"/>
+    <showGrid value="FALSE"/>
+    <gridColor value="RGB:FFD2D2D2"/>
+    <gridThickness value="1"/>
+    <font>
+      <name value="Arial"/>
+      <size value="10"/>
+      <color value="Black"/>
+      <italic value="FALSE"/>
+      <bold value="FALSE"/>
+    </font>
+    <legend>
+      <title value=""/>
+      <font>
+        <name value="Arial"/>
+        <size value="12"/>
+        <color value="Black"/>
+        <italic value="FALSE"/>
+        <bold value="TRUE"/>
+      </font>
+    </legend>
+    <zones0>
+      <visible value="FALSE"/>
+      <min value="0"/>
+      <max value="50"/>
+      <color value="LightGreen"/>
+    </zones0>
+    <zones1>
+      <visible value="FALSE"/>
+      <min value="50"/>
+      <max value="80"/>
+      <color value="Yellow"/>
+    </zones1>
+    <zones2>
+      <visible value="FALSE"/>
+      <min value="80"/>
+      <max value="100"/>
+      <color value="Red"/>
+    </zones2>
+  </Graph_yAxes2>
+  <Graph_legendPanel>
+    <enabled value="FALSE"/>
+    <overlap value="FALSE"/>
+    <position value="RIGHT"/>
+    <font>
+      <name value="Arial"/>
+      <size value="7"/>
+      <color value="RGB:FF202020"/>
+      <italic value="FALSE"/>
+      <bold value="TRUE"/>
+    </font>
+    <bgColor value="RGB:C8FFFFFF"/>
+    <borderColor value="Black"/>
+    <borderthickness value="1"/>
+    <padding value="10"/>
+    <verticalMargin value="10"/>
+    <horizontalMargin value="10"/>
+    <traceWidthFactor value="1"/>
+  </Graph_legendPanel>
+  <Graph_dataTracker>
+    <enabled value="FALSE"/>
+    <showSerieName value="FALSE"/>
+    <showTimeStamp value="FALSE"/>
+    <dataPrecision value="PRECISION_NOLIMIT"/>
+    <diameter value="5"/>
+    <handleLength value="25"/>
+    <font>
+      <name value="Arial"/>
+      <size value="7"/>
+      <color value="RGB:FF202020"/>
+      <italic value="FALSE"/>
+      <bold value="FALSE"/>
+    </font>
+    <bgColor value="RGB:C8FFFFFF"/>
+    <borderColor value="Black"/>
+    <borderthickness value="1"/>
+    <padding value="5"/>
+    <detectionDistance value="50"/>
+  </Graph_dataTracker>
+  <Graph_navigator>
+    <enabled value="FALSE"/>
+    <bgColor1 value="RGB:FFE1E1E1"/>
+    <bgColor2 value="RGB:FFE1E1E1"/>
+    <borderThickness value="1"/>
+    <borderColor value="Black"/>
+    <cursorColor value="RGB:1900FF00"/>
+    <cursorBorderColor value="RGB:FF606060"/>
+    <yAxisHandling value="AUTO"/>
+    <xAxisThickness value="1"/>
+    <xAxisColor value="Black"/>
+    <font>
+      <name value="Arial"/>
+      <size value="7"/>
+      <color value="RGB:FF202020"/>
+      <italic value="FALSE"/>
+      <bold value="FALSE"/>
+    </font>
+  </Graph_navigator>
+  <Graph_annotationPanels0>
+    <enabled value="FALSE"/>
+    <overlap value="FALSE"/>
+    <text value="Date: $DAY$/$MONTH$/$YEAR$"/>
+    <panelTextAlign value="CENTER"/>
+    <panelHrzAlign value="CENTER"/>
+    <positionOffsetX value="0"/>
+    <panelVrtAlign value="TOP"/>
+    <positionOffsetY value="0"/>
+    <font>
+      <name value="Arial"/>
+      <size value="12"/>
+      <color value="RGB:FF202020"/>
+      <italic value="FALSE"/>
+      <bold value="FALSE"/>
+    </font>
+    <bgColor value="RGB:C8FFFFFF"/>
+    <borderColor value="Black"/>
+    <borderthickness value="1"/>
+    <padding value="5"/>
+  </Graph_annotationPanels0>
+  <Graph_annotationPanels1>
+    <enabled value="FALSE"/>
+    <overlap value="FALSE"/>
+    <text value="Date: $DAY$/$MONTH$/$YEAR$"/>
+    <panelTextAlign value="CENTER"/>
+    <panelHrzAlign value="CENTER"/>
+    <positionOffsetX value="0"/>
+    <panelVrtAlign value="TOP"/>
+    <positionOffsetY value="0"/>
+    <font>
+      <name value="Arial"/>
+      <size value="12"/>
+      <color value="RGB:FF202020"/>
+      <italic value="FALSE"/>
+      <bold value="FALSE"/>
+    </font>
+    <bgColor value="RGB:C8FFFFFF"/>
+    <borderColor value="Black"/>
+    <borderthickness value="1"/>
+    <padding value="5"/>
+  </Graph_annotationPanels1>
+  <Form_Text value="New Graph"/>
+  <Form_BackColor value="RGB:FFF0F0F0"/>
+  <Form_BorderColor value="LightGray"/>
+</GraphForm>
+<Sensors>
+<Sensor ID="LIGHTMK4-17100E.lightSensor">
+<Alarm Source="0" Condition="0" Value="0" Cmd="" Delay="15"/>
+<Alarm Source="0" Condition="0" Value="0" Cmd="" Delay="15"/>
+</Sensor>
+<Sensor ID="LIGHTMK2-956EB.lightSensor">
+<Alarm Source="0" Condition="0" Value="0" Cmd="" Delay="15"/>
+<Alarm Source="0" Condition="0" Value="0" Cmd="" Delay="15"/>
+</Sensor>
+<Sensor ID="METEOMK1-5BF7C.temperature">
+</Sensor>
+<Sensor ID="METEOMK1-5BF7C.pressure">
+</Sensor>
+<Sensor ID="METEOMK1-5BF7C.humidity">
+</Sensor>
+</Sensors>
+</ROOT></textarea>
+</body>
+ <Script type='module'>
+
+  import * as YoctoVisualization from './output.js';
+  let xmlConfigData = document.getElementById('xmldata').value
+  YWebPage.run(xmlConfigData  ,YoctoVisualization.YWebPage.Dummysave);
+ </Script>
+<script nomodule >
+document.write("<p style='font-family: sans-serif; text-align:center'>Yocto-Visualization (for web) cannot run on this browser. Sorry.<br>Consider using a more recent browser, or <a href='https://www.yoctopuce.com/EN/tools.php'>the native version</a>. </p>")
+</script>
+</html>
