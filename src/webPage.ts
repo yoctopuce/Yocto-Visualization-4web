@@ -625,12 +625,11 @@ export class YWebPage
 
     //#ifndef READONLY
 
-    private static  NewVersionSizeX  : number =350;
-    private static  NewVersionSizeY  : number =75;
+
     private static NewVersionmessageDiv : HTMLDivElement;
 
     private static AnimateNewVerwsionMessage(step :number)
-    { YWebPage.NewVersionmessageDiv.style.left = Math.round((100-step)*YWebPage.NewVersionSizeX /100  )+"px"
+    { YWebPage.NewVersionmessageDiv.style.left = Math.round((100-step))+"%";
       if (step<100)
         { step+=2;
             if (step>100) step=100;
@@ -649,7 +648,7 @@ export class YWebPage
            installerDiv.style.transform="translate(-50%,-50%)";
            installerDiv.style.width="550px";
            installerDiv.style.height="380px";
-           installerDiv.style.zIndex="999999";
+           installerDiv.style.zIndex=  YWebPage.getTopZIndex().toString();
            installerDiv.style.border="1px solid black";
            installerDiv.style.boxShadow="rgba(0, 0, 0, 0.05) 4px 4px 4px 1px";
            document.body.appendChild(installerDiv);
@@ -716,14 +715,32 @@ export class YWebPage
         document.body.removeChild(YWebPage.NewVersionmessageDiv.parentNode as Node);
     }
 
+    private static getTopZIndex() : number
+    {  var elems :  HTMLCollectionOf<HTMLDivElement> = document.getElementsByTagName("DIV") as HTMLCollectionOf<HTMLDivElement> ;
+        var highestZ :number = 0;
+        for (var i :number = 0; i < elems.length; i++)
+        { var z :number = Number.parseInt( window.getComputedStyle(elems[i] ,null).getPropertyValue( "z-index"));
+            if (z > highestZ) highestZ =z;
+
+        }
+        return highestZ+1;
+    }
+
     private static CheckForNewVersion()
     {   if (!YoctoVisualization.constants.mustCheckForUpdate) return;
 
+
+
+
+        let generalSize : number =YoctoVisualization.constants.generalFontSize;
+        let  NewVersionSizeX  : number =generalSize*24;
+        let  NewVersionSizeY  : number =generalSize*5;
+
         let containerDiv : HTMLDivElement = document.createElement("DIV") as HTMLDivElement;
         containerDiv.style.position="absolute";
-        containerDiv.style.width=YWebPage.NewVersionSizeX+"px";
-        containerDiv.style.height=YWebPage.NewVersionSizeY+"px";
-
+        containerDiv.style.width=NewVersionSizeX+"px";
+        containerDiv.style.height=NewVersionSizeY+"px";
+        containerDiv.style.zIndex=  YWebPage.getTopZIndex().toString();
 
         containerDiv.style.top="5px";
         containerDiv.style.right="0px";
@@ -732,33 +749,39 @@ export class YWebPage
 
         YWebPage.NewVersionmessageDiv = document.createElement("DIV") as HTMLDivElement;
         YWebPage.NewVersionmessageDiv.style.position="absolute";
-        YWebPage.NewVersionmessageDiv.style.width=(YWebPage.NewVersionSizeX-7)+"px";
-        YWebPage.NewVersionmessageDiv.style.height=(YWebPage.NewVersionSizeY-2)+"px";
+        YWebPage.NewVersionmessageDiv.style.width=(NewVersionSizeX-7)+"px";
+        YWebPage.NewVersionmessageDiv.style.height=(NewVersionSizeY-2)+"px";
         YWebPage.NewVersionmessageDiv.style.backgroundColor="GhostWhite";
         YWebPage.NewVersionmessageDiv.style.border="1px solid dimgray";
 
         YWebPage.NewVersionmessageDiv.style.top="0px";
-        YWebPage.NewVersionmessageDiv.style.left=YWebPage.NewVersionSizeX+"px";
-        YWebPage.NewVersionmessageDiv.style.fontFamily=YoctoVisualization.constants.generalFontFamily;
-        YWebPage.NewVersionmessageDiv.style.fontSize="10px";
+        YWebPage.NewVersionmessageDiv.style.left=NewVersionSizeX+"px";
+
 
         let table : HTMLTableElement = document.createElement("TABLE") as HTMLTableElement;
+
+        table.style.fontFamily=YoctoVisualization.constants.generalFontFamily;
+        table.style.fontSize=generalSize+"px";
         let TR  :  HTMLTableRowElement = document.createElement("TR") as HTMLTableRowElement;
 
         let TD1  :  HTMLTableCellElement = document.createElement("TD") as HTMLTableCellElement;
         TD1.style.paddingLeft="5px";
         TD1.style.paddingRight="10px";
         TD1.rowSpan=2;
-        TD1.innerHTML=  YoctoVisualization.ressources.infoIcon("32", false, false, false, false, "information")
+        TD1.style.verticalAlign="middle";
+        TD1.innerHTML=  YoctoVisualization.ressources.infoIcon((generalSize*4).toString(), false, false, false, false, "information")
         TR.appendChild(TD1)
         let TD2  :  HTMLTableCellElement = document.createElement("TD") as HTMLTableCellElement;
-        TD2.innerHTML=  "A new Yocto-Visualitation (for web)<br>version is available";
+
+        TD2.innerHTML=  "A new Yocto-Visualization (for web)<br>version is available";
         TR.appendChild(TD2)
         table.appendChild(TR);
 
         TR   =  document.createElement("TR") as HTMLTableRowElement;
         TD2  =  document.createElement("TD") as HTMLTableCellElement;
         TD2.style.textAlign="right";
+        TD2.style.verticalAlign="bottom";
+
 
         let hubList: YoctoVisualization.Hub[] = YoctoVisualization.sensorsManager.hubList;
         let rootHub : YoctoVisualization.Hub | null  =null;
@@ -773,6 +796,8 @@ export class YWebPage
         a.style.color=" #0000EE"
         a.style.textDecoration="underline";
         a.style.cursor="pointer";
+        a.style.fontFamily=YoctoVisualization.constants.generalFontFamily;
+        a.style.fontSize=generalSize+"px";
 
        if (rootHub!=null)
         {   a.innerText="Download and start installer..";

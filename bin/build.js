@@ -190,7 +190,7 @@ async function bundleRenderer(objdir, target, banner) {
         target: target,
         format: fmt,
         globalName: 'Renderer',
-        sourcemap: true,
+        sourcemap: false,
         banner: banner,
         outfile: 'dist/' + target + '/yv4web-renderer.js',
     });
@@ -200,7 +200,7 @@ async function bundleRenderer(objdir, target, banner) {
         target: target,
         format: fmt,
         globalName: 'Renderer',
-        sourcemap: true,
+        sourcemap: false,
         minify: true,
         banner: banner,
         outfile: 'dist/' + target + '/yv4web-renderer.min.js',
@@ -221,7 +221,7 @@ async function bundle(objdir, target, bundleName, banner) {
         bundle: true,
         target: target,
         format: 'esm',
-        sourcemap: true,
+        sourcemap: false,
         minify: true,
         banner: banner,
         outfile: 'dist/' + target + '/' + bundleName + '.min.js',
@@ -257,11 +257,27 @@ async function bundleInstaller(objdir, target, bundleName, banner) {
         bundle: true,
         target: target,
         format: 'esm',
-        sourcemap: true,
+        sourcemap: false,
         minify: true,
         banner: banner,
         outfile: 'dist/' + target + '/' + bundleName + '.min.js',
     });
+}
+async function cleanup(full) {
+    // Cleanup intermediate object files
+    let objFiles = findFilesRecursively('obj', /\.(ts|js|map)$/);
+    for (let file of objFiles) {
+        fs.unlinkSync(file);
+    }
+    if (full) {
+        // Cleanup all files
+        let distFiles = findFilesRecursively('dist', /\.(js|map)$/);
+        for (let file of distFiles) {
+            fs.unlinkSync(file);
+        }
+    }
+    fs.unlinkSync('bin/build.js.map');
+    fs.unlinkSync('bin/build.js');
 }
 let args = process.argv.slice(2);
 if (args.length == 0) {
@@ -297,6 +313,12 @@ else {
                     bundleInstaller('obj/full', 'es2017', 'yv4web-installer', '/* Yocto-Visualization-4web installer (version ' + json.version + ') - www.yoctopuce.com */');
                 });
             }
+            break;
+        case "cleanup-release":
+            cleanup(false);
+            break;
+        case "cleanup-full":
+            cleanup(true);
             break;
     }
 }

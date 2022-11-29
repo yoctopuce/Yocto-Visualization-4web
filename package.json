@@ -2,7 +2,7 @@
   "name": "yocto-visualization-4web",
   "author": "Yoctopuce",
   "description": "Yoctopuce web-based sensor visualization application",
-  "version": "1.10.51774",
+  "version": "1.10.51840",
   "license": "SEE LICENSE IN LICENSE.txt",
   "repository": {
     "type": "git",
@@ -32,7 +32,9 @@
     "build": "npm run build_tools && npm run build_both",
     "installer": "node --enable-source-maps bin/app-server.js dist/es2017/yv4web-installer.html",
     "app-server": "node --enable-source-maps bin/app-server.js dist/es2017/app.html",
-    "app-test": "node --enable-source-maps bin/app-server.js dist/es2017/test.html"
+    "app-test": "node --enable-source-maps bin/app-server.js dist/es2017/test.html",
+    "cleanup-release": "node --enable-source-maps bin/build.js cleanup-release",
+    "cleanup-full": "node --enable-source-maps bin/build.js cleanup-full"
   },
   "bin": {
     "app-server": "bin/app-server.js"

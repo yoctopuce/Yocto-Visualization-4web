@@ -1,4 +1,4 @@
-/* Yocto-Visualization-4web (ES2015 read-only 1.10.51774) - www.yoctopuce.com */
+/* Yocto-Visualization-4web (ES2015 read-only 1.10.51840) - www.yoctopuce.com */
 // obj/rdonly/Renderer/YDataRendererCommon.js
 var Vector3 = class {
   constructor(a, b, c) {
@@ -193,15 +193,6 @@ var ViewPortSettings = class {
   }
 };
 var YFont = class {
-  get userData() {
-    return this._userData;
-  }
-  set userData(value) {
-    this._userData = value;
-  }
-  get directParent() {
-    return this._directParent;
-  }
   constructor(parentRenderer, directParent, size, fontChangeCallback) {
     this._userData = null;
     this._fontChangeCallback = null;
@@ -216,6 +207,15 @@ var YFont = class {
     this._directParent = directParent;
     this._fontChangeCallback = fontChangeCallback ? fontChangeCallback : null;
     this._size = new Proportional(size ? size : 10, Proportional.ResizeRule.FIXED, parentRenderer, this, this.ResetFont);
+  }
+  get userData() {
+    return this._userData;
+  }
+  set userData(value) {
+    this._userData = value;
+  }
+  get directParent() {
+    return this._directParent;
   }
   ResetFont(source) {
     this._font = null;
@@ -388,6 +388,14 @@ var YStringBuilder = class {
   }
 };
 var YStringFormat = class {
+  constructor(clip) {
+    this._Alignment = 0;
+    this._LineAlignment = 0;
+    this._formatFlags = 0;
+    this._Trimming = 0;
+    this._clip = 16384;
+    this._clip = clip;
+  }
   get Alignment() {
     return this._Alignment;
   }
@@ -412,16 +420,37 @@ var YStringFormat = class {
   set Trimming(value) {
     this._Trimming = value;
   }
-  constructor(clip) {
-    this._Alignment = 0;
-    this._LineAlignment = 0;
-    this._formatFlags = 0;
-    this._Trimming = 0;
-    this._clip = 16384;
-    this._clip = clip;
-  }
 };
 var YColor = class {
+  constructor(isHsl, transparency, r_h, g_s, b_l, isPredefined) {
+    this.hslConvertionDone = false;
+    this.rgbConvertionDone = false;
+    this.transparency = 0;
+    this.r = 0;
+    this.g = 0;
+    this.b = 0;
+    this.h = 0;
+    this.s = 0;
+    this.l = 0;
+    this._name = "";
+    this._htmlcode = this.computeHTMLCode();
+    this.hslConvertionDone = isHsl;
+    this.isHSLColor = isHsl;
+    this.transparency = transparency;
+    this._isPredefined = isPredefined === true;
+    if (isHsl) {
+      this.h = r_h;
+      this.s = g_s;
+      this.l = b_l;
+      this.hsl2rgb();
+    } else {
+      this.r = r_h;
+      this.g = g_s;
+      this.b = b_l;
+      this.rgbConvertionDone = true;
+    }
+    this._htmlcode = this.computeHTMLCode();
+  }
   get name() {
     return this._name;
   }
@@ -684,35 +713,6 @@ var YColor = class {
   get isPredefined() {
     return this._isPredefined;
   }
-  constructor(isHsl, transparency, r_h, g_s, b_l, isPredefined) {
-    this.hslConvertionDone = false;
-    this.rgbConvertionDone = false;
-    this.transparency = 0;
-    this.r = 0;
-    this.g = 0;
-    this.b = 0;
-    this.h = 0;
-    this.s = 0;
-    this.l = 0;
-    this._name = "";
-    this._htmlcode = this.computeHTMLCode();
-    this.hslConvertionDone = isHsl;
-    this.isHSLColor = isHsl;
-    this.transparency = transparency;
-    this._isPredefined = isPredefined === true;
-    if (isHsl) {
-      this.h = r_h;
-      this.s = g_s;
-      this.l = b_l;
-      this.hsl2rgb();
-    } else {
-      this.r = r_h;
-      this.g = g_s;
-      this.b = b_l;
-      this.rgbConvertionDone = true;
-    }
-    this._htmlcode = this.computeHTMLCode();
-  }
   computeHTMLCode() {
     let a = this.transparency / 255;
     let r = this.r;
@@ -971,15 +971,6 @@ var captureParametersSet = class {
   }
 };
 var GenericPanel = class {
-  get userData() {
-    return this._userData;
-  }
-  set userData(value) {
-    this._userData = value;
-  }
-  get directParent() {
-    return this._directParent;
-  }
   constructor(parent, directParent) {
     this._userData = null;
     this._enabled = false;
@@ -997,6 +988,15 @@ var GenericPanel = class {
     this._directParent = directParent;
     this._parentRenderer = parent;
     this._font = new YFont(parent, this, 8, null);
+  }
+  get userData() {
+    return this._userData;
+  }
+  set userData(value) {
+    this._userData = value;
+  }
+  get directParent() {
+    return this._directParent;
   }
   get enabled() {
     return this._enabled;
@@ -1222,6 +1222,16 @@ var AnnotationPanel = class extends GenericPanel {
   }
 };
 var Zone = class {
+  constructor(parentRenderer, directParent) {
+    this._userData = null;
+    this._zoneBrush = null;
+    this._color = YColor.Red;
+    this._visible = false;
+    this._min = 0;
+    this._max = 100;
+    this._directParent = directParent;
+    this._parentRenderer = parentRenderer;
+  }
   get directParent() {
     return this._directParent;
   }
@@ -1232,16 +1242,6 @@ var Zone = class {
     this._userData = value;
   }
   resetCache() {
-  }
-  constructor(parentRenderer, directParent) {
-    this._userData = null;
-    this._zoneBrush = null;
-    this._color = YColor.Red;
-    this._visible = false;
-    this._min = 0;
-    this._max = 100;
-    this._directParent = directParent;
-    this._parentRenderer = parentRenderer;
   }
   get zoneBrush() {
     if (this._zoneBrush == null)
@@ -1299,6 +1299,22 @@ var Zone = class {
   }
 };
 var Proportional = class {
+  constructor(value, resizeRule, parentRenderer, directParent, resetCallBack) {
+    this._reset = null;
+    this._refWidth = 1;
+    this._refHeight = 1;
+    this._refValue = 1;
+    this.valueStack = [];
+    this._resizeRule = Proportional.ResizeRule.FIXED;
+    this._userData = null;
+    this._reset = resetCallBack;
+    this._parentRenderer = parentRenderer;
+    this._value = value;
+    this._resizeRule = resizeRule;
+    this._directParent = directParent;
+    this.set_refPoint();
+    this._parentRenderer.AddNewProportionalToSizeValue(this);
+  }
   get userData() {
     return this._userData;
   }
@@ -1328,22 +1344,6 @@ var Proportional = class {
     this._refWidth = Math.max(1, this._parentRenderer.usableUiWidth());
     this._refHeight = Math.max(1, this._parentRenderer.usableUiHeight());
     this._refValue = this._value;
-  }
-  constructor(value, resizeRule, parentRenderer, directParent, resetCallBack) {
-    this._reset = null;
-    this._refWidth = 1;
-    this._refHeight = 1;
-    this._refValue = 1;
-    this.valueStack = [];
-    this._resizeRule = Proportional.ResizeRule.FIXED;
-    this._userData = null;
-    this._reset = resetCallBack;
-    this._parentRenderer = parentRenderer;
-    this._value = value;
-    this._resizeRule = resizeRule;
-    this._directParent = directParent;
-    this.set_refPoint();
-    this._parentRenderer.AddNewProportionalToSizeValue(this);
   }
   containerResizedPushNewCoef(coef) {
     this.valueStack.push(this._value);
@@ -1395,6 +1395,65 @@ var Proportional = class {
   Proportional2.ResizeRule = ResizeRule;
 })(Proportional || (Proportional = {}));
 var YDataRenderer = class {
+  constructor(UIContainer, logFunction) {
+    this._redrawAllowed = 1;
+    this._refWidth = 1;
+    this._refHeight = 1;
+    this.rendererTimingTotal = 0;
+    this.rendererTimingCount = 0;
+    this._PatchAnnotationCallback = null;
+    this._logFunction = null;
+    this._annotationPanels = [];
+    this._userData = null;
+    this.documentVisibiltyChangeFct = null;
+    this.containerResizedFct = null;
+    this._getCaptureParameters = null;
+    this.OnDblClick = null;
+    this.OnRightClick = null;
+    this._messagePanels = [];
+    this._Scr2ElmMatrix = null;
+    this._Elm2ScrMatrix = null;
+    this.ProportionalToSizeValues = [];
+    this._proportionnalValueChangeCallback = null;
+    this._resizeRule = Proportional.ResizeRule.FIXED;
+    this.requestAnimationFrameID = null;
+    this._snapshotPanel = null;
+    this._snapshotTimer = null;
+    this._AllowPrintScreenCapture = false;
+    if (!YDataRenderer.globalMouseMoveSet) {
+      document.addEventListener("mousemove", (e) => {
+        YDataRenderer.globalMouseMove(e);
+      });
+      YDataRenderer.globalMouseMoveSet = true;
+    }
+    this.UIContainer = UIContainer;
+    this.UIContainer.width = this.getContainerInnerWidth();
+    this.UIContainer.height = this.getContainerInnerHeight();
+    this._logFunction = logFunction;
+    this.parentForm = UIContainer.ownerDocument;
+    this._annotationPanels = [];
+    this._messagePanels = [];
+    this.DisableRedraw();
+    this._snapshotPanel = this.addMessagePanel();
+    this._snapshotPanel.panelTextAlign = MessagePanel.TextAlign.CENTER;
+    this._snapshotPanel.text = "Captured to clipboard";
+    this._snapshotPanel.panelHrzAlign = MessagePanel.HorizontalAlignPos.CENTER;
+    this._snapshotPanel.panelVrtAlign = MessagePanel.VerticalAlignPos.CENTER;
+    this._snapshotPanel.bgColor = new YColor(false, 200, 204, 247, 161);
+    this._snapshotPanel.font.size = 16;
+    this.AllowRedrawNoRefresh();
+    this.containerResizedFct = () => {
+      this.containerResize(null, null);
+    };
+    document.addEventListener("resize", this.containerResizedFct);
+    this.resetRefrenceSize();
+    this.documentVisibiltyChangeFct = () => {
+      if (document.visibilityState === "visible") {
+        this.redraw();
+      }
+    };
+    document.addEventListener("visibilitychange", this.documentVisibiltyChangeFct);
+  }
   get annotationPanels() {
     return this._annotationPanels;
   }
@@ -1781,65 +1840,6 @@ var YDataRenderer = class {
   }
   set AllowPrintScreenCapture(value) {
     this._AllowPrintScreenCapture = value;
-  }
-  constructor(UIContainer, logFunction) {
-    this._redrawAllowed = 1;
-    this._refWidth = 1;
-    this._refHeight = 1;
-    this.rendererTimingTotal = 0;
-    this.rendererTimingCount = 0;
-    this._PatchAnnotationCallback = null;
-    this._logFunction = null;
-    this._annotationPanels = [];
-    this._userData = null;
-    this.documentVisibiltyChangeFct = null;
-    this.containerResizedFct = null;
-    this._getCaptureParameters = null;
-    this.OnDblClick = null;
-    this.OnRightClick = null;
-    this._messagePanels = [];
-    this._Scr2ElmMatrix = null;
-    this._Elm2ScrMatrix = null;
-    this.ProportionalToSizeValues = [];
-    this._proportionnalValueChangeCallback = null;
-    this._resizeRule = Proportional.ResizeRule.FIXED;
-    this.requestAnimationFrameID = null;
-    this._snapshotPanel = null;
-    this._snapshotTimer = null;
-    this._AllowPrintScreenCapture = false;
-    if (!YDataRenderer.globalMouseMoveSet) {
-      document.addEventListener("mousemove", (e) => {
-        YDataRenderer.globalMouseMove(e);
-      });
-      YDataRenderer.globalMouseMoveSet = true;
-    }
-    this.UIContainer = UIContainer;
-    this.UIContainer.width = this.getContainerInnerWidth();
-    this.UIContainer.height = this.getContainerInnerHeight();
-    this._logFunction = logFunction;
-    this.parentForm = UIContainer.ownerDocument;
-    this._annotationPanels = [];
-    this._messagePanels = [];
-    this.DisableRedraw();
-    this._snapshotPanel = this.addMessagePanel();
-    this._snapshotPanel.panelTextAlign = MessagePanel.TextAlign.CENTER;
-    this._snapshotPanel.text = "Captured to clipboard";
-    this._snapshotPanel.panelHrzAlign = MessagePanel.HorizontalAlignPos.CENTER;
-    this._snapshotPanel.panelVrtAlign = MessagePanel.VerticalAlignPos.CENTER;
-    this._snapshotPanel.bgColor = new YColor(false, 200, 204, 247, 161);
-    this._snapshotPanel.font.size = 16;
-    this.AllowRedrawNoRefresh();
-    this.containerResizedFct = () => {
-      this.containerResize(null, null);
-    };
-    document.addEventListener("resize", this.containerResizedFct);
-    this.resetRefrenceSize();
-    this.documentVisibiltyChangeFct = () => {
-      if (document.visibilityState === "visible") {
-        this.redraw();
-      }
-    };
-    document.addEventListener("visibilitychange", this.documentVisibiltyChangeFct);
   }
   destroy() {
     document.removeEventListener("visibilitychange", this.documentVisibiltyChangeFct);
@@ -2633,6 +2633,12 @@ YGraphicsSVG.SVGID = 0;
 
 // obj/rdonly/Renderer/YAngularGauge.js
 var YAngularZone = class extends Zone {
+  constructor(parentRenderer, directParent) {
+    super(parentRenderer, directParent);
+    this._path = null;
+    this._width = 10;
+    this._outerRadius = 98;
+  }
   get path() {
     return this._path;
   }
@@ -2666,14 +2672,61 @@ var YAngularZone = class extends Zone {
     this._path = null;
     this._parentRenderer.redraw();
   }
-  constructor(parentRenderer, directParent) {
-    super(parentRenderer, directParent);
-    this._path = null;
-    this._width = 10;
-    this._outerRadius = 98;
-  }
 };
 var YAngularGauge = class extends YDataRenderer {
+  constructor(UIContainer, logFunction) {
+    super(UIContainer, logFunction);
+    this._min = 0;
+    this._max = 100;
+    this.SegmentMaxLength = 8;
+    this._borderpen = null;
+    this._borderColor = YColor.Black;
+    this._bgBrush = null;
+    this._backgroundColor1 = YColor.FromArgb(255, 240, 240, 240);
+    this._backgroundColor2 = YColor.FromArgb(255, 200, 200, 200);
+    this._borderThickness = 5;
+    this._valueFormater = null;
+    this._minmaxFormater = null;
+    this._thickness = 20;
+    this._value = 0;
+    this._needleValue = 0;
+    this._color1 = YColor.Green;
+    this._color2 = YColor.Red;
+    this._graduationPen = null;
+    this._graduationColor = YColor.Black;
+    this._graduationThickness = 2;
+    this._graduationSize = 10;
+    this._graduation = 10;
+    this._unitFactor = 1;
+    this._unit = "";
+    this._subgraduationPen = null;
+    this._subgraduationColor = YColor.Black;
+    this._subgraduationThickness = 1;
+    this._subgraduationSize = 5;
+    this._graduationOuterRadiusSize = 98;
+    this._subgraduationCount = 5;
+    this._statusColor = YColor.Gray;
+    this._statusLine = "";
+    this._showNeedle = true;
+    this._needleBrush = null;
+    this._needleColor = YColor.Red;
+    this._needleMaxSpeed = 5;
+    this._needleLength1 = 90;
+    this._needleLength2 = 5;
+    this._needleWidth = 5;
+    this._needleContourPen = null;
+    this._needleContourColor = YColor.DarkRed;
+    this._needleContourThickness = 1;
+    this._showMinMax = true;
+    this._path = null;
+    this._graduationFont = new YFont(this, this, Math.min(this.getContainerInnerWidth(), this.getContainerInnerHeight()) / 15, null);
+    this._unitFont = new YFont(this, this, Math.min(this.getContainerInnerWidth(), this.getContainerInnerHeight()) / 20, null);
+    this._statusFont = new YFont(this, this, Math.min(this.getContainerInnerWidth(), this.getContainerInnerHeight()) / 15, null);
+    this.unitFont.color = YColor.DarkGray;
+    this._statusFont.color = YColor.DarkGray;
+    this.resizeRule = Proportional.ResizeRule.RELATIVETOBOTH;
+    this._zones = [];
+  }
   get min() {
     return this._min;
   }
@@ -2980,59 +3033,6 @@ var YAngularGauge = class extends YDataRenderer {
     this._showMinMax = value;
     this.redraw();
   }
-  constructor(UIContainer, logFunction) {
-    super(UIContainer, logFunction);
-    this._min = 0;
-    this._max = 100;
-    this.SegmentMaxLength = 8;
-    this._borderpen = null;
-    this._borderColor = YColor.Black;
-    this._bgBrush = null;
-    this._backgroundColor1 = YColor.FromArgb(255, 240, 240, 240);
-    this._backgroundColor2 = YColor.FromArgb(255, 200, 200, 200);
-    this._borderThickness = 5;
-    this._valueFormater = null;
-    this._minmaxFormater = null;
-    this._thickness = 20;
-    this._value = 0;
-    this._needleValue = 0;
-    this._color1 = YColor.Green;
-    this._color2 = YColor.Red;
-    this._graduationPen = null;
-    this._graduationColor = YColor.Black;
-    this._graduationThickness = 2;
-    this._graduationSize = 10;
-    this._graduation = 10;
-    this._unitFactor = 1;
-    this._unit = "";
-    this._subgraduationPen = null;
-    this._subgraduationColor = YColor.Black;
-    this._subgraduationThickness = 1;
-    this._subgraduationSize = 5;
-    this._graduationOuterRadiusSize = 98;
-    this._subgraduationCount = 5;
-    this._statusColor = YColor.Gray;
-    this._statusLine = "";
-    this._showNeedle = true;
-    this._needleBrush = null;
-    this._needleColor = YColor.Red;
-    this._needleMaxSpeed = 5;
-    this._needleLength1 = 90;
-    this._needleLength2 = 5;
-    this._needleWidth = 5;
-    this._needleContourPen = null;
-    this._needleContourColor = YColor.DarkRed;
-    this._needleContourThickness = 1;
-    this._showMinMax = true;
-    this._path = null;
-    this._graduationFont = new YFont(this, this, Math.min(this.getContainerInnerWidth(), this.getContainerInnerHeight()) / 15, null);
-    this._unitFont = new YFont(this, this, Math.min(this.getContainerInnerWidth(), this.getContainerInnerHeight()) / 20, null);
-    this._statusFont = new YFont(this, this, Math.min(this.getContainerInnerWidth(), this.getContainerInnerHeight()) / 15, null);
-    this.unitFont.color = YColor.DarkGray;
-    this._statusFont.color = YColor.DarkGray;
-    this.resizeRule = Proportional.ResizeRule.RELATIVETOBOTH;
-    this._zones = [];
-  }
   clearCachedObjects() {
     if (this._zones != null) {
       for (let i = 0; i < this._zones.length; i++) {
@@ -3240,6 +3240,23 @@ var YAngularGauge = class extends YDataRenderer {
 
 // obj/rdonly/Renderer/YDigitalDisplay.js
 var YDigitalDisplay = class extends YDataRenderer {
+  constructor(UIContainer, logFunction) {
+    super(UIContainer, logFunction);
+    this._bgBrush = null;
+    this._backgroundColor1 = YColor.Black;
+    this._backgroundColor2 = YColor.FromArgb(255, 48, 48, 48);
+    this._alternateValue = null;
+    this._valueFormater = null;
+    this._hrzAlignmentOfset = 5;
+    this._hrzAlignment = YDigitalDisplay.HrzAlignment.DECIMAL;
+    this._outOfRangeMin = Number.NaN;
+    this._outOfRangeMax = Number.NaN;
+    this._outOfRangeColor = YColor.Red;
+    this._value = 0;
+    this._font = new YFont(this, this, Math.min(UIContainer.width / 5, UIContainer.height / 2), null);
+    this._font.color = YColor.LightGreen;
+    this.resizeRule = Proportional.ResizeRule.RELATIVETOBOTH;
+  }
   get backgroundColor1() {
     return this._backgroundColor1;
   }
@@ -3322,23 +3339,6 @@ var YDigitalDisplay = class extends YDataRenderer {
   }
   get font() {
     return this._font;
-  }
-  constructor(UIContainer, logFunction) {
-    super(UIContainer, logFunction);
-    this._bgBrush = null;
-    this._backgroundColor1 = YColor.Black;
-    this._backgroundColor2 = YColor.FromArgb(255, 48, 48, 48);
-    this._alternateValue = null;
-    this._valueFormater = null;
-    this._hrzAlignmentOfset = 5;
-    this._hrzAlignment = YDigitalDisplay.HrzAlignment.DECIMAL;
-    this._outOfRangeMin = Number.NaN;
-    this._outOfRangeMax = Number.NaN;
-    this._outOfRangeColor = YColor.Red;
-    this._value = 0;
-    this._font = new YFont(this, this, Math.min(UIContainer.width / 5, UIContainer.height / 2), null);
-    this._font.color = YColor.LightGreen;
-    this.resizeRule = Proportional.ResizeRule.RELATIVETOBOTH;
   }
   clearCachedObjects() {
     if (this.font != null)
@@ -3960,11 +3960,6 @@ var MinMaxHandler = class {
   }
 };
 var DataSegment = class {
-  static ArrayCopy(sourceArray, sourceIndex, destinationArray, destinationIndex, length) {
-    for (let i = 0; i < length; i++) {
-      destinationArray[destinationIndex + i] = sourceArray[sourceIndex + i].clone();
-    }
-  }
   constructor(p) {
     this.data = [];
     this.count = 0;
@@ -3980,6 +3975,11 @@ var DataSegment = class {
       throw new Error("invalid constructor paramter type");
     }
   }
+  static ArrayCopy(sourceArray, sourceIndex, destinationArray, destinationIndex, length) {
+    for (let i = 0; i < length; i++) {
+      destinationArray[destinationIndex + i] = sourceArray[sourceIndex + i].clone();
+    }
+  }
   grow() {
     let targetCount = this.data.length + DataSegment.SegmentGranularity;
     while (this.data.length < targetCount) {
@@ -3989,24 +3989,6 @@ var DataSegment = class {
 };
 DataSegment.SegmentGranularity = 1e3;
 var DataSerie = class {
-  get userData() {
-    return this._userData;
-  }
-  set userData(value) {
-    this._userData = value;
-  }
-  static get MaxPointsPerSeries() {
-    return DataSerie._MaxPointsPerSeries;
-  }
-  static set MaxPointsPerSeries(value) {
-    DataSerie._MaxPointsPerSeries = value;
-  }
-  get timeRange() {
-    return this._timeRange;
-  }
-  get valueRange() {
-    return this._valueRange;
-  }
   constructor(parent) {
     this.totalPointCount = 0;
     this._userData = null;
@@ -4027,6 +4009,24 @@ var DataSerie = class {
     this._timeRange = MinMaxHandler.DefaultValue();
     this._valueRange = MinMaxHandler.DefaultValue();
     this.parent = parent;
+  }
+  get userData() {
+    return this._userData;
+  }
+  set userData(value) {
+    this._userData = value;
+  }
+  static get MaxPointsPerSeries() {
+    return DataSerie._MaxPointsPerSeries;
+  }
+  static set MaxPointsPerSeries(value) {
+    DataSerie._MaxPointsPerSeries = value;
+  }
+  get timeRange() {
+    return this._timeRange;
+  }
+  get valueRange() {
+    return this._valueRange;
   }
   get yAxisIndex() {
     return this._yAxisIndex;
@@ -4324,15 +4324,6 @@ var DataSerie = class {
 };
 DataSerie._MaxPointsPerSeries = 0;
 var DataTracker = class {
-  get directParent() {
-    return this._directParent;
-  }
-  get userData() {
-    return this._userData;
-  }
-  set userData(value) {
-    this._userData = value;
-  }
   constructor(parent, directParent) {
     this._userData = null;
     this._enabled = false;
@@ -4355,6 +4346,15 @@ var DataTracker = class {
     this._directParent = directParent;
     this._parentRenderer = parent;
     this._font = new YFont(parent, this, 8, null);
+  }
+  get directParent() {
+    return this._directParent;
+  }
+  get userData() {
+    return this._userData;
+  }
+  set userData(value) {
+    this._userData = value;
   }
   get enabled() {
     return this._enabled;
@@ -4512,25 +4512,6 @@ var DataTracker = class {
   DataTracker2.DataPrecision = DataPrecision;
 })(DataTracker || (DataTracker = {}));
 var LegendPanel = class {
-  get directParent() {
-    return this._directParent;
-  }
-  get userData() {
-    return this._userData;
-  }
-  set userData(value) {
-    this._userData = value;
-  }
-  get traceWidthFactor() {
-    return this._traceWidth;
-  }
-  set traceWidthFactor(value) {
-    if (value <= 0)
-      throw new RangeError("This has to be a strictly positive value");
-    this._traceWidth = value;
-    this._parentRenderer.resetlegendPens();
-    this._parentRenderer.redraw();
-  }
   constructor(parent, directParent) {
     this._userData = null;
     this._traceWidth = 1;
@@ -4549,6 +4530,25 @@ var LegendPanel = class {
     this._directParent = directParent;
     this._parentRenderer = parent;
     this._font = new YFont(parent, this, 8, null);
+  }
+  get directParent() {
+    return this._directParent;
+  }
+  get userData() {
+    return this._userData;
+  }
+  set userData(value) {
+    this._userData = value;
+  }
+  get traceWidthFactor() {
+    return this._traceWidth;
+  }
+  set traceWidthFactor(value) {
+    if (value <= 0)
+      throw new RangeError("This has to be a strictly positive value");
+    this._traceWidth = value;
+    this._parentRenderer.resetlegendPens();
+    this._parentRenderer.redraw();
   }
   get enabled() {
     return this._enabled;
@@ -4659,32 +4659,6 @@ var LegendPanel = class {
   LegendPanel2.Position = Position;
 })(LegendPanel || (LegendPanel = {}));
 var Navigator = class {
-  get directParent() {
-    return this._directParent;
-  }
-  get userData() {
-    return this._userData;
-  }
-  set userData(value) {
-    this._userData = value;
-  }
-  get showXAxisZones() {
-    return this._showXAxisZones;
-  }
-  set showXAxisZones(value) {
-    this._showXAxisZones = value;
-  }
-  get relativeheight() {
-    return this._relativeheight;
-  }
-  set relativeheight(value) {
-    if (value < 10)
-      value = 10;
-    if (value > 50)
-      value = 50;
-    this._relativeheight = value;
-    this._parentRenderer.redraw();
-  }
   constructor(parent, directParent) {
     this._userData = null;
     this._viewport = new ViewPortSettings();
@@ -4710,6 +4684,32 @@ var Navigator = class {
     this._directParent = directParent;
     this._parentRenderer = parent;
     this._font = new YFont(parent, this, 8, null);
+  }
+  get directParent() {
+    return this._directParent;
+  }
+  get userData() {
+    return this._userData;
+  }
+  set userData(value) {
+    this._userData = value;
+  }
+  get showXAxisZones() {
+    return this._showXAxisZones;
+  }
+  set showXAxisZones(value) {
+    this._showXAxisZones = value;
+  }
+  get relativeheight() {
+    return this._relativeheight;
+  }
+  set relativeheight(value) {
+    if (value < 10)
+      value = 10;
+    if (value > 50)
+      value = 50;
+    this._relativeheight = value;
+    this._parentRenderer.redraw();
   }
   get enabled() {
     return this._enabled;
@@ -4873,6 +4873,32 @@ var Navigator = class {
   Navigator2.YAxisHandling = YAxisHandling;
 })(Navigator || (Navigator = {}));
 var Marker = class {
+  constructor(parent, directParent) {
+    this._userData = null;
+    this._stringFormat = null;
+    this._MarkerTextCallback = null;
+    this._enabled = false;
+    this._xposition = 0;
+    this._xpositionIsRelative = false;
+    this._yposition = 92;
+    this._text = "Marker";
+    this._textAlign = Marker.TextAlign.CENTER;
+    this._bgColor = YColor.FromArgb(255, 255, 255, 192);
+    this._borderColor = YColor.DarkRed;
+    this._borderthickness = 1;
+    this._arrowSize = 5;
+    this._padding = 5;
+    this._verticalMargin = 5;
+    this._horizontalMargin = 5;
+    this._bgBrush = null;
+    this._arrowBrush = null;
+    this._pen = null;
+    this._navigatorpen = null;
+    this._font = null;
+    this._directParent = directParent;
+    this._parentRenderer = parent;
+    this._font = new YFont(parent, this, 8, null);
+  }
   get userData() {
     return this._userData;
   }
@@ -4908,32 +4934,6 @@ var Marker = class {
   }
   get directParent() {
     return this._directParent;
-  }
-  constructor(parent, directParent) {
-    this._userData = null;
-    this._stringFormat = null;
-    this._MarkerTextCallback = null;
-    this._enabled = false;
-    this._xposition = 0;
-    this._xpositionIsRelative = false;
-    this._yposition = 92;
-    this._text = "Marker";
-    this._textAlign = Marker.TextAlign.CENTER;
-    this._bgColor = YColor.FromArgb(255, 255, 255, 192);
-    this._borderColor = YColor.DarkRed;
-    this._borderthickness = 1;
-    this._arrowSize = 5;
-    this._padding = 5;
-    this._verticalMargin = 5;
-    this._horizontalMargin = 5;
-    this._bgBrush = null;
-    this._arrowBrush = null;
-    this._pen = null;
-    this._navigatorpen = null;
-    this._font = null;
-    this._directParent = directParent;
-    this._parentRenderer = parent;
-    this._font = new YFont(parent, this, 8, null);
   }
   startCapture() {
     this._parentRenderer.startMarkerCapture(this);
@@ -5138,6 +5138,14 @@ var Marker = class {
   Marker2.TextAlign = TextAlign;
 })(Marker || (Marker = {}));
 var Legend = class {
+  constructor(parent, directParent) {
+    this._userData = null;
+    this._title = "";
+    this._font = null;
+    this._directParent = directParent;
+    this._parentRenderer = parent;
+    this._font = new YFont(parent, this, 12, null);
+  }
   get directParent() {
     return this._directParent;
   }
@@ -5146,14 +5154,6 @@ var Legend = class {
   }
   set userData(value) {
     this._userData = value;
-  }
-  constructor(parent, directParent) {
-    this._userData = null;
-    this._title = "";
-    this._font = null;
-    this._directParent = directParent;
-    this._parentRenderer = parent;
-    this._font = new YFont(parent, this, 12, null);
   }
   get title() {
     return this._title;
@@ -5167,6 +5167,28 @@ var Legend = class {
   }
 };
 var GenericAxis = class {
+  constructor(parent, directParent) {
+    this._userData = null;
+    this._AxisChanged = null;
+    this._pen = null;
+    this._gridPen = null;
+    this._visible = true;
+    this._AllowAutoShow = false;
+    this._min = Number.NaN;
+    this._max = Number.NaN;
+    this._step = Number.NaN;
+    this._thickness = 1;
+    this._color = YColor.Black;
+    this._showGrid = false;
+    this._gridColor = YColor.FromArgb(50, 0, 0, 0);
+    this._gridThickness = 1;
+    this._font = null;
+    this._zones = [];
+    this._directParent = directParent;
+    this._parentRenderer = parent;
+    this._legend = new Legend(parent, this);
+    this._font = new YFont(parent, this);
+  }
   get directParent() {
     return this._directParent;
   }
@@ -5189,28 +5211,6 @@ var GenericAxis = class {
   }
   set AxisChanged(value) {
     this._AxisChanged = value;
-  }
-  constructor(parent, directParent) {
-    this._userData = null;
-    this._AxisChanged = null;
-    this._pen = null;
-    this._gridPen = null;
-    this._visible = true;
-    this._AllowAutoShow = false;
-    this._min = Number.NaN;
-    this._max = Number.NaN;
-    this._step = Number.NaN;
-    this._thickness = 1;
-    this._color = YColor.Black;
-    this._showGrid = false;
-    this._gridColor = YColor.FromArgb(50, 0, 0, 0);
-    this._gridThickness = 1;
-    this._font = null;
-    this._zones = [];
-    this._directParent = directParent;
-    this._parentRenderer = parent;
-    this._legend = new Legend(parent, this);
-    this._font = new YFont(parent, this);
   }
   get pen() {
     if (this._pen == null)
@@ -5355,6 +5355,14 @@ var StartStopStep = class {
   }
 };
 var xAxisPosition = class {
+  constructor(v, rel, capture) {
+    this._isRelative = false;
+    this._value = 0;
+    this._capture = false;
+    this._isRelative = rel;
+    this._value = v;
+    this._capture = typeof capture == "undefined" ? false : capture;
+  }
   get relative() {
     return this._isRelative;
   }
@@ -5366,14 +5374,6 @@ var xAxisPosition = class {
   }
   set value(value) {
     this._value = value;
-  }
-  constructor(v, rel, capture) {
-    this._isRelative = false;
-    this._value = 0;
-    this._capture = false;
-    this._isRelative = rel;
-    this._value = v;
-    this._capture = typeof capture == "undefined" ? false : capture;
   }
   clone() {
     return new xAxisPosition(this._value, this._isRelative, this._capture);
@@ -5543,6 +5543,24 @@ var YAxis = class extends GenericAxis {
   YAxis2.HrzPosition = HrzPosition;
 })(YAxis || (YAxis = {}));
 var XAxis = class extends GenericAxis {
+  constructor(parent, directParent) {
+    super(parent, directParent);
+    this._position = XAxis.VrtPosition.BOTTOM;
+    this._markers = [];
+    this._initialZoom = 300;
+    this._initialOffset = 0;
+    this._format = XAxis.FORMATAUTO;
+    this._timeReference = TimeConverter.TimeReference.ABSOLUTE;
+    this._zeroTime = 0;
+    this._fullSize = 0;
+    this.innerHeight = 0;
+    this._overflowHandling = XAxis.OverflowHandling.DONOTHING;
+    this._parentGraph = parent;
+    this._markers = [];
+    this.min = TimeConverter.ToUnixTime(TimeConverter.UTCNow());
+    this.max = this.min + this.initialZoom;
+    this.step = 30;
+  }
   get position() {
     return this._position;
   }
@@ -5594,24 +5612,6 @@ var XAxis = class extends GenericAxis {
   set labelFormat(value) {
     this._format = value;
     this._parentRenderer.redraw();
-  }
-  constructor(parent, directParent) {
-    super(parent, directParent);
-    this._position = XAxis.VrtPosition.BOTTOM;
-    this._markers = [];
-    this._initialZoom = 300;
-    this._initialOffset = 0;
-    this._format = XAxis.FORMATAUTO;
-    this._timeReference = TimeConverter.TimeReference.ABSOLUTE;
-    this._zeroTime = 0;
-    this._fullSize = 0;
-    this.innerHeight = 0;
-    this._overflowHandling = XAxis.OverflowHandling.DONOTHING;
-    this._parentGraph = parent;
-    this._markers = [];
-    this.min = TimeConverter.ToUnixTime(TimeConverter.UTCNow());
-    this.max = this.min + this.initialZoom;
-    this.step = 30;
   }
   get timeReference() {
     return this._timeReference;
@@ -5840,64 +5840,6 @@ var YTimeSpan = class {
 };
 YTimeSpan.TicksPerSecond = 1e3;
 var YGraph = class extends YDataRenderer {
-  get legendPanel() {
-    return this._legendPanel;
-  }
-  get dataTracker() {
-    return this._dataTracker;
-  }
-  get borderColor() {
-    return this._borderColor;
-  }
-  set borderColor(value) {
-    this._borderColor = value;
-    this._borderPen = null;
-    this.redraw();
-  }
-  get borderThickness() {
-    return this._borderThickness;
-  }
-  set borderThickness(value) {
-    if (value < 0)
-      throw new RangeError("thickness must be a positive value");
-    this._borderThickness = value;
-    this._borderPen = null;
-    this.redraw();
-  }
-  static get verticalDragZoomEnabled() {
-    return YGraph._defaultVerticalDragZoomEnabled;
-  }
-  static set verticalDragZoomEnabled(value) {
-    YGraph._defaultVerticalDragZoomEnabled = value;
-  }
-  static createCaptureCursor() {
-    if (YGraph.captureCursor != null)
-      return;
-    let base64png = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAALHRFWHRDcmVhdGlvbiBUaW1lAFRodSAyMCBBdWcgMjAyMCAxMjoxNTo1MCArMDEwMP38NhoAAAAHdElNRQfkCBQOJAvCrm0ZAAAACXBIWXMAAFxGAABcRgEUlENBAAAABGdBTUEAALGPC / xhBQAAAmVJREFUeNrtVrFuFDEQHd9eBImAIBFoAgVC0NJQUFDwL / QgRXzAfUz + Iy0pQwsIJAhCQMQBUS5c2DXv7T5fzN5qs / Fxdw0jPY3ttT3jt54ZmyXIYDDoQXnodWBV / SRJXZhJbwCXov65pZ + 4zklfBsZRf2EMxOuTjc / igIu0s0UygAvnonWZ0NP4fB2QkQz6yHvP / i76V4E1jZ / bic4LIuMnND7ZwDl + u4 / me + AnkKPvu + 7rFMNZBzZ64eRTm5w6sQ8cAcUZexVytOCpOnv7j + QdDD + CHgKjMg80nWpeQrYgd4A3wHjWPJAqN4BVoLcsB1ZMd25ZDkzkvwNLd6AMQ4XGIuXElKz6SAo3rYpLhsZKyyJmwu2WTLiF5g / g2NozIY1 / BkacRwaYkZgUPlr7L2EdeAhjLxpqwTOr0vAHOZG37FPIOO3mfXXG1qEWAGvM + TC6Rydk / KmMv7bmWlD / v95qtaCThGpo1TPsFvp7wBO0v4nBqWoYvR0yOeLFThHmdH4TcgGQy8i + hkn5V / WbSjGr7e9oD96372LJB1o7izbPtYHpPw7V / 8u4yvzFkvPTO3MXuMbx8JRPij8svgAcAw / EwCe0f8XGxZYFB6JQZzl + rHWj1Gf5WZLVTj5py5HbVoXjeF4OuMhYnQHKulW / x6U64CPtbfpVxQu7CX0PeicMov3cKup5EZmw / KwMFNb8pMtl5G3MhIyHkOX3PPUSMmXzOX7Fqsw35Gu5NidEwXWr / jnnD + XUFzLARJRaDXnCQ53o0BpSLzcXzQfAK + Cl9EEwXrKTyr1OWGa3sFnLvPDsn6Tg8P0PrBcSMR2NtfsAAAAASUVORK5CYII =";
-    try {
-      YGraph.captureCursor = new YCursor(atob(base64png));
-    } catch (Exception) {
-      console.log("Cannot create custom cursor");
-    }
-  }
-  get dataPanels() {
-    return this._dataPanels;
-  }
-  addDataPanel() {
-    let p = new DataPanel(this, this);
-    this._dataPanels.push(p);
-    return p;
-  }
-  setMarkerCaptureCallbacks(start, stop) {
-    this._markerCaptureStartedCallback = start;
-    this._markerCaptureStoppedCallback = stop;
-  }
-  startMarkerCapture(m) {
-    if (this._markerCaptureStartedCallback != null)
-      this._markerCaptureStartedCallback(m);
-    this.markerCapture = m;
-    this.UIContainer.focus();
-  }
   constructor(ChartContainer, logFunction) {
     super(ChartContainer, logFunction);
     this._markerCaptureStartedCallback = null;
@@ -5969,6 +5911,64 @@ var YGraph = class extends YDataRenderer {
     let originalContainerHeight = ChartContainer.height;
     let originalFormWidth = ChartContainer.width;
     let originalFormHeight = ChartContainer.height;
+  }
+  get legendPanel() {
+    return this._legendPanel;
+  }
+  get dataTracker() {
+    return this._dataTracker;
+  }
+  get borderColor() {
+    return this._borderColor;
+  }
+  set borderColor(value) {
+    this._borderColor = value;
+    this._borderPen = null;
+    this.redraw();
+  }
+  get borderThickness() {
+    return this._borderThickness;
+  }
+  set borderThickness(value) {
+    if (value < 0)
+      throw new RangeError("thickness must be a positive value");
+    this._borderThickness = value;
+    this._borderPen = null;
+    this.redraw();
+  }
+  static get verticalDragZoomEnabled() {
+    return YGraph._defaultVerticalDragZoomEnabled;
+  }
+  static set verticalDragZoomEnabled(value) {
+    YGraph._defaultVerticalDragZoomEnabled = value;
+  }
+  static createCaptureCursor() {
+    if (YGraph.captureCursor != null)
+      return;
+    let base64png = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAALHRFWHRDcmVhdGlvbiBUaW1lAFRodSAyMCBBdWcgMjAyMCAxMjoxNTo1MCArMDEwMP38NhoAAAAHdElNRQfkCBQOJAvCrm0ZAAAACXBIWXMAAFxGAABcRgEUlENBAAAABGdBTUEAALGPC / xhBQAAAmVJREFUeNrtVrFuFDEQHd9eBImAIBFoAgVC0NJQUFDwL / QgRXzAfUz + Iy0pQwsIJAhCQMQBUS5c2DXv7T5fzN5qs / Fxdw0jPY3ttT3jt54ZmyXIYDDoQXnodWBV / SRJXZhJbwCXov65pZ + 4zklfBsZRf2EMxOuTjc / igIu0s0UygAvnonWZ0NP4fB2QkQz6yHvP / i76V4E1jZ / bic4LIuMnND7ZwDl + u4 / me + AnkKPvu + 7rFMNZBzZ64eRTm5w6sQ8cAcUZexVytOCpOnv7j + QdDD + CHgKjMg80nWpeQrYgd4A3wHjWPJAqN4BVoLcsB1ZMd25ZDkzkvwNLd6AMQ4XGIuXElKz6SAo3rYpLhsZKyyJmwu2WTLiF5g / g2NozIY1 / BkacRwaYkZgUPlr7L2EdeAhjLxpqwTOr0vAHOZG37FPIOO3mfXXG1qEWAGvM + TC6Rydk / KmMv7bmWlD / v95qtaCThGpo1TPsFvp7wBO0v4nBqWoYvR0yOeLFThHmdH4TcgGQy8i + hkn5V / WbSjGr7e9oD96372LJB1o7izbPtYHpPw7V / 8u4yvzFkvPTO3MXuMbx8JRPij8svgAcAw / EwCe0f8XGxZYFB6JQZzl + rHWj1Gf5WZLVTj5py5HbVoXjeF4OuMhYnQHKulW / x6U64CPtbfpVxQu7CX0PeicMov3cKup5EZmw / KwMFNb8pMtl5G3MhIyHkOX3PPUSMmXzOX7Fqsw35Gu5NidEwXWr / jnnD + XUFzLARJRaDXnCQ53o0BpSLzcXzQfAK + Cl9EEwXrKTyr1OWGa3sFnLvPDsn6Tg8P0PrBcSMR2NtfsAAAAASUVORK5CYII =";
+    try {
+      YGraph.captureCursor = new YCursor(atob(base64png));
+    } catch (Exception) {
+      console.log("Cannot create custom cursor");
+    }
+  }
+  get dataPanels() {
+    return this._dataPanels;
+  }
+  addDataPanel() {
+    let p = new DataPanel(this, this);
+    this._dataPanels.push(p);
+    return p;
+  }
+  setMarkerCaptureCallbacks(start, stop) {
+    this._markerCaptureStartedCallback = start;
+    this._markerCaptureStoppedCallback = stop;
+  }
+  startMarkerCapture(m) {
+    if (this._markerCaptureStartedCallback != null)
+      this._markerCaptureStartedCallback(m);
+    this.markerCapture = m;
+    this.UIContainer.focus();
   }
   destroy() {
     if (this._touchStartfct != null)
@@ -7495,6 +7495,42 @@ var DrawPrameters = class {
   }
 };
 var YSolidGauge = class extends YDataRenderer {
+  constructor(UIContainer, mode, logFunction) {
+    super(UIContainer, logFunction);
+    this._shownValue = 0;
+    this._min = 0;
+    this._max = 100;
+    this.SegmentMaxLength = 8;
+    this.mainViewPort = new ViewPortSettings();
+    this._borderpen = null;
+    this._borderColor = YColor.Black;
+    this._bgBrush = null;
+    this._backgroundColor1 = YColor.FromArgb(255, 240, 240, 240);
+    this._backgroundColor2 = YColor.FromArgb(255, 200, 200, 200);
+    this._borderThickness = 5;
+    this._valueFormater = null;
+    this._minmaxFormater = null;
+    this._thickness = 25;
+    this._maxSpeed = 0.1;
+    this._value = 0;
+    this._color1 = YColor.Green;
+    this._color2 = YColor.Red;
+    this._font = null;
+    this._minMaxFont = null;
+    this._showMinMax = true;
+    this._path = null;
+    this.lastDrawParameters = new DrawPrameters();
+    this._displayMode = YSolidGauge.DisplayMode.DISPLAY90;
+    this._minMaxFont = new YFont(this, this, Math.min(UIContainer.width, UIContainer.height) / 15, () => {
+      this.FontsizeChange(this._minMaxFont);
+    });
+    this._displayMode = mode;
+    this._font = new YFont(this, this, Math.min(UIContainer.width, UIContainer.height) / 5, null);
+    this.resizeRule = Proportional.ResizeRule.RELATIVETOBOTH;
+    let g = new YGraphics(UIContainer, UIContainer.width, UIContainer.height, 90);
+    let p = this.ComputeDrawParameters(g, UIContainer.width, UIContainer.height, this.mainViewPort);
+    g.Dispose();
+  }
   get min() {
     return this._min;
   }
@@ -7640,42 +7676,6 @@ var YSolidGauge = class extends YDataRenderer {
   }
   FontsizeChange(source) {
     this._path = null;
-  }
-  constructor(UIContainer, mode, logFunction) {
-    super(UIContainer, logFunction);
-    this._shownValue = 0;
-    this._min = 0;
-    this._max = 100;
-    this.SegmentMaxLength = 8;
-    this.mainViewPort = new ViewPortSettings();
-    this._borderpen = null;
-    this._borderColor = YColor.Black;
-    this._bgBrush = null;
-    this._backgroundColor1 = YColor.FromArgb(255, 240, 240, 240);
-    this._backgroundColor2 = YColor.FromArgb(255, 200, 200, 200);
-    this._borderThickness = 5;
-    this._valueFormater = null;
-    this._minmaxFormater = null;
-    this._thickness = 25;
-    this._maxSpeed = 0.1;
-    this._value = 0;
-    this._color1 = YColor.Green;
-    this._color2 = YColor.Red;
-    this._font = null;
-    this._minMaxFont = null;
-    this._showMinMax = true;
-    this._path = null;
-    this.lastDrawParameters = new DrawPrameters();
-    this._displayMode = YSolidGauge.DisplayMode.DISPLAY90;
-    this._minMaxFont = new YFont(this, this, Math.min(UIContainer.width, UIContainer.height) / 15, () => {
-      this.FontsizeChange(this._minMaxFont);
-    });
-    this._displayMode = mode;
-    this._font = new YFont(this, this, Math.min(UIContainer.width, UIContainer.height) / 5, null);
-    this.resizeRule = Proportional.ResizeRule.RELATIVETOBOTH;
-    let g = new YGraphics(UIContainer, UIContainer.width, UIContainer.height, 90);
-    let p = this.ComputeDrawParameters(g, UIContainer.width, UIContainer.height, this.mainViewPort);
-    g.Dispose();
   }
   clearCachedObjects() {
     this._bgBrush = null;
@@ -16300,7 +16300,7 @@ var YAPIContext = class {
     });
   }
   imm_GetAPIVersion() {
-    return "1.10.51774";
+    return "1.10.51840";
   }
   InitAPI(mode, errmsg) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -18071,7 +18071,7 @@ YNetwork.POECURRENT_INVALID = YAPI.INVALID_UINT;
 // obj/rdonly/constants.js
 var constants = class {
   static get buildVersion() {
-    return "1.10.51774";
+    return "1.10.51840";
   }
   static get deviceScreenWidth() {
     return screen.width * window.devicePixelRatio;
@@ -18499,6 +18499,36 @@ var __awaiter4 = function(thisArg, _arguments, P, generator) {
   });
 };
 var Hub = class {
+  constructor(hubType, protocol, user, password, clearPassword, addr, port, path, removeable) {
+    this._netname = "";
+    this._module = null;
+    this._logicname = "";
+    this._previousURL = "";
+    this._previousobfuscatedURL = "";
+    this._hubType = 2;
+    this._protocol = "";
+    this._user = "";
+    this._password = "";
+    this._addr = "";
+    this._port = "";
+    this._removable = true;
+    this._path = "";
+    this._state = 0;
+    while (/^\//.test(path)) {
+      path = path.slice(1);
+    }
+    while (/\/$/.test(path)) {
+      path = path.slice(0, -1);
+    }
+    this._hubType = hubType;
+    this._protocol = protocol;
+    this._user = user;
+    this._port = port;
+    this._password = clearPassword ? password != "" ? Hub.Encrypt(password, Hub.loginCypherPassword) : "" : password;
+    this._addr = addr;
+    this._path = path;
+    this._removable = typeof removeable === "undefined" ? true : removeable;
+  }
   static Decrypt(data, loginCypherPassword) {
     if (data == "")
       return "";
@@ -18608,36 +18638,6 @@ var Hub = class {
       default:
         return "Not connected.";
     }
-  }
-  constructor(hubType, protocol, user, password, clearPassword, addr, port, path, removeable) {
-    this._netname = "";
-    this._module = null;
-    this._logicname = "";
-    this._previousURL = "";
-    this._previousobfuscatedURL = "";
-    this._hubType = 2;
-    this._protocol = "";
-    this._user = "";
-    this._password = "";
-    this._addr = "";
-    this._port = "";
-    this._removable = true;
-    this._path = "";
-    this._state = 0;
-    while (/^\//.test(path)) {
-      path = path.slice(1);
-    }
-    while (/\/$/.test(path)) {
-      path = path.slice(0, -1);
-    }
-    this._hubType = hubType;
-    this._protocol = protocol;
-    this._user = user;
-    this._port = port;
-    this._password = clearPassword ? password != "" ? Hub.Encrypt(password, Hub.loginCypherPassword) : "" : password;
-    this._addr = addr;
-    this._path = path;
-    this._removable = typeof removeable === "undefined" ? true : removeable;
   }
   static HubFromXml(subnode) {
     let hubType = 2;
@@ -18778,8 +18778,6 @@ var TimedSensorValue = class {
   }
 };
 var AlarmSettings = class {
-  static ExecuteCommand(source, command) {
-  }
   constructor(index, owner, xmldata) {
     this.index = 0;
     this.Condition = 0;
@@ -18802,6 +18800,8 @@ var AlarmSettings = class {
       if ("Delay" in xmldata.Attributes)
         this.Delay = parseInt(xmldata.Attributes["Delay"]);
     }
+  }
+  static ExecuteCommand(source, command) {
   }
   setCondition(condition) {
     this.Condition = condition;
@@ -18930,45 +18930,6 @@ var MergeSourceRange = class {
   }
 };
 var CustomYSensor = class {
-  get isReadOnly() {
-    return this._readonly || !this._online;
-  }
-  static get MaxDataRecords() {
-    return CustomYSensor._MaxDataRecords;
-  }
-  static set MaxDataRecords(value) {
-    CustomYSensor._MaxDataRecords = value;
-  }
-  static get MaxLoggerRecords() {
-    return CustomYSensor._MaxLoggerRecords;
-  }
-  static set MaxLoggerRecords(value) {
-    CustomYSensor._MaxLoggerRecords = value;
-  }
-  get_lastAvgValue() {
-    if (this._online)
-      return this._lastAvgValue;
-    return Number.NaN;
-  }
-  get_lastMaxValue() {
-    if (this._online)
-      return this._lastMaxValue;
-    return Number.NaN;
-  }
-  get_lastMinValue() {
-    if (this._online)
-      return this._lastMinValue;
-    return Number.NaN;
-  }
-  ConfigHasChanged() {
-    return __awaiter4(this, void 0, void 0, function* () {
-      this.cfgChgNotificationsSupported = true;
-      this.mustReloadConfig = true;
-      this._online = true;
-      yield this.reloadConfig();
-      yield this.forceUpdate();
-    });
-  }
   constructor(s, name, SensorLocalConfig) {
     this.unit = "";
     this._frequency = "";
@@ -19024,6 +18985,45 @@ var CustomYSensor = class {
         }
       }
     }
+  }
+  get isReadOnly() {
+    return this._readonly || !this._online;
+  }
+  static get MaxDataRecords() {
+    return CustomYSensor._MaxDataRecords;
+  }
+  static set MaxDataRecords(value) {
+    CustomYSensor._MaxDataRecords = value;
+  }
+  static get MaxLoggerRecords() {
+    return CustomYSensor._MaxLoggerRecords;
+  }
+  static set MaxLoggerRecords(value) {
+    CustomYSensor._MaxLoggerRecords = value;
+  }
+  get_lastAvgValue() {
+    if (this._online)
+      return this._lastAvgValue;
+    return Number.NaN;
+  }
+  get_lastMaxValue() {
+    if (this._online)
+      return this._lastMaxValue;
+    return Number.NaN;
+  }
+  get_lastMinValue() {
+    if (this._online)
+      return this._lastMinValue;
+    return Number.NaN;
+  }
+  ConfigHasChanged() {
+    return __awaiter4(this, void 0, void 0, function* () {
+      this.cfgChgNotificationsSupported = true;
+      this.mustReloadConfig = true;
+      this._online = true;
+      yield this.reloadConfig();
+      yield this.forceUpdate();
+    });
   }
   checkAlarmIndex(index) {
     while (this.Alarms.length < index + 1) {
@@ -19984,6 +19984,84 @@ var __awaiter5 = function(thisArg, _arguments, P, generator) {
   });
 };
 var YWidget = class {
+  constructor(node, editor, default_x, default_y, default_width, default_height) {
+    this._genProp = null;
+    this._genRenderer = null;
+    this._BackColor = YColor.Transparent;
+    this._BorderColor = YColor.Gray;
+    this._relativePositionX = 0;
+    this._relativePositionY = 0;
+    this._PositionX = 0;
+    this._PositionY = 0;
+    this._relativeWidth = 100;
+    this._relativeHeight = 100;
+    this._Width = 300;
+    this._Height = 0;
+    this._InitialSizeIsRelative = false;
+    this._SizeIsRelative = false;
+    this._initialContainerID = "";
+    this._containerID = "";
+    this._Text = "";
+    let left = typeof default_x != "undefined" ? default_x : 0;
+    let top = typeof default_y != "undefined" ? default_y : 0;
+    let width = typeof default_width != "undefined" ? default_width : 0;
+    let height = typeof default_height != "undefined" ? default_height : 0;
+    let bottom = Number.NaN;
+    let right = Number.NaN;
+    if (node != null) {
+      let childnodes = node.get_childsByName();
+      if ("location" in childnodes) {
+        let it = childnodes["location"];
+        let attributes = it.get_attributes();
+        if ("x" in attributes)
+          left = parseInt(attributes["x"]);
+        if ("y" in attributes)
+          top = parseInt(attributes["y"]);
+      }
+      if ("size" in childnodes) {
+        let it = childnodes["size"];
+        let attributes = it.get_attributes();
+        if ("w" in attributes)
+          width = parseInt(attributes["w"]);
+        if ("h" in attributes)
+          height = parseInt(attributes["h"]);
+      }
+      if ("relativeCoord" in childnodes) {
+        let it = childnodes["relativeCoord"];
+        let attributes = it.get_attributes();
+        if ("x" in attributes)
+          this._relativePositionX = this.sizeRound(parseFloat(attributes["x"]));
+        if ("y" in attributes)
+          this._relativePositionY = this.sizeRound(parseFloat(attributes["y"]));
+        if ("w" in attributes)
+          this._relativeWidth = this.sizeRound(parseFloat(attributes["w"]));
+        if ("h" in attributes)
+          this._relativeHeight = this.sizeRound(parseFloat(attributes["h"]));
+        if ("active" in attributes)
+          this._InitialSizeIsRelative = attributes["active"].toUpperCase() == "TRUE";
+      }
+      if ("container" in childnodes) {
+        let it = childnodes["container"];
+        let attributes = it.get_attributes();
+        if ("id" in attributes)
+          this._initialContainerID = attributes["id"];
+      }
+    }
+    this.UIContainer = document.createElement("CANVAS");
+    this.UIContainer.style.position = "absolute";
+    let h = window.innerHeight;
+    let w = window.innerWidth;
+    this.PositionX = this._InitialSizeIsRelative ? Math.round(w * (this._relativePositionX / 100)) : left;
+    this.PositionY = this._InitialSizeIsRelative ? Math.round(h * (this._relativePositionY / 100)) : top;
+    this.Width = this._InitialSizeIsRelative ? Math.round(w * (this._relativeWidth / 100)) : width;
+    this.Height = this._InitialSizeIsRelative ? Math.round(h * (this._relativeWidth / 100)) : height;
+    this.UIContainer.style.border = "1px solid black";
+    this.UIContainer.style.backgroundColor = this._BackColor.htmlCode;
+    this.UIContainer.setAttribute("name", "YoctoVisualizationWidget");
+    document.body.appendChild(this.UIContainer);
+    this._windowResizeCallback = () => this.windowResized();
+    window.addEventListener("resize", this._windowResizeCallback);
+  }
   static log(st) {
     logForm.log(st);
   }
@@ -20251,84 +20329,6 @@ var YWidget = class {
   }
   contextMenuIsOpening() {
   }
-  constructor(node, editor, default_x, default_y, default_width, default_height) {
-    this._genProp = null;
-    this._genRenderer = null;
-    this._BackColor = YColor.Transparent;
-    this._BorderColor = YColor.Gray;
-    this._relativePositionX = 0;
-    this._relativePositionY = 0;
-    this._PositionX = 0;
-    this._PositionY = 0;
-    this._relativeWidth = 100;
-    this._relativeHeight = 100;
-    this._Width = 300;
-    this._Height = 0;
-    this._InitialSizeIsRelative = false;
-    this._SizeIsRelative = false;
-    this._initialContainerID = "";
-    this._containerID = "";
-    this._Text = "";
-    let left = typeof default_x != "undefined" ? default_x : 0;
-    let top = typeof default_y != "undefined" ? default_y : 0;
-    let width = typeof default_width != "undefined" ? default_width : 0;
-    let height = typeof default_height != "undefined" ? default_height : 0;
-    let bottom = Number.NaN;
-    let right = Number.NaN;
-    if (node != null) {
-      let childnodes = node.get_childsByName();
-      if ("location" in childnodes) {
-        let it = childnodes["location"];
-        let attributes = it.get_attributes();
-        if ("x" in attributes)
-          left = parseInt(attributes["x"]);
-        if ("y" in attributes)
-          top = parseInt(attributes["y"]);
-      }
-      if ("size" in childnodes) {
-        let it = childnodes["size"];
-        let attributes = it.get_attributes();
-        if ("w" in attributes)
-          width = parseInt(attributes["w"]);
-        if ("h" in attributes)
-          height = parseInt(attributes["h"]);
-      }
-      if ("relativeCoord" in childnodes) {
-        let it = childnodes["relativeCoord"];
-        let attributes = it.get_attributes();
-        if ("x" in attributes)
-          this._relativePositionX = this.sizeRound(parseFloat(attributes["x"]));
-        if ("y" in attributes)
-          this._relativePositionY = this.sizeRound(parseFloat(attributes["y"]));
-        if ("w" in attributes)
-          this._relativeWidth = this.sizeRound(parseFloat(attributes["w"]));
-        if ("h" in attributes)
-          this._relativeHeight = this.sizeRound(parseFloat(attributes["h"]));
-        if ("active" in attributes)
-          this._InitialSizeIsRelative = attributes["active"].toUpperCase() == "TRUE";
-      }
-      if ("container" in childnodes) {
-        let it = childnodes["container"];
-        let attributes = it.get_attributes();
-        if ("id" in attributes)
-          this._initialContainerID = attributes["id"];
-      }
-    }
-    this.UIContainer = document.createElement("CANVAS");
-    this.UIContainer.style.position = "absolute";
-    let h = window.innerHeight;
-    let w = window.innerWidth;
-    this.PositionX = this._InitialSizeIsRelative ? Math.round(w * (this._relativePositionX / 100)) : left;
-    this.PositionY = this._InitialSizeIsRelative ? Math.round(h * (this._relativePositionY / 100)) : top;
-    this.Width = this._InitialSizeIsRelative ? Math.round(w * (this._relativeWidth / 100)) : width;
-    this.Height = this._InitialSizeIsRelative ? Math.round(h * (this._relativeWidth / 100)) : height;
-    this.UIContainer.style.border = "1px solid black";
-    this.UIContainer.style.backgroundColor = this._BackColor.htmlCode;
-    this.UIContainer.setAttribute("name", "YoctoVisualizationWidget");
-    document.body.appendChild(this.UIContainer);
-    this._windowResizeCallback = () => this.windowResized();
-    window.addEventListener("resize", this._windowResizeCallback);
-  }
   rearrangeZindexes() {
     let containers = document.getElementsByName("YoctoVisualizationWidget");
     let n = 0;
@@ -20385,29 +20385,6 @@ var YWidget = class {
   }
 };
 var gaugeWidget = class extends YWidget {
-  containerResized() {
-    if (this._gauge != null)
-      this._gauge.containerResized();
-  }
-  destroy() {
-    this.prop.destroy();
-    super.destroy();
-    Object.entries(this).forEach((pair) => {
-      Reflect.set(this, pair[0], null);
-    });
-  }
-  contextMenuIsOpening() {
-    YWebPage.snapshotMenuItem.userdata = this;
-    YWebPage.snapshotMenuItem.visible = true;
-    YWebPage.resetDataViewMenuItem.visible = false;
-  }
-  get confirmDeleteString() {
-    return "Do you really want to delete this gauge ?";
-  }
-  AnnotationCallback(text) {
-    let sensor = this.prop.DataSource_source;
-    return this.PatchSensorAnnotationCallback(sensor, text);
-  }
   constructor(node, editor, x, y, width, height) {
     super(node, editor, x, y, width, height);
     this._gauge = new YSolidGauge(this.UIContainer, YSolidGauge.DisplayMode.DISPLAY90, YWidget.log);
@@ -20440,6 +20417,29 @@ var gaugeWidget = class extends YWidget {
     this.ApplyRelativeSizeIfRequired();
     this._gauge.AllowRedraw();
   }
+  containerResized() {
+    if (this._gauge != null)
+      this._gauge.containerResized();
+  }
+  destroy() {
+    this.prop.destroy();
+    super.destroy();
+    Object.entries(this).forEach((pair) => {
+      Reflect.set(this, pair[0], null);
+    });
+  }
+  contextMenuIsOpening() {
+    YWebPage.snapshotMenuItem.userdata = this;
+    YWebPage.snapshotMenuItem.visible = true;
+    YWebPage.resetDataViewMenuItem.visible = false;
+  }
+  get confirmDeleteString() {
+    return "Do you really want to delete this gauge ?";
+  }
+  AnnotationCallback(text) {
+    let sensor = this.prop.DataSource_source;
+    return this.PatchSensorAnnotationCallback(sensor, text);
+  }
   SourceChanged(value, index) {
     this.noDataSourcepanel.enabled = value instanceof NullYSensor;
     if (value instanceof NullYSensor) {
@@ -20458,29 +20458,6 @@ var gaugeWidget = class extends YWidget {
 };
 gaugeWidget.AnnotationPanelCount = 0;
 var angularGaugeWidget = class extends YWidget {
-  containerResized() {
-    if (this._angularGauge != null)
-      this._angularGauge.containerResized();
-  }
-  destroy() {
-    this.prop.destroy();
-    super.destroy();
-    Object.entries(this).forEach((pair) => {
-      Reflect.set(this, pair[0], null);
-    });
-  }
-  AnnotationCallback(text) {
-    let sensor = this.prop.DataSource_source;
-    return this.PatchSensorAnnotationCallback(sensor, text);
-  }
-  contextMenuIsOpening() {
-    YWebPage.snapshotMenuItem.userdata = this;
-    YWebPage.snapshotMenuItem.visible = true;
-    YWebPage.resetDataViewMenuItem.visible = false;
-  }
-  get confirmDeleteString() {
-    return "Do you really want to delete this gauge ?";
-  }
   constructor(node, editor, x, y, width, height) {
     super(node, editor, x, y, width, height);
     this._angularGauge = new YAngularGauge(this.UIContainer, YWidget.log);
@@ -20518,6 +20495,29 @@ var angularGaugeWidget = class extends YWidget {
     this._angularGauge.resizeRule = Proportional.ResizeRule.RELATIVETOBOTH;
     this.ApplyRelativeSizeIfRequired();
     this._angularGauge.AllowRedraw();
+  }
+  containerResized() {
+    if (this._angularGauge != null)
+      this._angularGauge.containerResized();
+  }
+  destroy() {
+    this.prop.destroy();
+    super.destroy();
+    Object.entries(this).forEach((pair) => {
+      Reflect.set(this, pair[0], null);
+    });
+  }
+  AnnotationCallback(text) {
+    let sensor = this.prop.DataSource_source;
+    return this.PatchSensorAnnotationCallback(sensor, text);
+  }
+  contextMenuIsOpening() {
+    YWebPage.snapshotMenuItem.userdata = this;
+    YWebPage.snapshotMenuItem.visible = true;
+    YWebPage.resetDataViewMenuItem.visible = false;
+  }
+  get confirmDeleteString() {
+    return "Do you really want to delete this gauge ?";
   }
   showStatus(status) {
     if (status != "")
@@ -20564,29 +20564,6 @@ var angularGaugeWidget = class extends YWidget {
 angularGaugeWidget.AnnotationPanelCount = 0;
 angularGaugeWidget.zonesCount = 0;
 var digitalDisplayWidget = class extends YWidget {
-  containerResized() {
-    if (this._display != null)
-      this._display.containerResized();
-  }
-  destroy() {
-    this.prop.destroy();
-    super.destroy();
-    Object.entries(this).forEach((pair) => {
-      Reflect.set(this, pair[0], null);
-    });
-  }
-  AnnotationCallback(text) {
-    let sensor = this.prop.DataSource_source;
-    return this.PatchSensorAnnotationCallback(sensor, text);
-  }
-  contextMenuIsOpening() {
-    YWebPage.snapshotMenuItem.userdata = this;
-    YWebPage.snapshotMenuItem.visible = true;
-    YWebPage.resetDataViewMenuItem.visible = false;
-  }
-  get confirmDeleteString() {
-    return "Do you really want to delete this digital display ?";
-  }
   constructor(node, editor, x, y, width, height) {
     super(node, editor, x, y, width, height);
     this._unit = "";
@@ -20624,6 +20601,29 @@ var digitalDisplayWidget = class extends YWidget {
     this._display.resizeRule = Proportional.ResizeRule.RELATIVETOBOTH;
     this.ApplyRelativeSizeIfRequired();
     this._display.AllowRedraw();
+  }
+  containerResized() {
+    if (this._display != null)
+      this._display.containerResized();
+  }
+  destroy() {
+    this.prop.destroy();
+    super.destroy();
+    Object.entries(this).forEach((pair) => {
+      Reflect.set(this, pair[0], null);
+    });
+  }
+  AnnotationCallback(text) {
+    let sensor = this.prop.DataSource_source;
+    return this.PatchSensorAnnotationCallback(sensor, text);
+  }
+  contextMenuIsOpening() {
+    YWebPage.snapshotMenuItem.userdata = this;
+    YWebPage.snapshotMenuItem.visible = true;
+    YWebPage.resetDataViewMenuItem.visible = false;
+  }
+  get confirmDeleteString() {
+    return "Do you really want to delete this digital display ?";
   }
   valueFormater(source, value) {
     if (this.prop.DataSource_source instanceof NullYSensor) {
@@ -20666,57 +20666,6 @@ var digitalDisplayWidget = class extends YWidget {
 };
 digitalDisplayWidget.AnnotationPanelCount = 0;
 var graphWidget = class extends YWidget {
-  AnnotationCallback(text) {
-    for (let i = 0; i < graphWidget.SeriesCount; i++) {
-      let s = Reflect.get(this.prop, "Graph_series" + i.toString());
-      let sensor = s.DataSource_source;
-      let name = "None";
-      let avgvalue = "N/A";
-      let minvalue = "N/A";
-      let maxvalue = "N/A";
-      let unit = "";
-      if (!(sensor instanceof NullYSensor)) {
-        let resolution = -Math.round(Math.log10(sensor.get_resolution()));
-        name = s.legend != "" ? s.legend : sensor.get_friendlyName();
-        if (sensor.isOnline()) {
-          avgvalue = sensor.get_lastAvgValue().toFixed(resolution);
-          minvalue = sensor.get_lastMinValue().toFixed(resolution);
-          maxvalue = sensor.get_lastMaxValue().toFixed(resolution);
-        }
-        unit = sensor.get_unit();
-      }
-      text = text.replace("$NAME" + (i + 1).toString() + "$", name);
-      text = text.replace("$AVGVALUE" + (i + 1).toString() + "$", avgvalue);
-      text = text.replace("$MAXVALUE" + (i + 1).toString() + "$", maxvalue);
-      text = text.replace("$MINVALUE" + (i + 1).toString() + "$", minvalue);
-      text = text.replace("$UNIT" + (i + 1).toString() + "$", unit);
-    }
-    return text;
-  }
-  destroy() {
-    this.prop.destroy();
-    super.destroy();
-    Object.entries(this).forEach((pair) => {
-      Reflect.set(this, pair[0], null);
-    });
-  }
-  containerResized() {
-    if (this._graph != null)
-      this._graph.containerResized();
-  }
-  contextMenuIsOpening() {
-    YWebPage.snapshotMenuItem.userdata = this;
-    YWebPage.snapshotMenuItem.visible = true;
-    YWebPage.resetDataViewMenuItem.visible = true;
-    YWebPage.resetDataViewMenuItem.userdata = this;
-  }
-  startMarkerCapture(markerIndex) {
-    this.markers[markerIndex].startCapture();
-  }
-  AxisParamtersChangedAutomatically(source) {
-    let yaxis = source.userData;
-    yaxis.visible = source.visible;
-  }
   constructor(node, editor, x, y, width, height) {
     super(node, editor, x, y, width, height);
     this._graph = new YGraph(this.UIContainer, YWidget.log);
@@ -20823,6 +20772,57 @@ var graphWidget = class extends YWidget {
     this._graph.resizeRule = Proportional.ResizeRule.FIXED;
     this.ApplyRelativeSizeIfRequired();
     this._graph.AllowRedraw();
+  }
+  AnnotationCallback(text) {
+    for (let i = 0; i < graphWidget.SeriesCount; i++) {
+      let s = Reflect.get(this.prop, "Graph_series" + i.toString());
+      let sensor = s.DataSource_source;
+      let name = "None";
+      let avgvalue = "N/A";
+      let minvalue = "N/A";
+      let maxvalue = "N/A";
+      let unit = "";
+      if (!(sensor instanceof NullYSensor)) {
+        let resolution = -Math.round(Math.log10(sensor.get_resolution()));
+        name = s.legend != "" ? s.legend : sensor.get_friendlyName();
+        if (sensor.isOnline()) {
+          avgvalue = sensor.get_lastAvgValue().toFixed(resolution);
+          minvalue = sensor.get_lastMinValue().toFixed(resolution);
+          maxvalue = sensor.get_lastMaxValue().toFixed(resolution);
+        }
+        unit = sensor.get_unit();
+      }
+      text = text.replace("$NAME" + (i + 1).toString() + "$", name);
+      text = text.replace("$AVGVALUE" + (i + 1).toString() + "$", avgvalue);
+      text = text.replace("$MAXVALUE" + (i + 1).toString() + "$", maxvalue);
+      text = text.replace("$MINVALUE" + (i + 1).toString() + "$", minvalue);
+      text = text.replace("$UNIT" + (i + 1).toString() + "$", unit);
+    }
+    return text;
+  }
+  destroy() {
+    this.prop.destroy();
+    super.destroy();
+    Object.entries(this).forEach((pair) => {
+      Reflect.set(this, pair[0], null);
+    });
+  }
+  containerResized() {
+    if (this._graph != null)
+      this._graph.containerResized();
+  }
+  contextMenuIsOpening() {
+    YWebPage.snapshotMenuItem.userdata = this;
+    YWebPage.snapshotMenuItem.visible = true;
+    YWebPage.resetDataViewMenuItem.visible = true;
+    YWebPage.resetDataViewMenuItem.userdata = this;
+  }
+  startMarkerCapture(markerIndex) {
+    this.markers[markerIndex].startCapture();
+  }
+  AxisParamtersChangedAutomatically(source) {
+    let yaxis = source.userData;
+    yaxis.visible = source.visible;
   }
   decomposeToSegments(data, start, dataCount) {
     let n1 = start;
@@ -21200,12 +21200,6 @@ var PropDescription = class {
   }
 };
 var GenericProperties = class {
-  static NoFilter(propNname) {
-    return true;
-  }
-  static escapeXml(unsafe) {
-    return unsafe.replace(/[^ !#$%(-;=?-z]/g, (c) => "&#" + c.charCodeAt(0) + ";");
-  }
   constructor(Owner) {
     this._Form_Text = "New window";
     this._Form_BackColor = YColor.FromArgb(255, 240, 240, 240);
@@ -21218,6 +21212,12 @@ var GenericProperties = class {
     this._containerID = "";
     this.ownerForm = Owner;
     this._Form_Text = "new window";
+  }
+  static NoFilter(propNname) {
+    return true;
+  }
+  static escapeXml(unsafe) {
+    return unsafe.replace(/[^ !#$%(-;=?-z]/g, (c) => "&#" + c.charCodeAt(0) + ";");
   }
   destroy() {
     Object.entries(this).forEach((pair) => {
@@ -23532,16 +23532,16 @@ var digitalDisplayFormProperties = class extends GenericProperties {
   }
 };
 var AlarmSection = class {
+  constructor(index) {
+    this._sensor = sensorsManager.getNullSensor();
+    this._index = 0;
+    this._index = index;
+  }
   get summary() {
     let c = this._sensor.getAlarmCondition(this._index);
     if (c == 0)
       return "Disabled";
     return "Enabled";
-  }
-  constructor(index) {
-    this._sensor = sensorsManager.getNullSensor();
-    this._index = 0;
-    this._index = index;
   }
   get ATTR_source__DisplayName() {
     return "Data source type";
@@ -23992,6 +23992,39 @@ var LegendPanelDescription = class {
   }
 };
 var AnnotationPanelDescription = class {
+  constructor(hrzAlignInit, vrtAlignInit, offsetY, overlap, textInit, BgColorInit, BorderColorInit, fontSizeInit, FontColorInit) {
+    this._enabled = false;
+    this._overlap = false;
+    this._text = "Date: $DAY$/$MONTH$/$YEAR$";
+    this._panelTextAlign = GenericPanel.TextAlign.CENTER;
+    this._panelHrzAlign = GenericPanel.HorizontalAlignPos.CENTER;
+    this._positionOffsetX = 0;
+    this._panelVrtAlign = GenericPanel.VerticalAlignPos.TOP;
+    this._positionOffsetY = 0;
+    this._font = new FontDescription("Arial", 12, YColor.FromArgb(255, 32, 32, 32), false, false);
+    this._bgColor = YColor.FromArgb(200, 255, 255, 255);
+    this._borderColor = YColor.Black;
+    this._borderthickness = 1;
+    this._padding = 5;
+    if (typeof textInit != "undefined")
+      this._text = textInit;
+    if (typeof offsetY != "undefined")
+      this._positionOffsetY = offsetY;
+    if (typeof overlap != "undefined")
+      this._overlap = overlap;
+    if (typeof BgColorInit != "undefined")
+      this._bgColor = BgColorInit;
+    if (typeof BorderColorInit != "undefined")
+      this._borderColor = BorderColorInit;
+    if (typeof fontSizeInit != "undefined")
+      this._font.size = fontSizeInit;
+    if (typeof FontColorInit != "undefined")
+      this._font.color = FontColorInit;
+    if (typeof vrtAlignInit != "undefined")
+      this._panelVrtAlign = vrtAlignInit;
+    if (typeof hrzAlignInit != "undefined")
+      this._panelHrzAlign = hrzAlignInit;
+  }
   get summary() {
     return this._enabled ? "Enabled" : "Disabled";
   }
@@ -24165,39 +24198,6 @@ var AnnotationPanelDescription = class {
   }
   set padding(value) {
     this._padding = value;
-  }
-  constructor(hrzAlignInit, vrtAlignInit, offsetY, overlap, textInit, BgColorInit, BorderColorInit, fontSizeInit, FontColorInit) {
-    this._enabled = false;
-    this._overlap = false;
-    this._text = "Date: $DAY$/$MONTH$/$YEAR$";
-    this._panelTextAlign = GenericPanel.TextAlign.CENTER;
-    this._panelHrzAlign = GenericPanel.HorizontalAlignPos.CENTER;
-    this._positionOffsetX = 0;
-    this._panelVrtAlign = GenericPanel.VerticalAlignPos.TOP;
-    this._positionOffsetY = 0;
-    this._font = new FontDescription("Arial", 12, YColor.FromArgb(255, 32, 32, 32), false, false);
-    this._bgColor = YColor.FromArgb(200, 255, 255, 255);
-    this._borderColor = YColor.Black;
-    this._borderthickness = 1;
-    this._padding = 5;
-    if (typeof textInit != "undefined")
-      this._text = textInit;
-    if (typeof offsetY != "undefined")
-      this._positionOffsetY = offsetY;
-    if (typeof overlap != "undefined")
-      this._overlap = overlap;
-    if (typeof BgColorInit != "undefined")
-      this._bgColor = BgColorInit;
-    if (typeof BorderColorInit != "undefined")
-      this._borderColor = BorderColorInit;
-    if (typeof fontSizeInit != "undefined")
-      this._font.size = fontSizeInit;
-    if (typeof FontColorInit != "undefined")
-      this._font.color = FontColorInit;
-    if (typeof vrtAlignInit != "undefined")
-      this._panelVrtAlign = vrtAlignInit;
-    if (typeof hrzAlignInit != "undefined")
-      this._panelHrzAlign = hrzAlignInit;
   }
 };
 var AnnotationPanelDescriptionGraph = class extends AnnotationPanelDescription {
@@ -24430,9 +24430,6 @@ var DataTrackerDescription = class {
   DataTrackerDescription2.DataPrecision = DataPrecision;
 })(DataTrackerDescription || (DataTrackerDescription = {}));
 var NavigatorDescription = class {
-  get summary() {
-    return this._enabled ? "Enabled" : "Disabled";
-  }
   constructor() {
     this._enabled = false;
     this._bgColor1 = YColor.FromArgb(255, 225, 225, 225);
@@ -24445,6 +24442,9 @@ var NavigatorDescription = class {
     this._xAxisThickness = 1;
     this._xAxisColor = YColor.Black;
     this._font = new FontDescription("Arial", 10, YColor.FromArgb(255, 32, 32, 32), false, false);
+  }
+  get summary() {
+    return this._enabled ? "Enabled" : "Disabled";
   }
   get ATTR_enabled__DisplayName() {
     return "Enabled";
@@ -25736,12 +25736,6 @@ var ContextMenuSeparator = class {
   }
 };
 var ContextMenuItemBase = class {
-  get userdata() {
-    return this._userdata;
-  }
-  set userdata(value) {
-    this._userdata = value;
-  }
   constructor(menu, icon, caption) {
     this._clickHidesMenu = true;
     this._userdata = null;
@@ -25798,6 +25792,12 @@ var ContextMenuItemBase = class {
     this.TR.appendChild(this.TD_caption);
     this.TR.addEventListener("focusin", this._TR_focusin);
     this.TR.addEventListener("focusout", this._TR_focusout);
+  }
+  get userdata() {
+    return this._userdata;
+  }
+  set userdata(value) {
+    this._userdata = value;
   }
   toString() {
     return this.TD_caption.innerText;
@@ -25886,16 +25886,16 @@ var ContextMenuItemBase = class {
   }
 };
 var ContextMenuItem = class extends ContextMenuItemBase {
+  constructor(menu, icon, caption, callback) {
+    super(menu, icon, caption);
+    this._callback = callback;
+    this.TD_caption.colSpan = 2;
+  }
   activate() {
     if (this._clickHidesMenu)
       this.closeMenu(true);
     if (this._callback != null)
       this._callback();
-  }
-  constructor(menu, icon, caption, callback) {
-    super(menu, icon, caption);
-    this._callback = callback;
-    this.TD_caption.colSpan = 2;
   }
 };
 var ContextMenuItemSubMenuEntry = class extends ContextMenuItem {
@@ -25975,18 +25975,6 @@ var ContextMenuItemSubMenuEntry = class extends ContextMenuItem {
   }
 };
 var ContextMenuBase = class {
-  get parentMenuItem() {
-    return this._parentMenuItem;
-  }
-  set parentMenuItem(value) {
-    this._parentMenuItem = value;
-  }
-  get userdata() {
-    return this._userdata;
-  }
-  set userdata(value) {
-    this._userdata = value;
-  }
   constructor(baseSize, openCallback, fontFamily) {
     this._visible = false;
     this._zIndex = 100002;
@@ -26005,6 +25993,18 @@ var ContextMenuBase = class {
     this.Menutable.style.zIndex = this._zIndex.toString();
     this._timer = null;
     this.visible = false;
+  }
+  get parentMenuItem() {
+    return this._parentMenuItem;
+  }
+  set parentMenuItem(value) {
+    this._parentMenuItem = value;
+  }
+  get userdata() {
+    return this._userdata;
+  }
+  set userdata(value) {
+    this._userdata = value;
   }
   closeAll() {
     this.close();
@@ -26979,9 +26979,6 @@ var button = class {
   }
 };
 var newWindowParam = class {
-  get GUICoef() {
-    return this._GUICoef;
-  }
   constructor(sizeCoefOverload) {
     this.createNow = false;
     this.left = 100;
@@ -27020,6 +27017,9 @@ var newWindowParam = class {
       this._GUICoef = sizeCoefOverload;
     }
   }
+  get GUICoef() {
+    return this._GUICoef;
+  }
   clone() {
     let it = new newWindowParam();
     let keys = Object.keys(this);
@@ -27034,13 +27034,6 @@ var newWindowParam = class {
   }
 };
 var YWindow = class {
-  static get ConTextMenuBestZindex() {
-    for (let i = 0; i < YWindow.windowList.length; i++) {
-      if (YWindow.windowList[i].isModal())
-        return -1;
-    }
-    return 1e5 + 2 * YWindow.windowList.length;
-  }
   constructor(params) {
     this._div = null;
     this._titleSpan = null;
@@ -27052,6 +27045,13 @@ var YWindow = class {
     this._contents = document.createElement("DIV");
     if (params.createNow)
       this.allocate();
+  }
+  static get ConTextMenuBestZindex() {
+    for (let i = 0; i < YWindow.windowList.length; i++) {
+      if (YWindow.windowList[i].isModal())
+        return -1;
+    }
+    return 1e5 + 2 * YWindow.windowList.length;
   }
   get innerContentDiv() {
     return this._contents;
@@ -27616,33 +27616,6 @@ var HTTPrequestResult = class {
   }
 };
 var HubInfo = class {
-  get protocol() {
-    return this._protocol;
-  }
-  get addr() {
-    return this._addr;
-  }
-  get port() {
-    return this._port;
-  }
-  get path() {
-    return this._path;
-  }
-  get userPassword() {
-    return this._userPassword;
-  }
-  get adminPassword() {
-    return this._adminPassword;
-  }
-  get serial() {
-    return this._serial;
-  }
-  get srvUsername() {
-    return this._srvusername != null ? this._srvusername : "";
-  }
-  get srvPassword() {
-    return this._srvpassword != null ? this._srvpassword : "";
-  }
   constructor(protocol, addr, port, path, srvusername, srvpassword) {
     this._userPassword = false;
     this._adminPassword = false;
@@ -27671,6 +27644,33 @@ var HubInfo = class {
         this._path = this._path.slice(0, -1);
       }
     }
+  }
+  get protocol() {
+    return this._protocol;
+  }
+  get addr() {
+    return this._addr;
+  }
+  get port() {
+    return this._port;
+  }
+  get path() {
+    return this._path;
+  }
+  get userPassword() {
+    return this._userPassword;
+  }
+  get adminPassword() {
+    return this._adminPassword;
+  }
+  get serial() {
+    return this._serial;
+  }
+  get srvUsername() {
+    return this._srvusername != null ? this._srvusername : "";
+  }
+  get srvPassword() {
+    return this._srvpassword != null ? this._srvpassword : "";
   }
   get_hubUrl(user, password) {
     let url = this.protocol + "://";

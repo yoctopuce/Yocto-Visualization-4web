@@ -116,9 +116,9 @@ export class YV4W_installer
 
     // debug purpose
     private   DEFAULT_PROTOCOL: string = YV4W_installer.HTTPS;
-    private  DEFAULTADDR: string = "yoctopuce-demo.org";
+    private  DEFAULTADDR: string = "";
     private  DEFAULTPORT: string = "443";
-    private  DEFAULTPATH: string = "CloudHub/mm";
+    private  DEFAULTPATH: string = "";
 
     private readonly DEFAULTUSER: string = "";
     private readonly DEFAULTPWD: string = "";
@@ -473,8 +473,8 @@ export class YV4W_installer
 
             Row = document.createElement("TR") as HTMLTableRowElement;
             TD1 = document.createElement("TD") as HTMLTableCellElement;
-            TD1.innerText = "On VirtualHub (for web), port is likely to be 80 if it is accessible by HTTP or 443 if it is only accessible through HTTPS. On VirtualHubs, port is likely to be 4444.\n\n"
-                + "On VirtualHub (for web), path is probably required, HTTP username et password might be required as well if the Cloudhub is installed on a password protected web server.";
+            TD1.innerText = "On VirtualHub (for web), the recommended setting is HTTPS, typically on port 443, and the instance path is required as well.\n\n"
+                + "On VirtualHubs and YoctoHubs, it is recommended to use WebSockets (WS), typically on port 4444.";
             TD1.colSpan = 2;
             Row.appendChild(TD1);
             Table.appendChild(Row);
@@ -782,8 +782,10 @@ export class YV4W_installer
             TD1 = document.createElement("TD") as HTMLTableCellElement;
             TD1.innerText = "Username:";
             TD1.style.borderLeft="20px solid transparent";
+            TD1.style.fontSize = "smaller";
             Row.appendChild(TD1);
             let TD2: HTMLTableCellElement = document.createElement("TD") as HTMLTableCellElement;
+            TD2.style.fontSize = "smaller";
             this._adminNameInput = document.createElement("INPUT") as HTMLInputElement;
             this._adminNameInput.addEventListener("input", () =>
             {
@@ -794,6 +796,7 @@ export class YV4W_installer
 
             let TD3 : HTMLTableCellElement = document.createElement("TD") as HTMLTableCellElement;
             TD3.innerText = "Password:";
+            TD3.style.fontSize = "smaller";
             Row.appendChild(TD3);
             let TD4 : HTMLTableCellElement = document.createElement("TD") as HTMLTableCellElement;
             this._adminPasswordInput = document.createElement("INPUT") as HTMLInputElement;
@@ -803,6 +806,7 @@ export class YV4W_installer
             this.MakeSureCredentialsAreNotEmpty()
             })
             TD4.appendChild(this._adminPasswordInput);
+            TD4.style.fontSize = "smaller";
             Row.appendChild(TD4);
 
             this._adminNameInput.value = this.DEFAULTUSER;
@@ -826,8 +830,10 @@ export class YV4W_installer
             TD1 = document.createElement("TD") as HTMLTableCellElement;
             TD1.innerText = "Username:";
             TD1.style.borderLeft="20px solid transparent";
+            TD1.style.fontSize = "smaller";
             userRow2.appendChild(TD1);
             TD2 = document.createElement("TD") as HTMLTableCellElement;
+            TD2.style.fontSize = "smaller";
             this._userNameInput = document.createElement("INPUT") as HTMLInputElement;
             this._userNameInput.addEventListener("input", () =>
             {
@@ -838,6 +844,7 @@ export class YV4W_installer
 
             TD3  = document.createElement("TD") as HTMLTableCellElement;
             TD3.innerText = "Password:";
+            TD3.style.fontSize = "smaller";
             userRow2.appendChild(TD3);
             TD4  = document.createElement("TD") as HTMLTableCellElement;
             this._userPasswordInput = document.createElement("INPUT") as HTMLInputElement;
@@ -847,6 +854,7 @@ export class YV4W_installer
             this.MakeSureCredentialsAreNotEmpty()
             })
             TD4.appendChild(this._userPasswordInput);
+            TD4.style.fontSize = "smaller";
             userRow2.appendChild(TD4);
 
             this._userNameInput.value = this.DEFAULTUSER;

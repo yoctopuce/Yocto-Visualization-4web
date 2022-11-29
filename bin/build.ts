@@ -166,7 +166,7 @@ async function bundleRenderer(objdir: string, target: string, banner: string)
         target: target,
         format: fmt,
         globalName: 'Renderer',
-        sourcemap: true,
+        sourcemap: false,
         banner: banner,
         outfile: 'dist/'+target+'/yv4web-renderer.js',
     });
@@ -176,7 +176,7 @@ async function bundleRenderer(objdir: string, target: string, banner: string)
         target: target,
         format: fmt,
         globalName: 'Renderer',
-        sourcemap: true,
+        sourcemap: false,
         minify: true,
         banner: banner,
         outfile: 'dist/'+target+'/yv4web-renderer.min.js',
@@ -199,7 +199,7 @@ async function bundle(objdir: string, target: string, bundleName: string, banner
         bundle: true,
         target: target,
         format: 'esm',
-        sourcemap: true,
+        sourcemap: false,
         minify: true,
         banner: banner,
         outfile: 'dist/'+target+'/'+bundleName+'.min.js',
@@ -242,47 +242,77 @@ async function bundleInstaller(objdir: string, target: string, bundleName: strin
         bundle: true,
         target: target,
         format: 'esm',
-        sourcemap: true,
+        sourcemap: false,
         minify: true,
         banner: banner,
         outfile: 'dist/'+target+'/'+bundleName+'.min.js',
     });
 }
 
+async function cleanup(full: boolean)
+{
+    // Cleanup intermediate object files
+    let objFiles: string[] = findFilesRecursively('obj', /\.(ts|js|map)$/);
+    for(let file of objFiles) {
+        fs.unlinkSync(file);
+    }
+
+    if(full) {
+        // Cleanup all files
+        let distFiles: string[] = findFilesRecursively('dist', /\.(js|map)$/);
+        for(let file of distFiles) {
+            fs.unlinkSync(file);
+        }
+    }
+
+    fs.unlinkSync('bin/build.js.map');
+    fs.unlinkSync('bin/build.js');
+}
+
 let args: string[] = process.argv.slice(2);
 if(args.length == 0) {
     console.log("command expected")
 } else {
-    switch(args[0]) {
-        case "newbuild":
-            setVersion(args[1]);
-            break;
-        case "build":
-            let json: { version: string } = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            console.log('Building version ' + json.version);
-            let buildES2015: boolean = (args.length < 2 || args[1] == 'es2015');
-            let buildES2017: boolean = (args.length < 2 || args[1] == 'es2017');
-            preprocess('src','obj/full',[]);
-            preprocess('src','obj/rdonly',['READONLY']);
-            if(buildES2015) {
-                transpile('obj/full', 'es2015');
-                transpile('obj/rdonly', 'es2015');
-                bundleRenderer('obj/rdonly', 'es2015', '/* Yocto-Visualization-4web renderer library (ES2015 '+json.version+') - www.yoctopuce.com */');
-                bundle('obj/rdonly', 'es2015', 'yv4web-readonly', '/* Yocto-Visualization-4web (ES2015 read-only '+json.version+') - www.yoctopuce.com */');
-                bundle('obj/full', 'es2015', 'yv4web-full','/* Yocto-Visualization-4web (ES2015 full '+json.version+') - www.yoctopuce.com */');
-            }
-            if(buildES2017) {
-                transpile('obj/full', 'es2017');
-                transpile('obj/rdonly', 'es2017');
-                bundleRenderer('obj/rdonly', 'es2017', '/* Yocto-Visualization-4web renderer library (ES2017 '+json.version+') - www.yoctopuce.com */');
-                Promise.all([
-                    bundle('obj/rdonly', 'es2017', 'yv4web-readonly', '/* Yocto-Visualization-4web (ES2017 read-only '+json.version+') - www.yoctopuce.com */'),
-                    bundle('obj/full', 'es2017', 'yv4web-full', '/* Yocto-Visualization-4web (ES2017 full '+json.version+') - www.yoctopuce.com */')
-                ]).then(() => {
-                    bundleInstaller('obj/full', 'es2017', 'yv4web-installer', '/* Yocto-Visualization-4web installer (version '+json.version+') - www.yoctopuce.com */');
-                });
-            }
-            break;
+    switch(args[0])
+    {
+    case "newbuild":
+        setVersion(args[1]);
+        break;
+    case "build":
+        let json: { version: string } = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+        console.log('Building version ' + json.version);
+        let buildES2015: boolean = (args.length < 2 || args[1] == 'es2015');
+        let buildES2017: boolean = (args.length < 2 || args[1] == 'es2017');
+        preprocess('src', 'obj/full', []);
+        preprocess('src', 'obj/rdonly', ['READONLY']);
+        if (buildES2015)
+        {
+            transpile('obj/full', 'es2015');
+            transpile('obj/rdonly', 'es2015');
+            bundleRenderer('obj/rdonly', 'es2015', '/* Yocto-Visualization-4web renderer library (ES2015 ' + json.version + ') - www.yoctopuce.com */');
+            bundle('obj/rdonly', 'es2015', 'yv4web-readonly', '/* Yocto-Visualization-4web (ES2015 read-only ' + json.version + ') - www.yoctopuce.com */');
+            bundle('obj/full', 'es2015', 'yv4web-full', '/* Yocto-Visualization-4web (ES2015 full ' + json.version + ') - www.yoctopuce.com */');
+        }
+        if (buildES2017)
+        {
+            transpile('obj/full', 'es2017');
+            transpile('obj/rdonly', 'es2017');
+            bundleRenderer('obj/rdonly', 'es2017', '/* Yocto-Visualization-4web renderer library (ES2017 ' + json.version + ') - www.yoctopuce.com */');
+            Promise.all([
+                bundle('obj/rdonly', 'es2017', 'yv4web-readonly', '/* Yocto-Visualization-4web (ES2017 read-only ' + json.version + ') - www.yoctopuce.com */'),
+                bundle('obj/full', 'es2017', 'yv4web-full', '/* Yocto-Visualization-4web (ES2017 full ' + json.version + ') - www.yoctopuce.com */')
+            ]).then(() =>
+            {
+                bundleInstaller('obj/full', 'es2017', 'yv4web-installer', '/* Yocto-Visualization-4web installer (version ' + json.version + ') - www.yoctopuce.com */');
+            });
+        }
+        break;
+    case "cleanup-release":
+        cleanup(false);
+        break;
+    case "cleanup-full":
+        cleanup(true);
+        break;
     }
 }
 
