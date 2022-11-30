@@ -119,18 +119,22 @@ export class YV4W_installer
     private  DEFAULTADDR: string = "";
     private  DEFAULTPORT: string = "443";
     private  DEFAULTPATH: string = "";
+    private  DEFAULTCANCELABLE: boolean = false;
 
     private readonly DEFAULTUSER: string = "";
     private readonly DEFAULTPWD: string = "";
     private readonly DEFAULTFILEPREFIX: string = "default";
-
     private readonly DEFAULTSRVUSERNAME: string = ""
     private readonly DEFAULTSRVPASSORD: string = ""
+
 
     private _container: HTMLElement
     private _prevButton: YoctoVisualization.button;
     private _nextButton: YoctoVisualization.button;
     private _okButton: YoctoVisualization.button;
+    private _cancelButton: YoctoVisualization.button;
+
+
     private _currentStep: number = 0;
     private _welcomeText: HTMLDivElement | null = null;
     private _hubAddr: HTMLDivElement | null = null;
@@ -275,6 +279,7 @@ export class YV4W_installer
               if (typeof options["addr"]  === "string")  this.DEFAULTADDR =  options["addr"];
               if (typeof options["port"]  === "number")  this.DEFAULTPORT =  options["port"].toString();
               if (typeof options["path"]  === "string")  this.DEFAULTPATH =  options["path"];
+              if (typeof options["cancelable"]  === "boolean")    this.DEFAULTCANCELABLE=  options["cancelable"];
 
           }
 
@@ -295,24 +300,35 @@ export class YV4W_installer
         {
             this.gotoPrevious()
         }, 1);
+
+       this._cancelButton = new YoctoVisualization.button("Cancel", async () =>
+         {
+          this.closeWindow();
+         }, 1);
+
         this._nextButton = new YoctoVisualization.button("Next >", () =>
         {
             this.gotoNext()
         }, 1);
         this._okButton = new YoctoVisualization.button("Ok", async () =>
         {
-            await this.resetAll()
+           this.DEFAULTCANCELABLE ? this.closeWindow() : await this.resetAll()
         }, 1);
 
+
+
         this._prevButton.tabIndex=100;
-        this._nextButton.tabIndex=101;
-        this._okButton.tabIndex=102;
+        this._cancelButton.tabIndex=101;
+        this._nextButton.tabIndex=102;
+        this._okButton.tabIndex=103;
 
         bottomdiv.appendChild(this._prevButton.Element);
+        bottomdiv.appendChild(this._cancelButton.Element);
         bottomdiv.appendChild(this._nextButton.Element);
         bottomdiv.appendChild(this._okButton.Element);
 
         this._prevButton.visible = false;
+        this._cancelButton.visible = this.DEFAULTCANCELABLE;
         this._container.appendChild(bottomdiv)
 
         let topDiv: HTMLDivElement = document.createElement("DIV") as HTMLDivElement;
@@ -333,6 +349,10 @@ export class YV4W_installer
 
         this.gotoPanel(this.WELCOMEPANEL)
     }
+
+    private closeWindow()
+       { this._container.parentElement?.removeChild(this._container);
+       }
 
     private createNewContentDiv(): HTMLDivElement
     {
@@ -375,10 +395,12 @@ export class YV4W_installer
         this._okButton.visible = false;
         this._prevButton.visible = false;
         this._nextButton.visible = true;
+        this._cancelButton.visible = this.DEFAULTCANCELABLE;
+
         if (this._welcomeText == null)
         {
             this._welcomeText = this.createNewContentDiv()
-            this._welcomeText.innerText = 'Yoctopuce is proud to offer you  Yocto-Visualization (for web), an application that will allows to view Yoctopuce sensors data with a simple web browser.\n\nThis wizard will help you to install Yocto-Visualization (for web) version ' + YoctoVisualization.constants.buildVersion + ' (' + this.ESVersion + ') on a YoctoHub such as YoctoHub-Ethernet, YoctoHub-Wireless, VirtualHub etc..\n\n Click on "next" to start'
+            this._welcomeText.innerText = 'Yoctopuce is proud to offer you  Yocto-Visualization (for web), an application that  allows to view Yoctopuce sensors data with a simple web browser.\n\nThis wizard will help you to install Yocto-Visualization (for web) version ' + YoctoVisualization.constants.buildVersion + ' (' + this.ESVersion + ') on a YoctoHub such as YoctoHub-Ethernet, YoctoHub-Wireless, VirtualHub etc..\n\n Click on "next" to start'
             this._container.appendChild(this._welcomeText)
 
         }
@@ -419,8 +441,10 @@ export class YV4W_installer
             let Row: HTMLTableRowElement = document.createElement("TR") as HTMLTableRowElement;
             let TD1: HTMLTableCellElement = document.createElement("TD") as HTMLTableCellElement;
             TD1.innerText = "Hub address:"
+            TD1.style.whiteSpace="normal";
             Row.appendChild(TD1);
             let TD2: HTMLTableCellElement = document.createElement("TD") as HTMLTableCellElement;
+            TD2.style.whiteSpace="normal";
 
             this._protocolInput = document.createElement("SELECT") as HTMLSelectElement;
             let httpopt1: HTMLOptionElement = document.createElement("OPTION") as HTMLOptionElement;
@@ -473,45 +497,33 @@ export class YV4W_installer
 
             Row = document.createElement("TR") as HTMLTableRowElement;
             TD1 = document.createElement("TD") as HTMLTableCellElement;
-            TD1.innerText = "On VirtualHub (for web), the recommended setting is HTTPS, typically on port 443, and the instance path is required as well.\n\n"
-                + "On VirtualHubs and YoctoHubs, it is recommended to use WebSockets (WS), typically on port 4444.";
+            TD1.style.whiteSpace="normal";
+            TD1.style.paddingTop="20px";
+            TD1.style.paddingBottom="20px";
+            TD1.style.textAlign="justify";
+
+            TD1.innerText = "On YoctoHubs, protocol is HTTP and port is likely to be 80. On native Virtualhub, protocol is HTTP and port is likely to be 4444. "
+               + "On VirtualHub (for web), the  hub path is mandatory and should be set to your VirtualHub (for web) instance path, protocol and  port can be either HTTP and 80 or HTTPS and 433."
+
             TD1.colSpan = 2;
             Row.appendChild(TD1);
             Table.appendChild(Row);
 
             Row = document.createElement("TR") as HTMLTableRowElement;
             TD1 = document.createElement("TD") as HTMLTableCellElement;
+            TD1.style.whiteSpace="normal";
             TD1.innerText = "Hub path:"
             Row.appendChild(TD1);
 
             TD2 = document.createElement("TD") as HTMLTableCellElement;
+            TD2.style.whiteSpace="normal";
             this._pathInput = document.createElement("INPUT") as HTMLInputElement;
             this._pathInput.value = this.DEFAULTPATH;
             this._pathInput.size = 48
             TD2.appendChild(this._pathInput);
             Row.appendChild(TD2);
             Table.appendChild(Row);
-            /*
-                  Row = document.createElement("TR") as HTMLTableRowElement;
-                  TD1 = document.createElement("TD") as HTMLTableCellElement;
-                  TD1.innerText = "username:"
-                  Row.appendChild(TD1);
-                  TD2 = document.createElement("TD") as HTMLTableCellElement;
-                  this._srvUsername = document.createElement("INPUT") as HTMLInputElement;
-                  this._srvUsername.value = this.DEFAULTSRVUSERNAME;
-                  this._srvUsername.size = 12
-                  TD2.appendChild(this._srvUsername);
-                  Row.appendChild(TD2);
-                  let txt: HTMLSpanElement = document.createElement("SPAN") as HTMLSpanElement;
-                  txt.innerText ="password:"
-                  TD2.appendChild(txt);
-                  this._srvPassword = document.createElement("INPUT") as HTMLInputElement;
-                   this._srvPassword.value = this.DEFAULTSRVPASSORD;
-                    this._srvPassword.size = 12
-                    TD2.appendChild(this._srvPassword);
 
-                    Table.appendChild(Row);
-            */
 
             this._hubAddr.appendChild(Table);
 
@@ -531,7 +543,7 @@ export class YV4W_installer
         this._nextButton.tabIndex=tabIndex++;
         (this._protocolInput as HTMLElement).focus();
 
-
+        this._nextButton.visible=true;
         this._nextButton.enabled = (<HTMLInputElement>this._ipAddrInput).value != "";
     }
 
@@ -548,11 +560,12 @@ export class YV4W_installer
             this._connectingText = this.createNewContentDiv()
             this._container.appendChild(this._connectingText)
         }
-        this._history.pop(); // this panel is not accessible through prev button
+        this.removeCurrentPanelFromHistory(); // this panel is not accessible through prev button
         this._connectingText.innerText = 'Connecting to hub ' + (<HTMLInputElement>this._ipAddrInput).value + ". Please wait..."
         this._connectingText.style.display = "";
         this._nextButton.visible = false;
         this._prevButton.visible = false;
+        this._cancelButton.visible = false;
         let IP: string = (<HTMLInputElement>this._ipAddrInput).value;
         let port: number = parseInt((<HTMLInputElement>this._ipPortInput).value);
         let protocol: string = (<HTMLSelectElement>this._protocolInput).value;
@@ -585,7 +598,7 @@ export class YV4W_installer
 
        if (!await info.makeRequest())
         {
-            let err: string = "Cannot connect to Hub\n\n" + url + '.\n\nMake sure the server is up, protocol, path, username and password are correct then click the "prev" to try again';
+            let err: string = "Cannot connect to Hub\n\n" + url + '.\n\nClick on the "prev" button, make sure the server is up, protocol, path, username and password are correct and try again';
             this.gotoPanel(this.CONNECTIONERROR, err);
             return;
 
@@ -696,6 +709,11 @@ export class YV4W_installer
 
     }
 
+    private  removeCurrentPanelFromHistory()
+        {
+        this._history.pop();
+        }
+
     private async showConnectionError(visible: boolean, goingback: boolean, message: string)
     {
         if (!visible)
@@ -713,17 +731,19 @@ export class YV4W_installer
         let Table: HTMLTableElement = document.createElement("TABLE") as HTMLTableElement;
         let Row: HTMLTableRowElement = document.createElement("TR") as HTMLTableRowElement;
         let TD1: HTMLTableCellElement = document.createElement("TD") as HTMLTableCellElement;
+    TD1.style.whiteSpace="normal";
         TD1.innerHTML = YoctoVisualization.ressources.FailedIcon("64", true, false, false, false, "oops");
         Row.appendChild(TD1);
         this._ErrMsgContainer = document.createElement("TD") as HTMLTableCellElement;
         Row.appendChild(this._ErrMsgContainer);
         Table.appendChild(Row)
-        this._connectiongError.appendChild(Table)
+        this._connectiongError.appendChild(Table);
 
-        this._history.pop(); // this panel is not accessible through prev button
+        //this.removeCurrentPanelFromHistory(); // this panel is not accessible through prev button
         (<HTMLTableCellElement>this._ErrMsgContainer).innerText = message;
         this._nextButton.visible = false;
         this._prevButton.visible = true;
+        this._cancelButton.visible = this.DEFAULTCANCELABLE;
         this._connectiongError.style.display = "";
 
         let tabIndex:number=1;
@@ -759,7 +779,7 @@ export class YV4W_installer
         if (this._history[this._history.length - 2] == this.PASSWORDPANEL)
         {
             errmsg = "Invalid credentials. " + errmsg;
-            this._history.pop()
+            this.removeCurrentPanelFromHistory();
         }
         if (this._pwdPanel == null)
         {
@@ -771,6 +791,7 @@ export class YV4W_installer
             let Table: HTMLTableElement = document.createElement("TABLE") as HTMLTableElement;
             let Row: HTMLTableRowElement = document.createElement("TR") as HTMLTableRowElement;
             let TD1: HTMLTableCellElement = document.createElement("TD") as HTMLTableCellElement;
+            TD1.style.whiteSpace="normal";
             /* admin credentials */
             TD1.innerText="Enter read/write credentials below, these are required for the installation but won't be saved in Yocto-Visualization's configuration."
             TD1.style.fontSize = "smaller"
@@ -780,11 +801,13 @@ export class YV4W_installer
 
             Row= document.createElement("TR") as HTMLTableRowElement;
             TD1 = document.createElement("TD") as HTMLTableCellElement;
+            TD1.style.whiteSpace="normal";
             TD1.innerText = "Username:";
             TD1.style.borderLeft="20px solid transparent";
             TD1.style.fontSize = "smaller";
             Row.appendChild(TD1);
             let TD2: HTMLTableCellElement = document.createElement("TD") as HTMLTableCellElement;
+            TD2.style.whiteSpace="normal";
             TD2.style.fontSize = "smaller";
             this._adminNameInput = document.createElement("INPUT") as HTMLInputElement;
             this._adminNameInput.addEventListener("input", () =>
@@ -795,10 +818,12 @@ export class YV4W_installer
             Row.appendChild(TD2);
 
             let TD3 : HTMLTableCellElement = document.createElement("TD") as HTMLTableCellElement;
+            TD3.style.whiteSpace="normal";
             TD3.innerText = "Password:";
             TD3.style.fontSize = "smaller";
             Row.appendChild(TD3);
             let TD4 : HTMLTableCellElement = document.createElement("TD") as HTMLTableCellElement;
+            TD4.style.whiteSpace="normal";
             this._adminPasswordInput = document.createElement("INPUT") as HTMLInputElement;
             this._adminPasswordInput.type="password"
             this._adminPasswordInput.addEventListener("input", () =>
@@ -820,6 +845,7 @@ export class YV4W_installer
             let userRow1: HTMLTableRowElement = document.createElement("TR") as HTMLTableRowElement;
 
             TD1 = document.createElement("TD") as HTMLTableCellElement;
+            TD1.style.whiteSpace="normal";
             TD1.innerText="\n\nEnter read-only credentials below, these will be saved in the configuration"
             TD1.style.fontSize = "smaller"
             TD1.colSpan=4;
@@ -828,11 +854,13 @@ export class YV4W_installer
 
             let userRow2: HTMLTableRowElement = document.createElement("TR") as HTMLTableRowElement;
             TD1 = document.createElement("TD") as HTMLTableCellElement;
+            TD1.style.whiteSpace="normal";
             TD1.innerText = "Username:";
             TD1.style.borderLeft="20px solid transparent";
             TD1.style.fontSize = "smaller";
             userRow2.appendChild(TD1);
             TD2 = document.createElement("TD") as HTMLTableCellElement;
+            TD2.style.whiteSpace="normal";
             TD2.style.fontSize = "smaller";
             this._userNameInput = document.createElement("INPUT") as HTMLInputElement;
             this._userNameInput.addEventListener("input", () =>
@@ -843,10 +871,12 @@ export class YV4W_installer
             userRow2.appendChild(TD2);
 
             TD3  = document.createElement("TD") as HTMLTableCellElement;
+            TD3.style.whiteSpace="normal";
             TD3.innerText = "Password:";
             TD3.style.fontSize = "smaller";
             userRow2.appendChild(TD3);
             TD4  = document.createElement("TD") as HTMLTableCellElement;
+            TD4.style.whiteSpace="normal";
             this._userPasswordInput = document.createElement("INPUT") as HTMLInputElement;
             this._userPasswordInput.type="password"
             this._userPasswordInput.addEventListener("input", () =>
@@ -888,6 +918,7 @@ export class YV4W_installer
 
         this._nextButton.visible = true;
         this._prevButton.visible = true;
+        this._cancelButton.visible = this.DEFAULTCANCELABLE;
         this._pwdPanel.style.display = "";
 
         let tabIndex:number=1;
@@ -906,11 +937,13 @@ export class YV4W_installer
     {
         let Row: HTMLTableRowElement = document.createElement("TR") as HTMLTableRowElement;
         let TD1: HTMLTableCellElement = document.createElement("TD") as HTMLTableCellElement;
+        TD1.style.whiteSpace="normal";
         TD1.style.whiteSpace = "nowrap";
         TD1.innerText = caption;
         Row.appendChild(TD1);
 
         let TD2: HTMLTableCellElement = document.createElement("TD") as HTMLTableCellElement;
+        TD2.style.whiteSpace="normal";
         TD2.innerText = value;
         Row.appendChild(TD2);
         return Row;
@@ -991,10 +1024,12 @@ export class YV4W_installer
                 Table.appendChild(this.createTextRow(" ", " "));
                 let Row: HTMLTableRowElement = document.createElement("TR") as HTMLTableRowElement;
                 let TD1: HTMLTableCellElement = document.createElement("TD") as HTMLTableCellElement;
+                TD1.style.whiteSpace="normal";
                 TD1.innerHTML = YoctoVisualization.ressources.FailedIcon("32", true, false, false, false, "oops");
                 TD1.style.textAlign = "right"
                 Row.appendChild(TD1);
                 let TD2: HTMLTableCellElement = document.createElement("TD") as HTMLTableCellElement;
+                TD2.style.whiteSpace="normal";
                 TD2.style.fontSize = "smaller";
                 TD2.innerText = error;
                 Row.appendChild(TD2);
@@ -1014,6 +1049,7 @@ export class YV4W_installer
         this._descPanel.style.display = "";
         this._nextButton.visible = true;
         this._prevButton.visible = true;
+        this._cancelButton.visible = this.DEFAULTCANCELABLE;
 
         let tabIndex:number=1;
         this._prevButton.tabIndex=tabIndex++;
@@ -1061,6 +1097,7 @@ export class YV4W_installer
 
         this._nextButton.visible = false;
         this._prevButton.visible = false;
+        this._cancelButton.visible = false;
 
         if (this._modifyInstallPanel == null)
         {
@@ -1185,8 +1222,9 @@ export class YV4W_installer
         this._modifyInstallPanel.style.display = "";
         this._nextButton.enabled = true;
         this._prevButton.enabled = true;
-        this._nextButton.visible = true;
+	      this._nextButton.visible = true;
         this._prevButton.visible = true;
+        this._cancelButton.visible = this.DEFAULTCANCELABLE;
 
         let tabIndex:number=1;
         (this._uninstallOpt    as HTMLElement).tabIndex=tabIndex++;
@@ -1229,11 +1267,13 @@ export class YV4W_installer
             {
                 let tr: HTMLTableRowElement = document.createElement("TR") as HTMLTableRowElement;
                 let td: HTMLTableCellElement = document.createElement("TD") as HTMLTableCellElement;
+                td.style.whiteSpace="normal";
 
                 td.innerText = this._webPageinstances[i].http_filename + (this._webPageinstances[i].compressed ? "[.gz]" : "");
                 tr.appendChild(td);
 
                 let td2: HTMLTableCellElement = document.createElement("TD") as HTMLTableCellElement;
+                td2.style.whiteSpace="normal";
                 td2.style.paddingLeft = "10px";
                 let chooser: HTMLSelectElement = document.createElement("SELECT") as HTMLSelectElement;
                 chooser.tabIndex = tabIndex++;
@@ -1345,10 +1385,12 @@ export class YV4W_installer
             Table.style.marginBottom = "20px";
             let Row: HTMLTableRowElement;
             let TD1: HTMLTableCellElement
+
             let TD2: HTMLTableCellElement
 
             Row = document.createElement("TR") as HTMLTableRowElement;
             TD1 = document.createElement("TD") as HTMLTableCellElement;
+            TD1.style.whiteSpace="normal";
             TD1.colSpan = 2;
             // TD1.style.fontSize="smaller"
             TD1.style.textAlign = "justify"
@@ -1358,9 +1400,11 @@ export class YV4W_installer
 
             Row = document.createElement("TR") as HTMLTableRowElement;
             TD1 = document.createElement("TD") as HTMLTableCellElement;
+            TD1.style.whiteSpace="normal";
             TD1.innerText = "Config file:";
             Row.appendChild(TD1);
             TD2 = document.createElement("TD") as HTMLTableCellElement;
+            TD2.style.whiteSpace="normal";
             this._configFileInput = document.createElement("INPUT") as HTMLInputElement;
             this._configFileInput.type = "file";
             this._configFileInput.accept = ".xml"
@@ -1371,6 +1415,7 @@ export class YV4W_installer
 
             Row = document.createElement("TR") as HTMLTableRowElement;
             TD1 = document.createElement("TD") as HTMLTableCellElement;
+            TD1.style.whiteSpace="normal";
             TD1.colSpan = 2;
             //TD1.style.fontSize="smaller"
             TD1.style.textAlign = "justify"
@@ -1381,9 +1426,11 @@ export class YV4W_installer
 
             Row = document.createElement("TR") as HTMLTableRowElement;
             TD1 = document.createElement("TD") as HTMLTableCellElement;
+            TD1.style.whiteSpace="normal";
             TD1.innerText = "HTML file:";
             Row.appendChild(TD1);
             TD2 = document.createElement("TD") as HTMLTableCellElement;
+            TD2.style.whiteSpace="normal";
             this._webPageInput = document.createElement("INPUT") as HTMLInputElement;
             this._webPageInput.type = "file";
             this._webPageInput.accept = ".html"
@@ -1396,8 +1443,9 @@ export class YV4W_installer
 
         this._nextButton.enabled = true;
         this._prevButton.enabled = true;
-        this._nextButton.visible = true;
+	this._nextButton.visible = true;
         this._prevButton.visible = true;
+        this._cancelButton.visible = this.DEFAULTCANCELABLE;
 
         let tabIndex:number=1;
         (this._webPageInput      as HTMLElement).tabIndex=tabIndex++;
@@ -1507,50 +1555,7 @@ export class YV4W_installer
                 this._useReadOnlyInput.checked = this._jsCodeinstances[0].readonly;
                 this._useFullVersionInput.checked = !this._jsCodeinstances[0].minified;
             }
-/*
-            this._userCredTable = document.createElement("TABLE") as HTMLTableElement;
-            this._userCredTable.style.fontSize = "small";
-            this._userCredTable.style.marginLeft = "20px";
-            this._userCredTable.style.marginTop = "0px";
-            this._userCredTable.style.marginBottom = "0px";
 
-            let Row: HTMLTableRowElement = document.createElement("TR") as HTMLTableRowElement;
-            let TD1: HTMLTableCellElement = document.createElement("TD") as HTMLTableCellElement;
-            TD1.colSpan = 2;
-            TD1.innerText = "On this hub, read-only feature requires the read-only credentials";
-            Row.appendChild(TD1);
-            this._userCredTable.appendChild(Row)
-            Row = document.createElement("TR") as HTMLTableRowElement;
-            TD1 = document.createElement("TD") as HTMLTableCellElement;
-
-            TD1.innerText = "Username:";
-            Row.appendChild(TD1);
-            let TD2: HTMLTableCellElement = document.createElement("TD") as HTMLTableCellElement;
-            this._userNameInput = document.createElement("INPUT") as HTMLInputElement;
-            this._userNameInput.value = "user"
-            this._userNameInput.addEventListener("input", () =>
-            {
-                this.MakeSureUserCredentialIsNotEmpty()
-            })
-            TD2.appendChild(this._userNameInput);
-            Row.appendChild(TD2);
-            this._userCredTable.appendChild(Row)
-            Row = document.createElement("TR") as HTMLTableRowElement;
-            TD1 = document.createElement("TD") as HTMLTableCellElement;
-            TD1.innerText = "Password:";
-            Row.appendChild(TD1);
-            TD2 = document.createElement("TD") as HTMLTableCellElement;
-            this._userPasswordInput = document.createElement("INPUT") as HTMLInputElement;
-            this._userPasswordInput.addEventListener("input", () =>
-            {
-                this.MakeSureUserCredentialIsNotEmpty()
-            })
-            TD2.appendChild(this._userPasswordInput);
-            Row.appendChild(TD2);
-            this._userCredTable.appendChild(Row)
-            this._userCredTable.style.display = "none"
-            this._optionsPanel.appendChild(this._userCredTable);
-            */
 
 
             p = document.createElement("P") as HTMLParagraphElement;
@@ -1563,6 +1568,7 @@ export class YV4W_installer
    //     (<HTMLTableElement>this._userCredTable).style.display = (this._currentHub_ReadOnlyProtected && (<HTMLInputElement>this._useReadOnlyInput).checked) ? "" : "none"
         this._nextButton.visible = true;
         this._prevButton.visible = true;
+        this._cancelButton.visible = this.DEFAULTCANCELABLE;
         this._optionsPanel.style.display = "";
 
         let tabIndex:number=1;
@@ -1614,6 +1620,7 @@ export class YV4W_installer
 
         this._nextButton.visible = false;
         this._prevButton.visible = false;
+        this._cancelButton.visible=false;
 
         switch (this._plannedaction)
         {
@@ -2355,6 +2362,7 @@ export class YV4W_installer
         this._nextButton.visible = true;
         this._nextButton.enabled = (<HTMLInputElement>this._confirmUninstall).checked;
         this._prevButton.visible = true;
+        this._cancelButton.visible = this.DEFAULTCANCELABLE;
 
         let tabIndex:number=1;
         (this._confirmUninstall    as HTMLElement).tabIndex=tabIndex++;
@@ -2381,6 +2389,7 @@ export class YV4W_installer
             let Table: HTMLTableElement = document.createElement("TABLE") as HTMLTableElement;
             let Row: HTMLTableRowElement = document.createElement("TR") as HTMLTableRowElement;
             let TD1: HTMLTableCellElement = document.createElement("TD") as HTMLTableCellElement;
+            TD1.style.whiteSpace="normal";
             TD1.innerHTML = YoctoVisualization.ressources.OkIcon("64", true, false, false, false, "youpi!");
             Row.appendChild(TD1);
             this._doneMsgContainer = document.createElement("TD") as HTMLTableCellElement;
@@ -2435,12 +2444,16 @@ export class YV4W_installer
         }
 
         p = document.createElement("P") as HTMLParagraphElement;
-        p.innerText = 'Click on the "Ok" button to restart the wizard';
+
+    this._cancelButton.visible = this.DEFAULTCANCELABLE;
+
+        p.innerText = this.DEFAULTCANCELABLE ? 'Click on the "Ok" button to close the wizard': 'Click on the "Ok" button to restart the wizard';
         (<HTMLTableCellElement>this._doneMsgContainer).appendChild(p);
 
-        this._history.pop(); // this panel is not accessible through prev button
+         this.removeCurrentPanelFromHistory(); // this panel is not accessible through prev button
         this._nextButton.visible = false;
         this._prevButton.visible = false;
+        this._cancelButton.visible = false;
         this._okButton.visible = true;
         this._donePanel.style.display = "";
 
@@ -2512,6 +2525,7 @@ export class YV4W_installer
         this._prevButton.visible = false;
         this._nextButton.visible = true;
         this._okButton.visible = false;
+        this._cancelButton.visible = this.DEFAULTCANCELABLE;
         this._jsCodeinstances = [];
         this._webPageinstances = [];
 

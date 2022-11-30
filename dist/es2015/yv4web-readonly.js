@@ -1,4 +1,4 @@
-/* Yocto-Visualization-4web (ES2015 read-only 1.10.51840) - www.yoctopuce.com */
+/* Yocto-Visualization-4web (ES2015 read-only 1.10.51909) - www.yoctopuce.com */
 // obj/rdonly/Renderer/YDataRendererCommon.js
 var Vector3 = class {
   constructor(a, b, c) {
@@ -9105,7 +9105,7 @@ var YDataSet = class {
         streamStr = this._parent.imm_json_get_array(bulkFile);
         urlIdx = 0;
         idx = this._progress;
-        while (idx < this._streams.length && urlIdx < suffixes.length) {
+        while (idx < this._streams.length && urlIdx < suffixes.length && urlIdx < streamStr.length) {
           stream = this._streams[idx];
           if (stream.imm_get_baseurl() == baseurl && stream.imm_get_urlsuffix() == suffixes[urlIdx]) {
             streamBin = this._yapi.imm_str2bin(streamStr[urlIdx]);
@@ -16300,7 +16300,7 @@ var YAPIContext = class {
     });
   }
   imm_GetAPIVersion() {
-    return "1.10.51840";
+    return "1.10.51909";
   }
   InitAPI(mode, errmsg) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -18071,7 +18071,7 @@ YNetwork.POECURRENT_INVALID = YAPI.INVALID_UINT;
 // obj/rdonly/constants.js
 var constants = class {
   static get buildVersion() {
-    return "1.10.51840";
+    return "1.10.51909";
   }
   static get deviceScreenWidth() {
     return screen.width * window.devicePixelRatio;

@@ -44,7 +44,7 @@ export class constants
 {
     public static get buildVersion(): string
     {
-        return /* version number patched automatically */'1.10.51840';
+        return /* version number patched automatically */'1.10.51909';
     }
     public static get deviceScreenWidth(): number {return screen.width * window.devicePixelRatio;}
     public static get deviceScreenHeight(): number {return screen.height * window.devicePixelRatio;}
@@ -158,7 +158,7 @@ export class constants
     public static set mustCheckForUpdate(value:boolean)
     {  //#ifndef READONLY
         if (value!=constants._checkForUpdate)
-        {  constants._checkForUpdate =true;
+        {  constants._checkForUpdate =value;
             constants.edited=true;
         }
         //#endif

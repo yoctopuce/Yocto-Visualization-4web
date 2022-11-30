@@ -376,7 +376,7 @@ export class configForm
             configForm._tabCapture = new configEditorTab(configForm, "Screen capture", configForm.fontSize, configForm.GUIcoef);
             configForm._tabResources = new configEditorTab(configForm, "Ressources", configForm.fontSize, configForm.GUIcoef);
             configForm._tabUI = new configEditorTab(configForm, "User interface", configForm.fontSize, configForm.GUIcoef);
-            configForm._tabExport = new configEditorTab(configForm, "XML Export", configForm.fontSize, configForm.GUIcoef);
+            configForm._tabExport = new configEditorTab(configForm, "Updates & XML", configForm.fontSize, configForm.GUIcoef);
             configForm._tabStub = new configEditorTab(configForm, "", configForm.fontSize, configForm.GUIcoef);
 
             this._tabPanelContents = document.createElement("TD") as HTMLTableCellElement;
@@ -844,9 +844,40 @@ export class configForm
             p = document.createElement("P") as HTMLParagraphElement;
             p.style.fontSize = configForm.fontSize.toString() + "px";
             p.style.textAlign = "justify";
+            p.innerText = "As long as your web browser can reach www.yoctopuce.com, "
+              + "the read/write edition of Yocto-Visualization (for web) can automatically check "
+              + "for new version. If you find this feature anoying, feel free to disable it. "
+            this._tabExport.divElement.appendChild(p);
+
+            let checkbox4 = document.createElement("INPUT") as HTMLInputElement;
+            checkbox4.style.display = "inline";
+            checkbox4.type = "checkbox";
+            checkbox4.style.transform = "scale(" + this.GUIcoef.toString() + ")"
+            checkbox4.style.marginLeft = Math.round(25 * this.GUIcoef).toString() + "px"
+            checkbox4.checked = YoctoVisualization.constants.mustCheckForUpdate;
+            checkbox4.addEventListener("change", () => {configForm.mustCheckForUpdateChange(checkbox4)})
+            this._tabExport.divElement.appendChild(checkbox4)
+            span = document.createElement("SPAN") as HTMLSpanElement;
+            span.style.fontSize = configForm.fontSize.toString() + "px";
+            span.innerText = "Automatically check for updates"
+
+            let a2: HTMLAnchorElement = document.createElement("A") as HTMLAnchorElement;
+            a2.innerText = "Check now"
+            a2.style.paddingLeft="25px";
+            a2.style.cursor = "pointer";
+            a2.style.color = "#0000EE";
+            a2.style.textDecoration = "underline";
+            a2.addEventListener("click", () => {YoctoVisualization.YWebPage.CheckForNewVersion(true);});
+            span.appendChild(a2)
+            this._tabExport.divElement.appendChild(span)
+
+
+            p = document.createElement("P") as HTMLParagraphElement;
+            p.style.fontSize = configForm.fontSize.toString() + "px";
+            p.style.textAlign = "justify";
             p.innerText = "Yocto-Visualization (for web) stores its configuration in a XML file. "
-                + "This file can be used to create a static web page running Yocto-Visualization (for web). "
-                + "It can be used in the Yocto-Visualization (for web) installer to create a pre-configured install. "
+                + "This file can be used to create a static web page running Yocto-Visualization (for web) "
+                + "or it can be used in the Yocto-Visualization (for web) installer to create a pre-configured install. "
                 + "Also, it is mostly compatible with the native version of Yocto-Visualization: you can use "
                 + "it instead of the original config.xml file. "
                 + "Just click on the link below to export/download your current configuration.";
@@ -924,10 +955,18 @@ export class configForm
     private static verticalDragZoomChange(source: HTMLInputElement)
     {
         let prev: boolean = YDataRendering.YGraph.verticalDragZoomEnabled;
-        YDataRendering.YGraph.verticalDragZoomEnabled = source.checked
+        YDataRendering.YGraph.verticalDragZoomEnabled = source.checked;
         if (prev != YDataRendering.YGraph.verticalDragZoomEnabled) YoctoVisualization.constants.edited = true;
 
     }
+
+private static mustCheckForUpdateChange(source: HTMLInputElement)
+    {
+     let prev: boolean = YoctoVisualization.constants.mustCheckForUpdate;
+     YoctoVisualization.constants.mustCheckForUpdate = source.checked;
+     if (prev != YoctoVisualization.constants.mustCheckForUpdate) YoctoVisualization.constants.edited = true;
+    }
+
 
     private static maxDataLogRecsChange(source: HTMLInputElement)
     {

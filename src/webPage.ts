@@ -657,13 +657,9 @@ export class YWebPage
                options = {"protocol": roothub.protocol,
                          "addr":  roothub.addr,
                          "port": parseInt(roothub.port),
-                         "path" : roothub.path};
+                         "path" : roothub.path,
+                         "cancelable":true};
 
-         /*options = {"protocol": "http",
-             "addr":  "youpi.com",
-             "port": 666,
-             "path" : "AvenueFoch"};
-*/
            (window as any).startYV4W_installer(installerDiv,options);
 
 
@@ -671,9 +667,8 @@ export class YWebPage
 
 
 
-    private static DownloadAndStartInstaller(roothub : YoctoVisualization.Hub |null ,deleteTimer : NodeJS.Timeout)
+    private static DownloadAndStartInstaller(installerURL:string,roothub : YoctoVisualization.Hub |null ,deleteTimer : NodeJS.Timeout)
        { clearTimeout(deleteTimer);
-         let installerURL="https://www.yoctopuce.com/FR/downloads/yoctovisualization4web/yoctovisualization4web.999.installer.js";
          console.log("Downloading installer ("+installerURL+")...");
          let P : HTMLParagraphElement = document.createElement("P") as HTMLParagraphElement;
          P.style.textAlign="center";
@@ -726,10 +721,20 @@ export class YWebPage
         return highestZ+1;
     }
 
-    private static CheckForNewVersion()
-    {   if (!YoctoVisualization.constants.mustCheckForUpdate) return;
+    public static async CheckForNewVersion( force: boolean)
+    {   if (!YoctoVisualization.constants.mustCheckForUpdate && !force) return;
 
+       let checkurl = location.protocol+"//www.yoctopuce.com/FR/common/getLastFirmwareLink.php?app=yoctovisualization4web.installer&version="+YoctoVisualization.constants.buildVersion+"&platform=_";
+      let response :Response = await fetch(checkurl);
+      if (!response.ok)  return;
+      let json : any;
+      try  { json  = await response.json();} catch (e) {return};
+      if (!(json instanceof Array)) return;
+      if (json.length<=0) return;
+      if (!("version" in json[0])) return;
+      if (!("link" in json[0])) return;
 
+       let newVersionInstallerURL :string =  json[0]["link"];
 
 
         let generalSize : number =YoctoVisualization.constants.generalFontSize;
@@ -801,7 +806,7 @@ export class YWebPage
 
        if (rootHub!=null)
         {   a.innerText="Download and start installer..";
-            a.addEventListener("click" ,()=>{YWebPage.DownloadAndStartInstaller(rootHub as YoctoVisualization.Hub,deleteTimer);});
+            a.addEventListener("click" ,()=>{YWebPage.DownloadAndStartInstaller(newVersionInstallerURL,rootHub as YoctoVisualization.Hub,deleteTimer);});
         }
         else
         { a.innerText="www.yoctopuce.com";
@@ -876,7 +881,7 @@ export class YWebPage
 
         //#ifndef READONLY
         YoctoVisualization.constants.edited = false;
-        YWebPage.CheckForNewVersion();
+        YWebPage.CheckForNewVersion(false);
         //#endif
 
 

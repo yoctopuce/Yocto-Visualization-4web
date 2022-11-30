@@ -1,3 +1,6 @@
-Yocto-Visualization-4web v1.10.51840
+Yocto-Visualization-4web v1.10.51909
 
-- First release
+- Remove map file
+- Fix installer white-spaces
+- Fix crash in bulk load in case something goes wrong in long URL processing
+- Add "check for updates" checkbox in config panel

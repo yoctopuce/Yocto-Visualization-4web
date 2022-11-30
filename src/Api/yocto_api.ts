@@ -1,6 +1,6 @@
 /*********************************************************************
  *
- * $Id: yocto_api.ts 51764 2022-11-25 07:52:50Z mvuilleu $
+ * $Id: yocto_api.ts 51903 2022-11-29 17:25:59Z mvuilleu $
  *
  * High-level programming interface, common to all modules
  *
@@ -1809,7 +1809,7 @@ export class YDataSet
             streamStr = this._parent.imm_json_get_array(bulkFile);
             urlIdx = 0;
             idx = this._progress;
-            while ((idx < this._streams.length) && (urlIdx < suffixes.length)) {
+            while ((idx < this._streams.length) && (urlIdx < suffixes.length) && (urlIdx < streamStr.length)) {
                 stream = this._streams[idx];
                 if ((stream.imm_get_baseurl() == baseurl) && (stream.imm_get_urlsuffix() == suffixes[urlIdx])) {
                     streamBin = this._yapi.imm_str2bin(streamStr[urlIdx]);
@@ -12481,7 +12481,7 @@ export class YAPIContext
 
     imm_GetAPIVersion()
     {
-        return /* version number patched automatically */'1.10.51840';
+        return /* version number patched automatically */'1.10.51909';
     }
 
     /**

@@ -1,4 +1,4 @@
-/* Yocto-Visualization-4web (ES2017 full 1.10.51840) - www.yoctopuce.com */
+/* Yocto-Visualization-4web (ES2017 full 1.10.51909) - www.yoctopuce.com */
 // obj/full/Renderer/YDataRendererCommon.js
 var Vector3 = class {
   constructor(a, b, c) {
@@ -9039,7 +9039,7 @@ var YDataSet = class {
       streamStr = this._parent.imm_json_get_array(bulkFile);
       urlIdx = 0;
       idx = this._progress;
-      while (idx < this._streams.length && urlIdx < suffixes.length) {
+      while (idx < this._streams.length && urlIdx < suffixes.length && urlIdx < streamStr.length) {
         stream = this._streams[idx];
         if (stream.imm_get_baseurl() == baseurl && stream.imm_get_urlsuffix() == suffixes[urlIdx]) {
           streamBin = this._yapi.imm_str2bin(streamStr[urlIdx]);
@@ -15735,7 +15735,7 @@ var YAPIContext = class {
     return this.imm_GetAPIVersion();
   }
   imm_GetAPIVersion() {
-    return "1.10.51840";
+    return "1.10.51909";
   }
   async InitAPI(mode, errmsg) {
     this._detectType = mode;
@@ -17478,7 +17478,7 @@ YFiles.FREESPACE_INVALID = YAPI.INVALID_UINT;
 // obj/full/constants.js
 var constants = class {
   static get buildVersion() {
-    return "1.10.51840";
+    return "1.10.51909";
   }
   static get deviceScreenWidth() {
     return screen.width * window.devicePixelRatio;
@@ -17636,7 +17636,7 @@ var constants = class {
   }
   static set mustCheckForUpdate(value) {
     if (value != constants._checkForUpdate) {
-      constants._checkForUpdate = true;
+      constants._checkForUpdate = value;
       constants.edited = true;
     }
   }
@@ -30708,7 +30708,7 @@ var configForm = class {
       configForm._tabCapture = new configEditorTab(configForm, "Screen capture", configForm.fontSize, configForm.GUIcoef);
       configForm._tabResources = new configEditorTab(configForm, "Ressources", configForm.fontSize, configForm.GUIcoef);
       configForm._tabUI = new configEditorTab(configForm, "User interface", configForm.fontSize, configForm.GUIcoef);
-      configForm._tabExport = new configEditorTab(configForm, "XML Export", configForm.fontSize, configForm.GUIcoef);
+      configForm._tabExport = new configEditorTab(configForm, "Updates & XML", configForm.fontSize, configForm.GUIcoef);
       configForm._tabStub = new configEditorTab(configForm, "", configForm.fontSize, configForm.GUIcoef);
       this._tabPanelContents = document.createElement("TD");
       this._tabPanelContents.colSpan = 6;
@@ -31124,7 +31124,36 @@ var configForm = class {
       p = document.createElement("P");
       p.style.fontSize = configForm.fontSize.toString() + "px";
       p.style.textAlign = "justify";
-      p.innerText = "Yocto-Visualization (for web) stores its configuration in a XML file. This file can be used to create a static web page running Yocto-Visualization (for web). It can be used in the Yocto-Visualization (for web) installer to create a pre-configured install. Also, it is mostly compatible with the native version of Yocto-Visualization: you can use it instead of the original config.xml file. Just click on the link below to export/download your current configuration.";
+      p.innerText = "As long as your web browser can reach www.yoctopuce.com, the read/write edition of Yocto-Visualization (for web) can automatically check for new version. If you find this feature anoying, feel free to disable it. ";
+      this._tabExport.divElement.appendChild(p);
+      let checkbox4 = document.createElement("INPUT");
+      checkbox4.style.display = "inline";
+      checkbox4.type = "checkbox";
+      checkbox4.style.transform = "scale(" + this.GUIcoef.toString() + ")";
+      checkbox4.style.marginLeft = Math.round(25 * this.GUIcoef).toString() + "px";
+      checkbox4.checked = constants.mustCheckForUpdate;
+      checkbox4.addEventListener("change", () => {
+        configForm.mustCheckForUpdateChange(checkbox4);
+      });
+      this._tabExport.divElement.appendChild(checkbox4);
+      span = document.createElement("SPAN");
+      span.style.fontSize = configForm.fontSize.toString() + "px";
+      span.innerText = "Automatically check for updates";
+      let a2 = document.createElement("A");
+      a2.innerText = "Check now";
+      a2.style.paddingLeft = "25px";
+      a2.style.cursor = "pointer";
+      a2.style.color = "#0000EE";
+      a2.style.textDecoration = "underline";
+      a2.addEventListener("click", () => {
+        YWebPage.CheckForNewVersion(true);
+      });
+      span.appendChild(a2);
+      this._tabExport.divElement.appendChild(span);
+      p = document.createElement("P");
+      p.style.fontSize = configForm.fontSize.toString() + "px";
+      p.style.textAlign = "justify";
+      p.innerText = "Yocto-Visualization (for web) stores its configuration in a XML file. This file can be used to create a static web page running Yocto-Visualization (for web) or it can be used in the Yocto-Visualization (for web) installer to create a pre-configured install. Also, it is mostly compatible with the native version of Yocto-Visualization: you can use it instead of the original config.xml file. Just click on the link below to export/download your current configuration.";
       this._tabExport.divElement.appendChild(p);
       p = document.createElement("P");
       p.style.fontSize = configForm.fontSize.toString() + "px";
@@ -31184,6 +31213,12 @@ var configForm = class {
     let prev = YGraph.verticalDragZoomEnabled;
     YGraph.verticalDragZoomEnabled = source.checked;
     if (prev != YGraph.verticalDragZoomEnabled)
+      constants.edited = true;
+  }
+  static mustCheckForUpdateChange(source) {
+    let prev = constants.mustCheckForUpdate;
+    constants.mustCheckForUpdate = source.checked;
+    if (prev != constants.mustCheckForUpdate)
       constants.edited = true;
   }
   static maxDataLogRecsChange(source) {
@@ -35824,13 +35859,13 @@ var YWebPage = class {
         protocol: roothub.protocol,
         addr: roothub.addr,
         port: parseInt(roothub.port),
-        path: roothub.path
+        path: roothub.path,
+        cancelable: true
       };
     window.startYV4W_installer(installerDiv, options);
   }
-  static DownloadAndStartInstaller(roothub, deleteTimer) {
+  static DownloadAndStartInstaller(installerURL, roothub, deleteTimer) {
     clearTimeout(deleteTimer);
-    let installerURL = "https://www.yoctopuce.com/FR/downloads/yoctovisualization4web/yoctovisualization4web.999.installer.js";
     console.log("Downloading installer (" + installerURL + ")...");
     let P = document.createElement("P");
     P.style.textAlign = "center";
@@ -35875,9 +35910,29 @@ var YWebPage = class {
     }
     return highestZ + 1;
   }
-  static CheckForNewVersion() {
-    if (!constants.mustCheckForUpdate)
+  static async CheckForNewVersion(force) {
+    if (!constants.mustCheckForUpdate && !force)
       return;
+    let checkurl = location.protocol + "//www.yoctopuce.com/FR/common/getLastFirmwareLink.php?app=yoctovisualization4web.installer&version=" + constants.buildVersion + "&platform=_";
+    let response = await fetch(checkurl);
+    if (!response.ok)
+      return;
+    let json;
+    try {
+      json = await response.json();
+    } catch (e) {
+      return;
+    }
+    ;
+    if (!(json instanceof Array))
+      return;
+    if (json.length <= 0)
+      return;
+    if (!("version" in json[0]))
+      return;
+    if (!("link" in json[0]))
+      return;
+    let newVersionInstallerURL = json[0]["link"];
     let generalSize = constants.generalFontSize;
     let NewVersionSizeX = generalSize * 24;
     let NewVersionSizeY = generalSize * 5;
@@ -35936,7 +35991,7 @@ var YWebPage = class {
     if (rootHub != null) {
       a.innerText = "Download and start installer..";
       a.addEventListener("click", () => {
-        YWebPage.DownloadAndStartInstaller(rootHub, deleteTimer);
+        YWebPage.DownloadAndStartInstaller(newVersionInstallerURL, rootHub, deleteTimer);
       });
     } else {
       a.innerText = "www.yoctopuce.com";
@@ -35977,7 +36032,7 @@ var YWebPage = class {
     sensorsManager.run();
     YWebPage.loadFromXML(xmlData);
     constants.edited = false;
-    YWebPage.CheckForNewVersion();
+    YWebPage.CheckForNewVersion(false);
   }
   static async pageIsleaving(e) {
     if (!e.persistent) {
