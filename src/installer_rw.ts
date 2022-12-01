@@ -109,17 +109,16 @@ class pageInstance
 }
 
 export class YV4W_installer
-{
-
-    public static readonly HTTP = "http";
+{   public static readonly HTTP = "http";
     public static readonly HTTPS = "https";
 
     // debug purpose
-    private   DEFAULT_PROTOCOL: string = YV4W_installer.HTTPS;
+    private   DEFAULT_PROTOCOL: string = YV4W_installer.HTTP;
     private  DEFAULTADDR: string = "";
-    private  DEFAULTPORT: string = "443";
+    private  DEFAULTPORT: string = "80";
     private  DEFAULTPATH: string = "";
     private  DEFAULTCANCELABLE: boolean = false;
+    private  DEFAULTINTIALFOCUS: boolean = true;
 
     private readonly DEFAULTUSER: string = "";
     private readonly DEFAULTPWD: string = "";
@@ -127,13 +126,11 @@ export class YV4W_installer
     private readonly DEFAULTSRVUSERNAME: string = ""
     private readonly DEFAULTSRVPASSORD: string = ""
 
-
     private _container: HTMLElement
     private _prevButton: YoctoVisualization.button;
     private _nextButton: YoctoVisualization.button;
     private _okButton: YoctoVisualization.button;
     private _cancelButton: YoctoVisualization.button;
-
 
     private _currentStep: number = 0;
     private _welcomeText: HTMLDivElement | null = null;
@@ -280,6 +277,8 @@ export class YV4W_installer
               if (typeof options["port"]  === "number")  this.DEFAULTPORT =  options["port"].toString();
               if (typeof options["path"]  === "string")  this.DEFAULTPATH =  options["path"];
               if (typeof options["cancelable"]  === "boolean")    this.DEFAULTCANCELABLE=  options["cancelable"];
+              if (typeof options["initialFocus"]  === "boolean")  this.DEFAULTINTIALFOCUS=  options["initialFocus"];
+
 
           }
 
@@ -417,7 +416,8 @@ export class YV4W_installer
 
         let tabIndex:number=1;
         this._nextButton.tabIndex=tabIndex++;
-        this._nextButton.focus();
+        // Forcing focus will force the container page to make the button visible, and might cause spurious scrolling
+        if (this.DEFAULTINTIALFOCUS) this._nextButton.focus();
         this._welcomeText.style.display = "";
     }
 

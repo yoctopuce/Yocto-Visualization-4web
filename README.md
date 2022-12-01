@@ -4,13 +4,18 @@ Yocto-Visualization (for web)
 ## What is Yocto-Visualization (for web) good for ?
 
 This application is a fully web-based version of our popular
-[Yocto-Visualization V2](//www.yoctopuce.com/EN/article/yocto-visualization-user-s-guide) desktop application.
+[Yocto-Visualization V2](//www.yoctopuce.com/EN/article/yocto-visualization-user-s-guide) 
+desktop application meant to quickly visualize data from Yoctopuce sensors.
+
+
+![Snapshot](https://www.yoctopuce.com/pubarchive/2022-11/YV4WebScreenShot_1.png  "Yocto-Visualization (for web) running in a browser)")
+
 
 It can easily be embedded in any web page to provide real-time
 graphs of Yoctopuce sensors, including datalogger access.
 
 The source code include some preprocessor directive encoded
-within TypeScript comments (aka //#ifdef ... //#endif)
+within [TypeScript](//www.typescriptlang.org) comments (aka //#ifdef ... //#endif)
 to produce a read-only version of the application, without the
 code needed to configure widgets. The build process can therefore
 build two different minified versions: full and read-only.
@@ -21,8 +26,8 @@ src/**          full source code (TypeScript)
 obj/debug/**	default location for transpiled code, for debug purposes
 obj/full/**     preprocessor output and transpiled files, full version
 obj/rdonly/**	preprocessor output and transpiled files, read-only version
-dist/es2015/**	production code (minified), compatible with EcmaScript 2015+
-dist/es2017/**	production code (minified), compatible with EcmaScript 2017+
+dist/es2015/**	production code (both regular and minified), compatible with EcmaScript 2015+
+dist/es2017/**	production code (both regular and minified), compatible with EcmaScript 2017+
 bin/**          build tools and debugging tools
 ```
 
@@ -45,26 +50,34 @@ a simple one for testing purpose , just go to the top level and type:
 npm run app-server
 ```
 
-This will start a web browser with a demo, you will not be able to save 
-because in this demo there is nowhere to save the configuration.
+This will start a web browser with a demo, you will not be able to properly
+save  because in this demo there is nowhere to save the configuration.
 
    
-## How to install it (on a yoctohub)?
-We provided an installer allowing an easy install on [YoctoHub](//www.yoctopuce.com/EN/products/category/extensions-and-networking), 
-[Virtualhub](//www.yoctopuce.com/EN/virtualhub.php)
-and CloudHub   just go to the top level and type:
+## How to install it (on a Yoctopuce Hub)?
+We provided an installer allowing an easy install on
+[YoctoHub](//www.yoctopuce.com/EN/products/category/extensions-and-networking), 
+[Virtualhub](//www.yoctopuce.com/EN/virtualhub.php) and  
+[Virtualhub (for web)](//www.yoctopuce.com/EN/tools.php).
+Just go to the top level and type:
+
 
 ```
 npm run installer
 ```
   
-Note: if YoctoVisualisation must be run on a  Virtualhub, the virtualhub
-filesystem must be enabled: make sure the virtualhub is started with the
--F option. 
+Note: if YoctoVisualisation must be run on a  Virtualhub (native version), the
+virtualhub filesystem must be enabled: make sure the virtualhub is started 
+with the -F option. 
 
-The same installer is also available from the [Yoctopuce tool page](www.yoctopuce.com/EN/tools):
+The same installer is also available from the [Yoctopuce tool page](//www.yoctopuce.com/EN/tools).
 
- 
+## Acknowledgements
+Yocto-Visualization (for web) uses the
+[PAKO javascript library](//github.com/nodeca/pako)
+by Vitaly Puzrin and Andrei Tuputcyn,  ported to 
+[TypeScript](//www.typescriptlang.org) by Yoctopuce.
+
 
 ## License information
 
