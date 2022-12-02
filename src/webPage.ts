@@ -724,18 +724,28 @@ export class YWebPage
     public static async CheckForNewVersion( force: boolean)
     {   if (!YoctoVisualization.constants.mustCheckForUpdate && !force) return;
 
-       let checkurl = location.protocol+"//www.yoctopuce.com/FR/common/getLastFirmwareLink.php?app=yoctovisualization4web.installer&version="+YoctoVisualization.constants.buildVersion+"&platform=_";
-      let response :Response = await fetch(checkurl);
-      if (!response.ok)  return;
-      let json : any;
-      try  { json  = await response.json();} catch (e) {return};
-      if (!(json instanceof Array)) return;
-      if (json.length<=0) return;
-      if (!("version" in json[0])) return;
-      if (!("link" in json[0])) return;
 
-       let newVersionInstallerURL :string =  json[0]["link"];
 
+        let checkurl = location.protocol+"//www.yoctopuce.com/FR/common/getLastFirmwareLink.php?app=yoctovisualization4web.installer&version="+YoctoVisualization.constants.buildVersion+"&platform=_";
+        let response :Response = await fetch(checkurl);
+        if (!response.ok)  return;
+        let json : any;
+        try  { json  = await response.json();} catch (e) {return};
+        if (!(json instanceof Array)) return;
+        if (json.length<=0) return;
+        if (!("version" in json[0])) return;
+        if (!("link" in json[0])) return;
+
+        let newVersionInstallerURL :string =  json[0]["link"];
+        let newVersionNumber  : number = parseInt( json[0]["version"]);
+        let currentVersionStr  : string = YoctoVisualization.constants.buildVersion;
+        let currentVersionNumber : number=0;
+        if (currentVersionStr.indexOf("-")<0)
+        {  let n = currentVersionStr.lastIndexOf(".");
+           if (n>=0) currentVersionStr.substr(n+1);
+            currentVersionNumber= parseInt(currentVersionStr);
+        }
+        if (currentVersionNumber>= newVersionNumber) return;
 
         let generalSize : number =YoctoVisualization.constants.generalFontSize;
         let  NewVersionSizeX  : number =generalSize*24;
@@ -1142,8 +1152,34 @@ export class HubInfo
         if (this.path != "") url += "/" + this.path;
         return url;
     }
-    public async makeRequest(): Promise<boolean>
-    {
+    public async makeRequest(): Promise<boolean | number>
+    { /*
+      let url: string = this._protocol + "://" + this._addr + ":" + this._port.toString();
+      if (this._path != "") url += "/" + this._path;
+      url += "/info.json";
+
+      let response :Response = await fetch(url);
+      if (response.ok)
+       {  let HubData: any;
+          try {HubData = await response.json();} catch (e) {return -1;}
+          if (HubData.port && HubData.port.length > 0) {
+              let proto_port: string = HubData.port[0].split(':');
+              this._protocol = proto_port[0];
+              this._port = parseInt(proto_port[1]);
+          }
+          this._serial = HubData.serialNumber;
+          this._path = HubData.dir;
+          this._adminPassword = (HubData.adminPassword.toUpperCase() == "TRUE");
+          this._userPassword = (HubData.userPassword.toUpperCase() == "TRUE");
+          return true;
+      }
+
+      if   ((response.status == 404) &&  (this._path != "")) return -2;
+      return response.status;
+   */
+
+
+
         let url: string = this._protocol + "://" + this._addr + ":" + this._port.toString();
         if (this._path != "") url += "/" + this._path;
         url += "/info.json";
@@ -1165,6 +1201,7 @@ export class HubInfo
             this._userPassword = (HubData.userPassword.toUpperCase() == "TRUE");
             return true;
         }
+        /*
         else
         {
             // probably a hub or a virtualhub
@@ -1177,7 +1214,9 @@ export class HubInfo
                 this._protocol = "ws";
             }
         }
-        return false;
+        */
+        return res.status;
+        //return false;
     }
 
     private findChild(parent: XMLDocument | ChildNode, name: string): ChildNode | null
@@ -1334,20 +1373,20 @@ export class YoctoHubFileHandler
             {
                 xhr.open(method, url);
             }
-
             xhr.overrideMimeType('text/plain; charset=x-user-defined');
-
-            xhr.onload = function ()
+            xhr.onreadystatechange = function ()
             {
-                if (this.status >= 200 && this.status < 300)
-                {
-                    resolve(new HTTPrequestResult(YoctoAPI.YAPI.imm_str2bin(xhr.response), this.status, xhr.statusText));
+                //console.log('readyState:'+xhr.readyState+' status='+xhr.status);
+                if (xhr.readyState == 4) {
+                    if (this.status >= 200 && this.status < 300)
+                    {
+                        resolve(new HTTPrequestResult(YoctoAPI.YAPI.imm_str2bin(xhr.response), this.status, xhr.statusText));
+                    }
+                    else
+                    {
+                        resolve(new HTTPrequestResult(null, this.status, xhr.statusText));
+                    }
                 }
-                else
-                {
-                    resolve(new HTTPrequestResult(null, this.status, xhr.statusText));
-                }
-
             }
             xhr.onerror = function ()
             {

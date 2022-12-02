@@ -654,7 +654,7 @@ export class AngularGaugeFormProperties extends YoctoVisualization.GenericProper
     public get AngularGauge_zones0(): AngularZoneDescription { return this._AngularGauge_zones0; }
     public set AngularGauge_zones0(value: AngularZoneDescription) { this._AngularGauge_zones0 = value; }
 
-    private _AngularGauge_zones1: AngularZoneDescription = new AngularZoneDescription(0, 50, YDataRendering.YColor.Yellow);
+    private _AngularGauge_zones1: AngularZoneDescription = new AngularZoneDescription(50, 80, YDataRendering.YColor.Yellow);
     public get ATTR_AngularGauge_zones1__DisplayName(): string { return "Zone 2"}
     public get ATTR_AngularGauge_zones1__CategoryAttribute(): string { return "Zones"}
     public get ATTR_AngularGauge_zones1__ReadOnlyAttribute(): boolean { return true}
@@ -662,7 +662,7 @@ export class AngularGaugeFormProperties extends YoctoVisualization.GenericProper
     public get AngularGauge_zones1(): AngularZoneDescription { return this._AngularGauge_zones1; }
     public set AngularGauge_zones1(value: AngularZoneDescription) { this._AngularGauge_zones1 = value; }
 
-    private _AngularGauge_zones2: AngularZoneDescription = new AngularZoneDescription(0, 50, YDataRendering.YColor.Red);
+    private _AngularGauge_zones2: AngularZoneDescription = new AngularZoneDescription(80, 100, YDataRendering.YColor.Red);
     public get ATTR_AngularGauge_zones2__DisplayName(): string { return "Zone 2"}
     public get ATTR_AngularGauge_zones2__CategoryAttribute(): string { return "Zones"}
     public get ATTR_AngularGauge_zones2__ReadOnlyAttribute(): boolean { return true}

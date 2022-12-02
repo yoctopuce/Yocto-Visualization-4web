@@ -2,7 +2,7 @@
   "name": "yocto-visualization-4web",
   "author": "Yoctopuce",
   "description": "Yoctopuce web-based sensor visualization application",
-  "version": "1.10.51983",
+  "version": "1.10.52094",
   "license": "SEE LICENSE IN LICENSE.txt",
   "repository": {
     "type": "git",

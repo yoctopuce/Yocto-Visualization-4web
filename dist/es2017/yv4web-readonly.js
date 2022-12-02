@@ -1,4 +1,4 @@
-/* Yocto-Visualization-4web (ES2017 read-only 1.10.51983) - www.yoctopuce.com */
+/* Yocto-Visualization-4web (ES2017 read-only 1.10.52094) - www.yoctopuce.com */
 // obj/rdonly/Renderer/YDataRendererCommon.js
 var Vector3 = class {
   constructor(a, b, c) {
@@ -15735,7 +15735,7 @@ var YAPIContext = class {
     return this.imm_GetAPIVersion();
   }
   imm_GetAPIVersion() {
-    return "1.10.51983";
+    return "1.10.52094";
   }
   async InitAPI(mode, errmsg) {
     this._detectType = mode;
@@ -17289,7 +17289,7 @@ YNetwork.POECURRENT_INVALID = YAPI.INVALID_UINT;
 // obj/rdonly/constants.js
 var constants = class {
   static get buildVersion() {
-    return "1.10.51983";
+    return "1.10.52094";
   }
   static get deviceScreenWidth() {
     return screen.width * window.devicePixelRatio;
@@ -18278,6 +18278,11 @@ var CustomYSensor = class {
       this.recordedDataLoadProgress = await this.recordedData.loadMore();
     } catch (e) {
       logForm.log(this.hwdName + ": load more caused an exception " + e.message);
+    }
+    for (let i = 0; i < this.FormsToNotify.length; i++) {
+      if (this.FormsToNotify[i] instanceof graphWidget) {
+        this.FormsToNotify[i].startDataPreload(this);
+      }
     }
     this.globalDataLoadProgress = this.recordedDataLoadProgress;
     let measures = await this.recordedData.get_preview();
@@ -20016,7 +20021,6 @@ var graphWidget = class extends YWidget {
       this._graph.series[index].clear();
       return;
     }
-    this.dataloggerProgress.enabled = true;
     let s = Reflect.get(this.prop, "Graph_series" + index.toString());
     let data;
     switch (s.DataSource_datatype) {
@@ -20136,6 +20140,13 @@ var graphWidget = class extends YWidget {
     this.prop.Graph_showRecordedData = false;
     this.truncateView();
     this.prop.Graph_showRecordedData = tmp;
+  }
+  startDataPreload(source) {
+    if (!this.prop.Graph_showRecordedData) {
+      this.dataloggerProgress.enabled = false;
+      return;
+    }
+    this.dataloggerProgress.enabled = true;
   }
   SensorNewDataBlock(source, sourceFromIndex, sourcetoIndex, targetIndex, fromDataLogger) {
     if (this.prop == null)
@@ -21494,8 +21505,8 @@ var AngularGaugeFormProperties = class extends GenericProperties {
     this._AngularGauge_backgroundColor1 = YColor.FromArgb(255, 240, 240, 240);
     this._AngularGauge_backgroundColor2 = YColor.FromArgb(255, 200, 200, 200);
     this._AngularGauge_zones0 = new AngularZoneDescription(0, 50, YColor.LightGreen);
-    this._AngularGauge_zones1 = new AngularZoneDescription(0, 50, YColor.Yellow);
-    this._AngularGauge_zones2 = new AngularZoneDescription(0, 50, YColor.Red);
+    this._AngularGauge_zones1 = new AngularZoneDescription(50, 80, YColor.Yellow);
+    this._AngularGauge_zones2 = new AngularZoneDescription(80, 100, YColor.Red);
     this._annotationPanels0 = new AnnotationPanelDescription(GenericPanel.HorizontalAlignPos.CENTER, GenericPanel.VerticalAlignPos.CENTER, 0, false, "$NAME$", YColor.FromArgb(0, 127, 127, 127), YColor.FromArgb(0, 127, 127, 127), 10, YColor.FromArgb(255, 0, 0, 0));
     this._annotationPanels1 = new AnnotationPanelDescription(GenericPanel.HorizontalAlignPos.CENTER, GenericPanel.VerticalAlignPos.BOTTOM, 0, false, "$NAME$", YColor.FromArgb(0, 127, 127, 127), YColor.FromArgb(0, 127, 127, 127), 10, YColor.FromArgb(255, 0, 0, 0));
     this.initFromXmlData(initData);
@@ -26797,14 +26808,8 @@ var HubInfo = class {
       this._adminPassword = HubData.adminPassword.toUpperCase() == "TRUE";
       this._userPassword = HubData.userPassword.toUpperCase() == "TRUE";
       return true;
-    } else {
-      if (this._protocol == "https") {
-        this._protocol = "wss";
-      } else {
-        this._protocol = "ws";
-      }
     }
-    return false;
+    return res.status;
   }
   findChild(parent, name) {
     let res = null;
@@ -26910,11 +26915,13 @@ var YoctoHubFileHandler = class {
         xhr.open(method, url);
       }
       xhr.overrideMimeType("text/plain; charset=x-user-defined");
-      xhr.onload = function() {
-        if (this.status >= 200 && this.status < 300) {
-          resolve(new HTTPrequestResult(YAPI.imm_str2bin(xhr.response), this.status, xhr.statusText));
-        } else {
-          resolve(new HTTPrequestResult(null, this.status, xhr.statusText));
+      xhr.onreadystatechange = function() {
+        if (xhr.readyState == 4) {
+          if (this.status >= 200 && this.status < 300) {
+            resolve(new HTTPrequestResult(YAPI.imm_str2bin(xhr.response), this.status, xhr.statusText));
+          } else {
+            resolve(new HTTPrequestResult(null, this.status, xhr.statusText));
+          }
         }
       };
       xhr.onerror = function() {

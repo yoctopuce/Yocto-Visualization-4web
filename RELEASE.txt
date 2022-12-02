@@ -1,11 +1,3 @@
-Yocto-Visualization-4web v1.10.51983
+Yocto-Visualization-4web v1.10.52094
 
-- Fixed installer white-spaces
-- Removed old files from dist
-- Added the intialFocus feature to the installer
-- Minor changes to installer web page
-- Polishing the offline demo
-- Added a readme file in dist/es2017
-- Added a readme file in dist/es2015
-- Improved main readme file
-- Added a screenshot to the readme file
+- Internal release

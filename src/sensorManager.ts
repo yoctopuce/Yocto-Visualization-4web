@@ -727,6 +727,13 @@ export class CustomYSensor
         catch (e)
         { YoctoVisualization.logForm.log(this.hwdName + ": load more caused an exception " + (e as Error).message); }
 
+       for (let i: number = 0; i < this.FormsToNotify.length; i++)
+       {
+        if (this.FormsToNotify[i] instanceof YoctoVisualization.graphWidget) {
+            (this.FormsToNotify[i] as YoctoVisualization.graphWidget).startDataPreload(this);
+        }}
+
+
         this.globalDataLoadProgress = this.recordedDataLoadProgress;
 
         let measures: YoctoAPI.YMeasure[] = await this.recordedData.get_preview();

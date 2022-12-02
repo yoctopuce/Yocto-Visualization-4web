@@ -2163,7 +2163,7 @@ private prop: YoctoVisualization.GraphFormProperties;
             this._graph.series[index].clear();
             return;
         }
-        this.dataloggerProgress.enabled=true;
+
         let s: YoctoVisualization.ChartSerie = Reflect.get(this.prop, "Graph_series" + index.toString()) as YoctoVisualization.ChartSerie;
         let data: YoctoVisualization.TimedSensorValue[];
         switch (s.DataSource_datatype)
@@ -2184,6 +2184,7 @@ private prop: YoctoVisualization.GraphFormProperties;
         {
             this._graph.series[index].InsertPoints(l[i]);
         }
+
     }
 
 //#ifndef READONLY
@@ -2367,6 +2368,18 @@ private prop: YoctoVisualization.GraphFormProperties;
         this.prop.Graph_showRecordedData = tmp;
 
     }
+
+    public startDataPreload(source: YoctoVisualization.CustomYSensor)
+        {
+
+           if (!this.prop.Graph_showRecordedData)
+           {
+              this.dataloggerProgress.enabled=false;
+              return;
+          }
+            this.dataloggerProgress.enabled=true;
+
+        }
 
     public SensorNewDataBlock(source: YoctoVisualization.CustomYSensor, sourceFromIndex: number, sourcetoIndex: number, targetIndex: number, fromDataLogger: boolean): void
     {

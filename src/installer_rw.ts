@@ -342,6 +342,8 @@ export class YV4W_installer
         topDiv.style.backgroundColor = YoctoVisualization.constants.WindowHeaderBackgroundColor;
         topDiv.style.color = YoctoVisualization.constants.WindowHeaderColor;
         topDiv.style.fontSize = YoctoVisualization.constants.WindowHeaderFontSize.toString() + "px";
+        topDiv.style.whiteSpace="nowrap";
+        topDiv.style.overflow="hidden";
 
         topDiv.innerText = "Yocto-Visualization (for web) installer"
         this._container.appendChild(topDiv)
@@ -394,6 +396,7 @@ export class YV4W_installer
         this._okButton.visible = false;
         this._prevButton.visible = false;
         this._nextButton.visible = true;
+        this._nextButton.enabled = true;
         this._cancelButton.visible = this.DEFAULTCANCELABLE;
 
         if (this._welcomeText == null)
@@ -596,12 +599,22 @@ export class YV4W_installer
 
         let info: YoctoVisualization.HubInfo = new YoctoVisualization.HubInfo(protocol, IP, port, path, null,null/*srvusername, srvpassword*/);
 
-       if (!await info.makeRequest())
-        {
-            let err: string = "Cannot connect to Hub\n\n" + url + '.\n\nClick on the "prev" button, make sure the server is up, protocol, path, username and password are correct and try again';
+        let infoRes : number | boolean =   await info.makeRequest();
+       if (infoRes !== true)
+        {   let err: string = "Failed to connect to the Hub while using the url\n\n" + url + '\n\n';
+            let prvmsg: string ="Click on the \"prev\" button,"
+            switch (infoRes as number)
+            { case  0 : err += prvmsg+" and make sure that protocol, address, port and path are correct, and try again.\n\n";break;
+              case -1 : err += "(invalid server answer), contact yoctopuce support."; break;
+              case -2 : err += "Check hub firmware, it might be too old."; break;
+              case 404: err += prvmsg+" make sure the path is correct, and try again.";break;
+              case 500: err += " the hub encountered an interal error (Error 500)";break;
+              case 503: err += " the hub is  not available (Error 503)";break;
+              case 401: err+= " Unauthorized access, check server configuration(Error 401)";break;
+              default:  err+= "server responded with an HTTP error "+(infoRes as number);break;
+            }
             this.gotoPanel(this.CONNECTIONERROR, err);
             return;
-
         }
 
         if (info.serial != "")  // if serial is not empty names the request worked
@@ -731,7 +744,7 @@ export class YV4W_installer
         let Table: HTMLTableElement = document.createElement("TABLE") as HTMLTableElement;
         let Row: HTMLTableRowElement = document.createElement("TR") as HTMLTableRowElement;
         let TD1: HTMLTableCellElement = document.createElement("TD") as HTMLTableCellElement;
-    TD1.style.whiteSpace="normal";
+        TD1.style.whiteSpace="normal";
         TD1.innerHTML = YoctoVisualization.ressources.FailedIcon("64", true, false, false, false, "oops");
         Row.appendChild(TD1);
         this._ErrMsgContainer = document.createElement("TD") as HTMLTableCellElement;
@@ -982,6 +995,8 @@ export class YV4W_installer
             Table.appendChild(this.createTextRow("Model:", await m.get_productName()));
             Table.appendChild(this.createTextRow("Serial:", serial));
             Table.appendChild(this.createTextRow("Firmware:", firmware));
+            let tmp :number =  firmware.lastIndexOf(".");
+            if (tmp>=0) firmware= firmware.substr(tmp+1);
 
             this._instancesFiles = [];
 

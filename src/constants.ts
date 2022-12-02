@@ -44,7 +44,7 @@ export class constants
 {
     public static get buildVersion(): string
     {
-        return /* version number patched automatically */'1.10.51983';
+        return /* version number patched automatically */'1.10.52094';
     }
     public static get deviceScreenWidth(): number {return screen.width * window.devicePixelRatio;}
     public static get deviceScreenHeight(): number {return screen.height * window.devicePixelRatio;}
