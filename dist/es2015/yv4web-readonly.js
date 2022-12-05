@@ -1,4 +1,4 @@
-/* Yocto-Visualization-4web (ES2015 read-only 1.10.52094) - www.yoctopuce.com */
+/* Yocto-Visualization-4web (ES2015 read-only 1.10.52126) - www.yoctopuce.com */
 // obj/rdonly/Renderer/YDataRendererCommon.js
 var Vector3 = class {
   constructor(a, b, c) {
@@ -16300,7 +16300,7 @@ var YAPIContext = class {
     });
   }
   imm_GetAPIVersion() {
-    return "1.10.52094";
+    return "1.10.52126";
   }
   InitAPI(mode, errmsg) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -18071,7 +18071,7 @@ YNetwork.POECURRENT_INVALID = YAPI.INVALID_UINT;
 // obj/rdonly/constants.js
 var constants = class {
   static get buildVersion() {
-    return "1.10.52094";
+    return "1.10.52126";
   }
   static get deviceScreenWidth() {
     return screen.width * window.devicePixelRatio;
@@ -27701,11 +27701,19 @@ var HubInfo = class {
       if (this._path != "")
         url += "/" + this._path;
       url += "/info.json";
-      let HubData = null;
-      let res = yield YoctoHubFileHandler.makeRequest("GET", url, this._srvusername, this._srvpassword);
-      if (res.data != null) {
-        let data = new TextDecoder().decode(res.data);
-        HubData = JSON.parse(data);
+      let response;
+      try {
+        response = yield fetch(url, {mode: "cors"});
+      } catch (e) {
+        return -3;
+      }
+      if (response.ok) {
+        let HubData;
+        try {
+          HubData = yield response.json();
+        } catch (e) {
+          return -1;
+        }
         if (HubData.port && HubData.port.length > 0) {
           let proto_port = HubData.port[0].split(":");
           this._protocol = proto_port[0];
@@ -27717,7 +27725,11 @@ var HubInfo = class {
         this._userPassword = HubData.userPassword.toUpperCase() == "TRUE";
         return true;
       }
-      return res.status;
+      if (response.status == 404 && this._path != "")
+        return -2;
+      if (response.status == 0 && response.statusText == null)
+        return -3;
+      return response.status;
     });
   }
   findChild(parent, name) {

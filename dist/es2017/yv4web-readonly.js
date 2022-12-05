@@ -1,4 +1,4 @@
-/* Yocto-Visualization-4web (ES2017 read-only 1.10.52094) - www.yoctopuce.com */
+/* Yocto-Visualization-4web (ES2017 read-only 1.10.52126) - www.yoctopuce.com */
 // obj/rdonly/Renderer/YDataRendererCommon.js
 var Vector3 = class {
   constructor(a, b, c) {
@@ -15735,7 +15735,7 @@ var YAPIContext = class {
     return this.imm_GetAPIVersion();
   }
   imm_GetAPIVersion() {
-    return "1.10.52094";
+    return "1.10.52126";
   }
   async InitAPI(mode, errmsg) {
     this._detectType = mode;
@@ -17289,7 +17289,7 @@ YNetwork.POECURRENT_INVALID = YAPI.INVALID_UINT;
 // obj/rdonly/constants.js
 var constants = class {
   static get buildVersion() {
-    return "1.10.52094";
+    return "1.10.52126";
   }
   static get deviceScreenWidth() {
     return screen.width * window.devicePixelRatio;
@@ -26793,11 +26793,19 @@ var HubInfo = class {
     if (this._path != "")
       url += "/" + this._path;
     url += "/info.json";
-    let HubData = null;
-    let res = await YoctoHubFileHandler.makeRequest("GET", url, this._srvusername, this._srvpassword);
-    if (res.data != null) {
-      let data = new TextDecoder().decode(res.data);
-      HubData = JSON.parse(data);
+    let response;
+    try {
+      response = await fetch(url, {mode: "cors"});
+    } catch (e) {
+      return -3;
+    }
+    if (response.ok) {
+      let HubData;
+      try {
+        HubData = await response.json();
+      } catch (e) {
+        return -1;
+      }
       if (HubData.port && HubData.port.length > 0) {
         let proto_port = HubData.port[0].split(":");
         this._protocol = proto_port[0];
@@ -26809,7 +26817,11 @@ var HubInfo = class {
       this._userPassword = HubData.userPassword.toUpperCase() == "TRUE";
       return true;
     }
-    return res.status;
+    if (response.status == 404 && this._path != "")
+      return -2;
+    if (response.status == 0 && response.statusText == null)
+      return -3;
+    return response.status;
   }
   findChild(parent, name) {
     let res = null;

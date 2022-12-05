@@ -727,10 +727,11 @@ export class YWebPage
 
 
         let checkurl = location.protocol+"//www.yoctopuce.com/FR/common/getLastFirmwareLink.php?app=yoctovisualization4web.installer&version="+YoctoVisualization.constants.buildVersion+"&platform=_";
-        let response :Response = await fetch(checkurl);
+        let response :Response;
+        try { response = await fetch(checkurl);} catch(e:any) {return;}
         if (!response.ok)  return;
         let json : any;
-        try  { json  = await response.json();} catch (e) {return};
+        try  { json  = await response.json();} catch (e) {return}
         if (!(json instanceof Array)) return;
         if (json.length<=0) return;
         if (!("version" in json[0])) return;
@@ -742,8 +743,8 @@ export class YWebPage
         let currentVersionNumber : number=0;
         if (currentVersionStr.indexOf("-")<0)
         {  let n = currentVersionStr.lastIndexOf(".");
-           if (n>=0) currentVersionStr.substr(n+1);
-            currentVersionNumber= parseInt(currentVersionStr);
+           if (n>=0) currentVersionStr=currentVersionStr.substr(n+1);
+           currentVersionNumber= parseInt(currentVersionStr);
         }
         if (currentVersionNumber>= newVersionNumber) return;
 
@@ -1153,12 +1154,13 @@ export class HubInfo
         return url;
     }
     public async makeRequest(): Promise<boolean | number>
-    { /*
+    {
       let url: string = this._protocol + "://" + this._addr + ":" + this._port.toString();
       if (this._path != "") url += "/" + this._path;
       url += "/info.json";
-
-      let response :Response = await fetch(url);
+      let response :Response;
+      try { response  = await fetch(url,{mode: 'cors'});}
+      catch (e: any) {return -3;}
       if (response.ok)
        {  let HubData: any;
           try {HubData = await response.json();} catch (e) {return -1;}
@@ -1175,8 +1177,9 @@ export class HubInfo
       }
 
       if   ((response.status == 404) &&  (this._path != "")) return -2;
+      if   ((response.status == 0) &&  (response.statusText == null)) return -3;
       return response.status;
-   */
+   /*
 
 
 
@@ -1214,8 +1217,8 @@ export class HubInfo
                 this._protocol = "ws";
             }
         }
-        */
-        return res.status;
+
+        return res.status;*/
         //return false;
     }
 

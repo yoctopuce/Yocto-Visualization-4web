@@ -113,7 +113,9 @@ export class YV4W_installer
     public static readonly HTTPS = "https";
 
     // debug purpose
-    private   DEFAULT_PROTOCOL: string = YV4W_installer.HTTP;
+    private  CALLERISHTTPS = location.protocol.toLowerCase().substr(0,5)=="HTTPS";
+    private  DEFAULT_PROTOCOL: string = this.CALLERISHTTPS ? YV4W_installer.HTTPS: YV4W_installer.HTTP;
+    private  FIRMWAREMINVERSION : number = 43805;
     private  DEFAULTADDR: string = "";
     private  DEFAULTPORT: string = "80";
     private  DEFAULTPATH: string = "";
@@ -133,6 +135,7 @@ export class YV4W_installer
     private _cancelButton: YoctoVisualization.button;
 
     private _currentStep: number = 0;
+    private _warningRow : HTMLTableRowElement | null = null
     private _welcomeText: HTMLDivElement | null = null;
     private _hubAddr: HTMLDivElement | null = null;
     private _connectingText: HTMLDivElement | null = null;
@@ -184,6 +187,7 @@ export class YV4W_installer
     private _currentHub_RO_username: string = "";
     private _currentHub_RO_password: string = "";
     private _currentHub_protocol: string = "";
+   private _currentHubLink_protocol: string = "";
     private _currentHub_Addr: string = "";
     private _currentHub_port: string = "";
     private _currentHub_path: string = "";
@@ -341,7 +345,7 @@ export class YV4W_installer
         topDiv.style.right = "5px";
         topDiv.style.backgroundColor = YoctoVisualization.constants.WindowHeaderBackgroundColor;
         topDiv.style.color = YoctoVisualization.constants.WindowHeaderColor;
-        topDiv.style.fontSize = YoctoVisualization.constants.WindowHeaderFontSize.toString() + "px";
+        topDiv.style.fontSize = "x-large"; // YoctoVisualization.constants.WindowHeaderFontSize.toString() + "px";
         topDiv.style.whiteSpace="nowrap";
         topDiv.style.overflow="hidden";
 
@@ -466,6 +470,9 @@ export class YV4W_installer
                 {
                     if ((this._protocolInput.value == YV4W_installer.HTTPS) && (parseInt(this._ipPortInput.value) == 80)) this._ipPortInput.value = "443";
                     if ((this._protocolInput.value == YV4W_installer.HTTP) && (parseInt(this._ipPortInput.value) == 443)) this._ipPortInput.value = "80";
+                    if (this._warningRow!=null)   this._warningRow.style.display = ((this._protocolInput.value == YV4W_installer.HTTP) && this.CALLERISHTTPS) ?"":"none";
+
+
                 }
             });
 
@@ -498,6 +505,16 @@ export class YV4W_installer
             Row.appendChild(TD2);
             Table.appendChild(Row);
 
+            this._warningRow = document.createElement("TR") as HTMLTableRowElement;
+            TD1 = document.createElement("TD") as HTMLTableCellElement;
+            TD1.style.whiteSpace="normal";
+            TD1.style.fontSize="smaller"
+            TD1.innerText = "WARNING: Unless your web browser is configured to accept 'mixed content', trying to establish an HTTP connection from an HTTPS page is likely to fail.";
+            TD1.colSpan=2;
+            this._warningRow.style.display="none";
+            this._warningRow.appendChild(TD1);
+            Table.appendChild(this._warningRow);
+
             Row = document.createElement("TR") as HTMLTableRowElement;
             TD1 = document.createElement("TD") as HTMLTableCellElement;
             TD1.style.whiteSpace="normal";
@@ -526,6 +543,10 @@ export class YV4W_installer
             TD2.appendChild(this._pathInput);
             Row.appendChild(TD2);
             Table.appendChild(Row);
+
+
+
+
 
 
             this._hubAddr.appendChild(Table);
@@ -572,6 +593,8 @@ export class YV4W_installer
         let IP: string = (<HTMLInputElement>this._ipAddrInput).value;
         let port: number = parseInt((<HTMLInputElement>this._ipPortInput).value);
         let protocol: string = (<HTMLSelectElement>this._protocolInput).value;
+        this._currentHubLink_protocol = (<HTMLSelectElement>this._protocolInput).value;
+
         //let srvusername = this._srvUsername != null ? this._srvUsername.value : null;
         //let srvpassword = this._srvPassword != null ? this._srvPassword.value : null;
 
@@ -606,7 +629,8 @@ export class YV4W_installer
             switch (infoRes as number)
             { case  0 : err += prvmsg+" and make sure that protocol, address, port and path are correct, and try again.\n\n";break;
               case -1 : err += "(invalid server answer), contact yoctopuce support."; break;
-              case -2 : err += "Check hub firmware, it might be too old."; break;
+              case -2 : err += prvmsg+" then check path. If path is correct check hub firmware version. This installer doesn't work with versions older that "+this.FIRMWAREMINVERSION+"."; break;
+              case -3 : err += "An network error occured, make sure hub address is correct.\n\nAlso connexion migh have been  blocked by your web browser, most likely due to CORS policy.\n\nCheck your browser console (Shift-Control-I on most browsers), if you find an error message about a Cross-Origin Request Blocked over a 404 error, Press '<Prev' and check path carefuly."; break;
               case 404: err += prvmsg+" make sure the path is correct, and try again.";break;
               case 500: err += " the hub encountered an interal error (Error 500)";break;
               case 503: err += " the hub is  not available (Error 503)";break;
@@ -748,6 +772,7 @@ export class YV4W_installer
         TD1.innerHTML = YoctoVisualization.ressources.FailedIcon("64", true, false, false, false, "oops");
         Row.appendChild(TD1);
         this._ErrMsgContainer = document.createElement("TD") as HTMLTableCellElement;
+        this._ErrMsgContainer.style.textAlign="justify";
         Row.appendChild(this._ErrMsgContainer);
         Table.appendChild(Row)
         this._connectiongError.appendChild(Table);
@@ -823,6 +848,7 @@ export class YV4W_installer
             TD2.style.whiteSpace="normal";
             TD2.style.fontSize = "smaller";
             this._adminNameInput = document.createElement("INPUT") as HTMLInputElement;
+            this._adminNameInput.size=12;
             this._adminNameInput.addEventListener("input", () =>
             {
                 this.MakeSureCredentialsAreNotEmpty()
@@ -839,6 +865,7 @@ export class YV4W_installer
             TD4.style.whiteSpace="normal";
             this._adminPasswordInput = document.createElement("INPUT") as HTMLInputElement;
             this._adminPasswordInput.type="password"
+            this._adminPasswordInput.size=12;
             this._adminPasswordInput.addEventListener("input", () =>
             {
             this.MakeSureCredentialsAreNotEmpty()
@@ -876,6 +903,7 @@ export class YV4W_installer
             TD2.style.whiteSpace="normal";
             TD2.style.fontSize = "smaller";
             this._userNameInput = document.createElement("INPUT") as HTMLInputElement;
+            this._userNameInput.size=12;
             this._userNameInput.addEventListener("input", () =>
             {
             this.MakeSureCredentialsAreNotEmpty()
@@ -892,6 +920,7 @@ export class YV4W_installer
             TD4.style.whiteSpace="normal";
             this._userPasswordInput = document.createElement("INPUT") as HTMLInputElement;
             this._userPasswordInput.type="password"
+            this._userPasswordInput.size=12;
             this._userPasswordInput.addEventListener("input", () =>
             {
             this.MakeSureCredentialsAreNotEmpty()
@@ -1005,9 +1034,9 @@ export class YV4W_installer
             this._currentfs = null;
             let error: string = "";
 
-            if ((firmware.indexOf("-") < 0) && (parseInt(firmware) < 43805))
+            if ((firmware.indexOf("-") < 0) && (parseInt(firmware) < this.FIRMWAREMINVERSION))
             {
-                error = "Hub firmware is too old for Yocto-Visualization to run properly. You need at least version 43805";
+                error = "Hub firmware is too old for Yocto-Visualization to run properly. You need at least version "+this.FIRMWAREMINVERSION;
                 this._nextButton.enabled = false;
             }
 
@@ -2301,7 +2330,7 @@ export class YV4W_installer
         if (success != YoctoAPI.YAPI_SUCCESS) throw "Upload failed (Error" + success.toString() + ")";
         status.innerText = 'done.';
         status = log('Configuring hub');
-        let url = this._currentHub_protocol + "://" + this._applicationURL;
+        let url = this._currentHubLink_protocol + "://" + this._applicationURL;
         let network = await YoctoAPI.YNetwork.FindNetwork(await ((<YoctoAPI.YModule>this._currentHub).get_serialNumber()) + ".network");
         if ((<HTMLInputElement>this._makeDefaultInput).checked)
         {

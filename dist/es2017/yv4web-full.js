@@ -1,4 +1,4 @@
-/* Yocto-Visualization-4web (ES2017 full 1.10.52094) - www.yoctopuce.com */
+/* Yocto-Visualization-4web (ES2017 full 1.10.52126) - www.yoctopuce.com */
 // obj/full/Renderer/YDataRendererCommon.js
 var Vector3 = class {
   constructor(a, b, c) {
@@ -15735,7 +15735,7 @@ var YAPIContext = class {
     return this.imm_GetAPIVersion();
   }
   imm_GetAPIVersion() {
-    return "1.10.52094";
+    return "1.10.52126";
   }
   async InitAPI(mode, errmsg) {
     this._detectType = mode;
@@ -17478,7 +17478,7 @@ YFiles.FREESPACE_INVALID = YAPI.INVALID_UINT;
 // obj/full/constants.js
 var constants = class {
   static get buildVersion() {
-    return "1.10.52094";
+    return "1.10.52126";
   }
   static get deviceScreenWidth() {
     return screen.width * window.devicePixelRatio;
@@ -35925,7 +35925,12 @@ var YWebPage = class {
     if (!constants.mustCheckForUpdate && !force)
       return;
     let checkurl = location.protocol + "//www.yoctopuce.com/FR/common/getLastFirmwareLink.php?app=yoctovisualization4web.installer&version=" + constants.buildVersion + "&platform=_";
-    let response = await fetch(checkurl);
+    let response;
+    try {
+      response = await fetch(checkurl);
+    } catch (e) {
+      return;
+    }
     if (!response.ok)
       return;
     let json;
@@ -35934,7 +35939,6 @@ var YWebPage = class {
     } catch (e) {
       return;
     }
-    ;
     if (!(json instanceof Array))
       return;
     if (json.length <= 0)
@@ -35950,7 +35954,7 @@ var YWebPage = class {
     if (currentVersionStr.indexOf("-") < 0) {
       let n = currentVersionStr.lastIndexOf(".");
       if (n >= 0)
-        currentVersionStr.substr(n + 1);
+        currentVersionStr = currentVersionStr.substr(n + 1);
       currentVersionNumber = parseInt(currentVersionStr);
     }
     if (currentVersionNumber >= newVersionNumber)
@@ -36275,11 +36279,19 @@ var HubInfo = class {
     if (this._path != "")
       url += "/" + this._path;
     url += "/info.json";
-    let HubData = null;
-    let res = await YoctoHubFileHandler.makeRequest("GET", url, this._srvusername, this._srvpassword);
-    if (res.data != null) {
-      let data = new TextDecoder().decode(res.data);
-      HubData = JSON.parse(data);
+    let response;
+    try {
+      response = await fetch(url, {mode: "cors"});
+    } catch (e) {
+      return -3;
+    }
+    if (response.ok) {
+      let HubData;
+      try {
+        HubData = await response.json();
+      } catch (e) {
+        return -1;
+      }
       if (HubData.port && HubData.port.length > 0) {
         let proto_port = HubData.port[0].split(":");
         this._protocol = proto_port[0];
@@ -36291,7 +36303,11 @@ var HubInfo = class {
       this._userPassword = HubData.userPassword.toUpperCase() == "TRUE";
       return true;
     }
-    return res.status;
+    if (response.status == 404 && this._path != "")
+      return -2;
+    if (response.status == 0 && response.statusText == null)
+      return -3;
+    return response.status;
   }
   findChild(parent, name) {
     let res = null;
