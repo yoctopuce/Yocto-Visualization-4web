@@ -1,6 +1,6 @@
 /*********************************************************************
  *
- * $Id: yocto_api.ts 51903 2022-11-29 17:25:59Z mvuilleu $
+ * $Id: yocto_api.ts 52180 2022-12-06 14:02:30Z mvuilleu $
  *
  * High-level programming interface, common to all modules
  *
@@ -10230,6 +10230,8 @@ export abstract class YWebSocketHub extends YGenericHub
                     mstimeout = this._YIO_10_MINUTES_TCP_TIMEOUT;
                 } else if (yreq.devUrl.indexOf('/flash.json') >= 0) {
                     mstimeout = this._YIO_10_MINUTES_TCP_TIMEOUT;
+                } else if (yreq.devUrl.indexOf('/Yvw4I.js') >= 0) {
+                    mstimeout = this._YIO_10_MINUTES_TCP_TIMEOUT;
                 }
             }
             yreq.timeoutId = setTimeout((chan,yr) => { this.imm_abortRequest(chan, yr); }, mstimeout, tcpchan, yreq);
@@ -12481,7 +12483,7 @@ export class YAPIContext
 
     imm_GetAPIVersion()
     {
-        return /* version number patched automatically */'1.10.52126';
+        return /* version number patched automatically */'1.10.52180';
     }
 
     /**

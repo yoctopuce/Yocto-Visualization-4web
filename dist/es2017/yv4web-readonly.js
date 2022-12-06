@@ -1,4 +1,4 @@
-/* Yocto-Visualization-4web (ES2017 read-only 1.10.52126) - www.yoctopuce.com */
+/* Yocto-Visualization-4web (ES2017 read-only 1.10.52180) - www.yoctopuce.com */
 // obj/rdonly/Renderer/YDataRendererCommon.js
 var Vector3 = class {
   constructor(a, b, c) {
@@ -14055,6 +14055,8 @@ var YWebSocketHub = class extends YGenericHub {
           mstimeout = this._YIO_10_MINUTES_TCP_TIMEOUT;
         } else if (yreq.devUrl.indexOf("/flash.json") >= 0) {
           mstimeout = this._YIO_10_MINUTES_TCP_TIMEOUT;
+        } else if (yreq.devUrl.indexOf("/Yvw4I.js") >= 0) {
+          mstimeout = this._YIO_10_MINUTES_TCP_TIMEOUT;
         }
       }
       yreq.timeoutId = setTimeout((chan, yr) => {
@@ -15735,7 +15737,7 @@ var YAPIContext = class {
     return this.imm_GetAPIVersion();
   }
   imm_GetAPIVersion() {
-    return "1.10.52126";
+    return "1.10.52180";
   }
   async InitAPI(mode, errmsg) {
     this._detectType = mode;
@@ -17289,7 +17291,7 @@ YNetwork.POECURRENT_INVALID = YAPI.INVALID_UINT;
 // obj/rdonly/constants.js
 var constants = class {
   static get buildVersion() {
-    return "1.10.52126";
+    return "1.10.52180";
   }
   static get deviceScreenWidth() {
     return screen.width * window.devicePixelRatio;

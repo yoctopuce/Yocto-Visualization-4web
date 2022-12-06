@@ -406,7 +406,7 @@ export class configForm
             p.style.fontSize = configForm.fontSize.toString() + "px";
             p.style.paddingTop = "0px";
             p.style.marginTop = Math.round(3 * this.GUIcoef).toString() + "px";
-            p.innerText = "Enter the list of VirtualHub / YoctoHub / Yocto-Visualization server IP addresses this page can connect to"
+            p.innerText = "Enter the list of VirtualHub or YoctoHub this page can connect to"
             this._tabNetwork.divElement.appendChild(p)
 
             configForm._Hubtable = document.createElement("TABLE") as HTMLTableElement;

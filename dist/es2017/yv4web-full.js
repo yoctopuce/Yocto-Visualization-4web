@@ -1,4 +1,4 @@
-/* Yocto-Visualization-4web (ES2017 full 1.10.52126) - www.yoctopuce.com */
+/* Yocto-Visualization-4web (ES2017 full 1.10.52180) - www.yoctopuce.com */
 // obj/full/Renderer/YDataRendererCommon.js
 var Vector3 = class {
   constructor(a, b, c) {
@@ -14055,6 +14055,8 @@ var YWebSocketHub = class extends YGenericHub {
           mstimeout = this._YIO_10_MINUTES_TCP_TIMEOUT;
         } else if (yreq.devUrl.indexOf("/flash.json") >= 0) {
           mstimeout = this._YIO_10_MINUTES_TCP_TIMEOUT;
+        } else if (yreq.devUrl.indexOf("/Yvw4I.js") >= 0) {
+          mstimeout = this._YIO_10_MINUTES_TCP_TIMEOUT;
         }
       }
       yreq.timeoutId = setTimeout((chan, yr) => {
@@ -15735,7 +15737,7 @@ var YAPIContext = class {
     return this.imm_GetAPIVersion();
   }
   imm_GetAPIVersion() {
-    return "1.10.52126";
+    return "1.10.52180";
   }
   async InitAPI(mode, errmsg) {
     this._detectType = mode;
@@ -17478,7 +17480,7 @@ YFiles.FREESPACE_INVALID = YAPI.INVALID_UINT;
 // obj/full/constants.js
 var constants = class {
   static get buildVersion() {
-    return "1.10.52126";
+    return "1.10.52180";
   }
   static get deviceScreenWidth() {
     return screen.width * window.devicePixelRatio;
@@ -30742,7 +30744,7 @@ var configForm = class {
       p.style.fontSize = configForm.fontSize.toString() + "px";
       p.style.paddingTop = "0px";
       p.style.marginTop = Math.round(3 * this.GUIcoef).toString() + "px";
-      p.innerText = "Enter the list of VirtualHub / YoctoHub / Yocto-Visualization server IP addresses this page can connect to";
+      p.innerText = "Enter the list of VirtualHub or YoctoHub this page can connect to";
       this._tabNetwork.divElement.appendChild(p);
       configForm._Hubtable = document.createElement("TABLE");
       configForm._Hubtable.style.position = "absolute";
