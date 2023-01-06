@@ -1,6 +1,6 @@
 /*********************************************************************
  *
- * $Id: yocto_api.ts 52180 2022-12-06 14:02:30Z mvuilleu $
+ * $Id: yocto_api.ts 52591 2022-12-30 10:29:12Z mvuilleu $
  *
  * High-level programming interface, common to all modules
  *
@@ -8870,20 +8870,21 @@ export abstract class YGenericHub
     urlInfo: _YY_UrlInfo;                   // structure that describe the root URL of the hub
     notiflen: number = 0;                   // notification message length before forced disconnection
     lastPingStamp: number = 0;              // timestamp of last notification received
+    stalledTimeoutMs: number = DEFAULT_NETWORK_TIMEOUT_MS; // hub-specific timeout for detecting stalled connections
     timeoutId: any = null;                  // actually a number | NodeJs.Timeout: timeout for declaring stalled hub
     isNotifWorking: boolean = false;        // true if we are receiving valid notification
     devListExpires: number  = 0;            // timestamp of next useful updateDeviceList
     serialByYdx: string[] = [];             // serials by hub-specific devYdx
     retryDelay: number = 15;                // delay before reconnecting in case of error: initially 15ms
     notifPos: number = -1;                  // current absolute position in hub notification stream
-    notifCarryOver: string = '';            // last uncomplete notification message
-    currPos: number = 0;                    // current position in data stream
+    notifCarryOver: string = '';            // last incomplete notification message
     missing: object = {};                   // used during UpdateDeviceList
     disconnecting: boolean = false;         // set to true when requested to disconnect
     notbynOpenTimeout: number | null = null;// testHub timeout
     notbynTryOpen: {():void} | null = null; // testHub retry code
     _reconnectionTimer: any = null;         // actually a number | NodeJS.Timeout
     _firstArrivalCallback: boolean = true;  // indicates that this is the first time we see this device
+    _isHubWorking: boolean = false;         // indicates that the hub is fully connected and ready
     _missing: YBoolDict = {};               // hash table by serial number, used during UpdateDeviceList
     _rwAccess: boolean | null = null;       // null until hub has been tested for rw-access
     _hubAdded: boolean = false;
@@ -8936,9 +8937,7 @@ export abstract class YGenericHub
             errmsg.msg = yreq.errorMsg;
             return yreq.errorType;
         }
-        if (!this._hubAdded) {
-            await this.signalHubConnected();
-        }
+        await this.signalHubConnected();
         return YAPI_SUCCESS;
     }
 
@@ -8946,8 +8945,12 @@ export abstract class YGenericHub
      */
     async signalHubConnected(): Promise<void>
     {
+        if(this._yapi._logLevel >= 4) {
+            this._yapi.imm_log('Hub connected');
+        }
         this.notbynOpenTimeout = null;
-        if(this._connectionType != Y_YHubType.HUB_TESTONLY) {
+        this._isHubWorking = true;
+        if(!this._hubAdded && this._connectionType != Y_YHubType.HUB_TESTONLY) {
             await this._yapi.ensureUpdateDeviceListNotRunning();
             await this._yapi._addHub(this);
             // Hub has been removed from _pendingHubs by _addHub
@@ -8957,6 +8960,7 @@ export abstract class YGenericHub
 
     imm_testHubAgainLater(): boolean
     {
+        this._isHubWorking = false;
         this.isNotifWorking = false;
         this.devListExpires = 0;
         if(this._connectionType == Y_YHubType.HUB_PREREGISTERED && this._hubAdded) {
@@ -8966,6 +8970,9 @@ export abstract class YGenericHub
         }
         if(this._reconnectionTimer) {
             // reconnection already scheduled
+            if(this._yapi._logLevel >= 4) {
+                this._yapi.imm_log('Hub disconnected, reconnection is already scheduled');
+            }
             return true;
         }
         // need to schedule next retry
@@ -8973,15 +8980,24 @@ export abstract class YGenericHub
         if(this.notbynOpenTimeout) {
             let now = this._yapi.GetTickCount();
             if (now >= this.notbynOpenTimeout) {
+                if(this._yapi._logLevel >= 4) {
+                    this._yapi.imm_log('Hub connection failed (timeout)');
+                }
                 return false;
             }
             if (now + this.retryDelay > this.notbynOpenTimeout) {
                 this.retryDelay = this.notbynOpenTimeout - now;
             }
         }
+        if(this._yapi._logLevel >= 4) {
+            this._yapi.imm_log('Hub reconnection scheduled in ' + (this.retryDelay / 1000) + 's');
+        }
         this._reconnectionTimer = setTimeout(() => {
             this._reconnectionTimer = null;
             if(this.notbynTryOpen) {
+                if(this._yapi._logLevel >= 4) {
+                    this._yapi.imm_log('Retry hub connection now');
+                }
                 this.notbynTryOpen();
             }
         }, this.retryDelay);
@@ -9322,7 +9338,7 @@ export abstract class YGenericHub
     // default implementation of function to abort communication channel immediately
     imm_disconnectNow(): void
     {
-        // nothing to do
+        this._isHubWorking = false;
     }
 
     // default implementation of isOnline
@@ -9515,8 +9531,13 @@ export abstract class YWebSocketHub extends YGenericHub
             this.notbynOpenTimeout = (mstimeout ? this._yapi.GetTickCount() + mstimeout : null);
             this.notbynOpenPromise = new Promise<YConditionalResult>(
                 (resolve, reject) => {
+                    let TryOpenID: string = (Date.now() % 600000).toString();
                     if (mstimeout) {
+                        this.stalledTimeoutMs = mstimeout;
                         this.notbynOpenTimeoutObj = setTimeout(() => {
+                            if(this._yapi._logLevel >= 4) {
+                                this._yapi.imm_log('WebSocket connection timeout ['+TryOpenID+']');
+                            }
                             resolve({errorType: YAPI_TIMEOUT, errorMsg: "Timeout on WebSocket connection"});
                             this.imm_commonDisconnect();
                             this.imm_disconnectNow();
@@ -9524,11 +9545,20 @@ export abstract class YWebSocketHub extends YGenericHub
                     }
                     this.notbynTryOpen = () => {
                         if (this.disconnecting) {
+                            if(this._yapi._logLevel >= 4) {
+                                this._yapi.imm_log('WebSocket connect cancelled (disconnecting) ['+TryOpenID+']');
+                            }
                             resolve({ errorType: YAPI_IO_ERROR, errorMsg: "I/O error" });
                         } else {
+                            if(this._yapi._logLevel >= 4) {
+                                this._yapi.imm_log('Opening websocket connection ['+TryOpenID+']');
+                            }
                             this.imm_webSocketOpen(this.urlInfo.url + 'not.byn');
                             this._firstArrivalCallback = true;
                             if (!this.websocket) {
+                                if(this._yapi._logLevel >= 4) {
+                                    this._yapi.imm_log('Failed to open WebSocket connection ['+TryOpenID+']');
+                                }
                                 resolve({ errorType: YAPI_IO_ERROR, errorMsg: "I/O error" });
                             } else {
                                 this.websocket.onmessage = ((evt: _YY_WebSocketMessageEvent) => {
@@ -9540,10 +9570,16 @@ export abstract class YWebSocketHub extends YGenericHub
                                             clearTimeout(this.notbynOpenTimeoutObj);
                                             this.notbynOpenTimeoutObj = null;
                                         }
+                                        if(this._yapi._logLevel >= 4) {
+                                            this._yapi.imm_log('WebSocket connection established ['+TryOpenID+']');
+                                        }
                                         // this will cause an API load - which may still cause a disconnect
                                         // in case of communication failure
                                         this.signalHubConnected()
                                             .catch((e) => {
+                                                if(this._yapi._logLevel >= 4) {
+                                                    this._yapi.imm_log('Exception in signalHubConnected ['+TryOpenID+']');
+                                                }
                                                 this.imm_disconnectNow();
                                             })
                                             .then(() => {
@@ -9568,7 +9604,7 @@ export abstract class YWebSocketHub extends YGenericHub
                                 });
                                 this.websocket.onclose = ((evt: _YY_WebSocketCloseEvent) => {
                                     if(this._yapi._logLevel >= 4) {
-                                        this._yapi.imm_log('WebSocket connection closed');
+                                        this._yapi.imm_log('WebSocket connection closed ['+TryOpenID+']');
                                     }
                                     this._connectionState = WSConnState.DISCONNECTED;
                                     this.websocket = null;
@@ -9587,7 +9623,7 @@ export abstract class YWebSocketHub extends YGenericHub
                                 });
                                 this.websocket.onerror = ((evt: _YY_WebSocketErrorEvent) => {
                                     if(evt.message && (!/ ETIMEDOUT /.test(evt.message) || this._yapi._logLevel >= 4)) {
-                                        this._yapi.imm_log('WebSocket error: ', evt);
+                                        this._yapi.imm_log('WebSocket error ['+TryOpenID+']: ', evt);
                                     }
                                     if (this.retryDelay < 0) {
                                         // this happens typically for websocket callback
@@ -9595,7 +9631,7 @@ export abstract class YWebSocketHub extends YGenericHub
                                     }
                                     this.imm_disconnectNow();
                                     if (this.disconnecting) {
-                                        this._yapi.imm_log('Disconnecting after error');
+                                        this._yapi.imm_log('Disconnecting after error ['+TryOpenID+']');
                                         return;
                                     }
                                     // connection error
@@ -9609,10 +9645,10 @@ export abstract class YWebSocketHub extends YGenericHub
                                 this.timeoutId = setTimeout(() => {
                                     if (!this.imm_isForwarded()) {
                                         // abort communication channel, this will trigger a reconnect
-                                        this._yapi.imm_log('WS: connection stalled during open');
+                                        this._yapi.imm_log('WS: connection stalled during open ['+TryOpenID+']');
                                         this.imm_disconnectNow();
                                     }
-                                }, 60000);  // 30s timeout to start receiving notifications
+                                }, this.stalledTimeoutMs);  // initial timeout to start receiving notifications
                             }
                         }
                     };
@@ -10023,7 +10059,7 @@ export abstract class YWebSocketHub extends YGenericHub
                     let boundary = this.imm_getBoundary();
                     let body = this.imm_formEncodeBody(obj_body, boundary);
                     subReq = subReq.slice(0,-2) +
-                        'Content-Type: multipart/form-data, boundary=' + boundary + '\r\n\r\n';
+                        'Content-Type: x-upload, boundary=' + boundary + '\r\n\r\n';
                     yreq.toBeSent = new Uint8Array(subReq.length + body.length);
                     yreq.toBeSent.set(body, subReq.length);
                     yreq.progressCb = obj_body.progressCb;
@@ -10041,7 +10077,10 @@ export abstract class YWebSocketHub extends YGenericHub
                 }
                 if(!ws || this.disconnecting || this._connectionState != WSConnState.CONNECTED) {
                     if(this._yapi._logLevel >= 4) {
-                        this._yapi.imm_log('request @' + yreq._creat + ' failed, websocket is down');
+                        let wsState: string = (ws ? ' websocket=NULL' : '');
+                        let dsState: string = (this.disconnecting ? ' disconnecting' : '');
+                        let cnState: string = (this._connectionState != WSConnState.CONNECTED ? ' connState='+this._connectionState : '');
+                        this._yapi.imm_log('request @' + yreq._creat + ' failed, websocket is down:'+wsState+dsState+cnState);
                     }
                     yreq.errorType = YAPI_IO_ERROR;
                     yreq.errorMsg = 'WebSocket not connected';
@@ -10487,6 +10526,7 @@ export abstract class YWebSocketHub extends YGenericHub
     // abort communication channel immediately
     imm_disconnectNow(): void
     {
+        super.imm_disconnectNow();
         this._connectionState = WSConnState.DISCONNECTED;
         if(this.websocket) {
             let websocket = this.websocket;
@@ -11033,6 +11073,14 @@ export class YAPIContext
                     // skip it for now
                     continue;
                 }
+                if (!hub._isHubWorking) {
+                    // this hub is experiencing connectivity issues
+                    // skip it for now
+                    if(this._logLevel >= 4) {
+                        this.imm_log('Skip updateDeviceList for hub '+hub.urlInfo.host+', currently offline');
+                    }
+                    continue;
+                }
                 if (hub.devListExpires <= this.GetTickCount()) {
                     hub._missing = {};
                     hubs.push(hub);
@@ -11207,22 +11255,24 @@ export class YAPIContext
         }
         hub.timeoutId = setTimeout(() => {
             if (!hub.imm_isForwarded()) {
-                this.imm_log('WS: closing stalled connection');
+                this.imm_log('Closing stalled connection after '+(hub.stalledTimeoutMs/1000)+'s');
                 // abort communication channel immediately, this will trigger a reconnect
                 hub.imm_disconnectNow();
             }
-        }, 60000);  // 60s timeout before closing a stalled connection
+        }, hub.stalledTimeoutMs);
 
         let rows = (hub.notifCarryOver + str_lines).split('\n');
         let nrows = rows.length;
         let value;
+        // in continuous mode, last line is either empty or a partial event
         if(str_lines.substr(-1) != '\n') {
+            // last line might be incomplete, keep it for later
             hub.notifCarryOver = rows[--nrows];
         } else {
+            // last line is empty, drop it
+            nrows--;
             hub.notifCarryOver = '';
         }
-        // in continuous mode, last line is either empty or a partial event
-        nrows--;
         for (let idx = 0; idx < nrows; idx++) {
             let ev = rows[idx];
             if (ev.length == 0) continue;
@@ -11337,10 +11387,9 @@ export class YAPIContext
             } else {
                 // oops, bad notification ? be safe until a good one comes
                 hub.devListExpires = 0;
-                //alert('bad event on line '+idx+'/'+nrows+' : '+ev);
+                this.imm_log('Bad event on received from server:',ev);
                 hub.notifPos = -1;
             }
-            hub.currPos += ev.length + 1;
         }
         if (this._forwardValues > 0) {
             await this.HandleEvents(new YErrorMsg());
@@ -12483,7 +12532,7 @@ export class YAPIContext
 
     imm_GetAPIVersion()
     {
-        return /* version number patched automatically */'1.10.52180';
+        return /* version number patched automatically */'1.10.52602';
     }
 
     /**
@@ -12840,7 +12889,7 @@ export class YAPIContext
         this._pendingHubs[urlInfo.url] = newhub;
         // trigger testHub, but don't wait for the result
         // the hub will be removed from _pendingHubs when connected
-        newhub.testHub(0, errmsg).then((errcode: number) => {
+        newhub.testHub(this._networkTimeoutMs, errmsg).then((errcode: number) => {
             if(errcode != YAPI_SUCCESS) {
                 if(this._pendingHubs[urlInfo.url]) {
                     delete this._pendingHubs[urlInfo.url];
@@ -13086,6 +13135,9 @@ export class YAPIContext
      */
     async HandleEvents(errmsg: YErrorMsg | null = null): Promise<number>
     {
+        // In Typescript, value change callbacks and timed reports don't need HandleEvents
+        // (the impact of queuing on performance was too big, and delayed processing could
+        //  cause severe issues when a browser window is "inactive")
         return YAPI_SUCCESS;
     }
 
@@ -13110,11 +13162,15 @@ export class YAPIContext
      */
     async Sleep(ms_duration: number, errmsg: YErrorMsg | null = null): Promise<number>
     {
-        let end = this.GetTickCount() + ms_duration;
-        await this.HandleEvents(errmsg);
-        while(this.GetTickCount() < end) {
-            await this._microSleep_internal();
-            await this.HandleEvents(errmsg);
+        // In Typescript, value change callbacks and timed reports don't need HandleEvents
+        // (the impact of queuing on performance was too big, and delayed processing could
+        //  cause severe issues when a browser window is "inactive")
+        let end: number = this.GetTickCount() + ms_duration;
+        let remaining: number = ms_duration;
+        while(remaining > 0) {
+            let waitTime: number = Math.min(remaining, 25);
+            await new Promise<void>((resolve, reject) => { setTimeout(resolve, waitTime); });
+            remaining = end - this.GetTickCount();
         }
         return YAPI_SUCCESS;
     }
@@ -13124,7 +13180,7 @@ export class YAPIContext
     {
         return new Promise<void>(function(resolve,reject) {
             //noinspection DynamicallyGeneratedCodeJS
-            setTimeout(resolve,3) ;
+            setTimeout(resolve,3);
         });
     }
 
@@ -13150,26 +13206,33 @@ export class YAPIContext
      */
     SetTimeout(callback: Function, ms_timeout: number, args?: any): number
     {
-        this._setTimeout_internal(callback, this.GetTickCount()+ms_timeout, args);
+        // - In Typescript, value change callbacks and timed reports don't need HandleEvents
+        //   (the impact of queuing on performance was too big, and delayed processing could
+        //    cause severe issues when a browser window is "inactive")
+        // - The use of the true setTimeout function cause less stacking of async contexts
+        //   than nesting setTimeout_internal calls directly as done before
+        let endtime: number = this.GetTickCount() + ms_timeout;
+        let setTimeout_internal = async () => {
+            let delay = endtime - this.GetTickCount();
+            if(delay < 40) {
+                // very short wait, use a single setTimeout call if needed
+                if(delay > 3) {
+                    await new Promise<void>((resolve, reject) => { setTimeout(resolve, delay); });
+                }
+                // then invoke callback immediately
+                callback.apply(null, args);
+            } else {
+                if(delay >= 150) {
+                    // 150ms or more, call updateDeviceList with ~100ms interval
+                    await this.UpdateDeviceList();
+                    delay = Math.min(endtime - YAPI.GetTickCount(), 110);
+                }
+                await this.Sleep(delay - 20);
+                setTimeout_internal();
+            }
+        };
+        setTimeout_internal();
         return YAPI_SUCCESS;
-    }
-
-    _setTimeout_internal(callback: Function, endtime: number, args: any)
-    {
-        let delay = endtime - YAPI.GetTickCount();
-        if(delay < 0) {
-            callback.apply(null, args);
-        } else if(delay < 100) {
-            this.Sleep(delay).then(() => {
-                this._setTimeout_internal(callback, endtime, args);
-            });
-        } else {
-            this.UpdateDeviceList().then(() => {
-                this.Sleep(90).then(() => {
-                    this._setTimeout_internal(callback, endtime, args);
-                });
-            });
-        }
     }
 
     /**

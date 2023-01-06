@@ -77,12 +77,11 @@ class ResizeMoveHandle
       private index : number;
 
       private container : HTMLElement
-      private div : HTMLDivElement
-
-      private svg : SVGSVGElement
-      private arrow : SVGPathElement
-      private circle :  SVGCircleElement
-      private isactive:boolean;
+      private div       : HTMLDivElement
+      private svg       : SVGSVGElement
+      private arrow     : SVGPathElement
+      private circle    : SVGCircleElement
+      private isactive  : boolean;
 
       constructor(container : HTMLElement,  index :number, mouseDownListener : any, touchStartlistener : any )
       { this.index=index;
@@ -232,7 +231,8 @@ export class YWidget
     private _windowResizeCallback: WindowResizeCallback;
 
     public SourceChanged(src: object, index?: number) {}
-    public showRecordedDatachanged() {}
+    public loadRecordedDataIfNeeded() {}
+    public removeDataloggerData() {}
 
 //#ifndef READONLY
     public delete(): void
@@ -342,6 +342,7 @@ export class YWidget
     {
         if (this._SizeIsRelative) this.relativePositionX = value; else this._PositionX = value;
         this.UIContainer.style.left = this._PositionX.toString() + "px";
+        if (this._genRenderer != null) this._genRenderer.clearTransformationMatrix();
 //#ifndef READONLY
         this.DrawHandles(this.UIContainer.offsetLeft, this.UIContainer.offsetTop,
             this.UIContainer.offsetWidth, this.UIContainer.offsetHeight);
@@ -358,6 +359,7 @@ export class YWidget
 
         if (this._SizeIsRelative) this.relativePositionY = value; else this._PositionY = value;
         this.UIContainer.style.top = this._PositionY.toString() + "px";
+        if (this._genRenderer != null) this._genRenderer.clearTransformationMatrix();
 //#ifndef READONLY
         this.DrawHandles(this.UIContainer.offsetLeft, this.UIContainer.offsetTop,
             this.UIContainer.offsetWidth, this.UIContainer.offsetHeight);
@@ -646,7 +648,7 @@ export class YWidget
         this.PositionX = this._InitialSizeIsRelative ? Math.round( w*(this._relativePositionX /100)): left;
         this.PositionY = this._InitialSizeIsRelative ? Math.round( h*(this._relativePositionY /100)): top;
         this.Width     = this._InitialSizeIsRelative ? Math.round( w*(this._relativeWidth /100))    : width;
-        this.Height    = this._InitialSizeIsRelative ? Math.round( h*(this._relativeWidth /100))    : height;
+        this.Height    = this._InitialSizeIsRelative ? Math.round( h*(this._relativeHeight /100))    : height;
         this.UIContainer.style.border = "1px solid black";
         this.UIContainer.style.backgroundColor = this._BackColor.htmlCode;
         this.UIContainer.setAttribute("name", "YoctoVisualizationWidget");
@@ -674,6 +676,11 @@ export class YWidget
         n++;
         YWidget.HandlesDiv.style.zIndex = n.toString();
 //#endif
+    }
+
+    public SensorArrivalcallback(source: YoctoVisualization.CustomYSensor)
+    {
+
     }
 
     public SensorStateChangedcallback(source: YoctoVisualization.CustomYSensor)
@@ -1784,9 +1791,7 @@ export class graphWidget extends YWidget
     private offLineSourcesPanel: YDataRendering.MessagePanel;
     private captureRunningPanel: YDataRendering.MessagePanel;
     private dataloggerProgress: YDataRendering.MessagePanel;
-
-
-private prop: YoctoVisualization.GraphFormProperties;
+    private prop: YoctoVisualization.GraphFormProperties;
     private markers: YDataRendering.Marker[];
     private seriesProperties: YoctoVisualization.ChartSerie[]
     private static AnnotationPanelCount: number = 0;
@@ -2039,7 +2044,7 @@ private prop: YoctoVisualization.GraphFormProperties;
 //#ifndef READONLY
         if (this.SizeIsRelative) this.refreshProperties()
 //#endif
-
+        this.loadRecordedDataIfNeeded()
         this._graph.AllowRedraw();
     }
 
@@ -2150,20 +2155,26 @@ private prop: YoctoVisualization.GraphFormProperties;
         }
         this.updateOfflinePanel();
         this.preLoadSensorData(value, index);
+        this.loadRecordedDataIfNeeded();
         if (value) value.registerCallback(this);
         this._graph.AllowRedraw();
+
+
+    }
+
+
+    public SensorArrivalcallback(source: YoctoVisualization.CustomYSensor)
+    {   this.loadRecordedDataIfNeeded();
 
     }
 
     private preLoadSensorData(value: YoctoVisualization.CustomYSensor, index: number): void
-    {   this.dataloggerProgress.text= graphWidget.DataLoggerLoadingMsg;
-
+    {
         if (value instanceof YoctoVisualization.NullYSensor)
         {
             this._graph.series[index].clear();
             return;
         }
-
         let s: YoctoVisualization.ChartSerie = Reflect.get(this.prop, "Graph_series" + index.toString()) as YoctoVisualization.ChartSerie;
         let data: YoctoVisualization.TimedSensorValue[];
         switch (s.DataSource_datatype)
@@ -2184,7 +2195,6 @@ private prop: YoctoVisualization.GraphFormProperties;
         {
             this._graph.series[index].InsertPoints(l[i]);
         }
-
     }
 
 //#ifndef READONLY
@@ -2208,7 +2218,6 @@ private prop: YoctoVisualization.GraphFormProperties;
 
     public Get_PropertyValue(src: YoctoVisualization.UIElement): any
     {
-
         let info: YoctoVisualization.PropPathinfo = new YoctoVisualization.PropPathinfo();
         let path: string[] = src.ExtractPropPath(info);
         switch (info.propType)
@@ -2219,7 +2228,6 @@ private prop: YoctoVisualization.GraphFormProperties;
             return YoctoVisualization.GenericProperties.newGetProperty(this._graph, this.prop, info.fullpropname, path, null);
         case "DataSource":
             return null;
-
         }
         return null;
 
@@ -2243,7 +2251,6 @@ private prop: YoctoVisualization.GraphFormProperties;
         for (let i: number = 0; i < graphWidget.SeriesCount; i++)
         {
             if (this.showOffline[i]) message = message + ((message != "") ? "\n" : "") + this.offlineMessages[i];
-
         }
         if (message == "" && this.offLineSourcesPanel.enabled) this.offLineSourcesPanel.enabled = false;
         if (message != "" && ((this.offLineSourcesPanel.text != message) || (!this.offLineSourcesPanel.enabled)))
@@ -2331,7 +2338,7 @@ private prop: YoctoVisualization.GraphFormProperties;
 
     private async startToClearDataLoggers()
     {
-        debugger
+
         let loggers: YoctoAPI.YDataLogger[] = [];
         for (let i: number = 0; i < graphWidget.SeriesCount; i++)
         {
@@ -2361,7 +2368,6 @@ private prop: YoctoVisualization.GraphFormProperties;
             await loggers[i].forgetAllDataStreams();
             await loggers[i].set_recording(YoctoAPI.YDataLogger.RECORDING_ON);
         }
-
         let tmp: boolean = this.prop.Graph_showRecordedData;
         this.prop.Graph_showRecordedData = false;
         this.truncateView();
@@ -2369,6 +2375,30 @@ private prop: YoctoVisualization.GraphFormProperties;
 
     }
 
+    public dataLoggerLoadprocessIsRunningNotification (  source : YoctoVisualization.CustomYSensor)
+    { let loadTotalPercent  =0;
+      let sensorCount  =0;
+      if (!this.prop.Graph_showRecordedData) return;
+
+        for (let i: number = 0; i < graphWidget.SeriesCount; i++)
+        {    let s: YoctoVisualization.ChartSerie = Reflect.get(this.prop, "Graph_series" + i.toString());
+             let sensor: YoctoVisualization.CustomYSensor = s.DataSource_source;
+             if  (sensor.dataloggerLoadisRunning)
+             {  loadTotalPercent += sensor.dataloggerLoadProgress;
+                 sensorCount++
+             }
+        }
+        if (sensorCount>0) this.dataloggerProgress.text  = graphWidget.DataLoggerLoadingMsg+" (" + (loadTotalPercent / sensorCount).toFixed(0) + "%)"
+        //console.log(loadTotalPercent);
+
+        let showPanel : boolean = (sensorCount>0) && (loadTotalPercent>0) && (loadTotalPercent<sensorCount*100)
+       // console.log("sensorCount="+sensorCount+"  loadTotalPercent="+ loadTotalPercent);
+       // if  (!showPanel)   debugger
+        this.dataloggerProgress.enabled = showPanel   ;
+
+    }
+
+    /*
     public startDataPreload(source: YoctoVisualization.CustomYSensor)
         {
 
@@ -2380,6 +2410,8 @@ private prop: YoctoVisualization.GraphFormProperties;
             this.dataloggerProgress.enabled=true;
 
         }
+
+     */
 
     public SensorNewDataBlock(source: YoctoVisualization.CustomYSensor, sourceFromIndex: number, sourcetoIndex: number, targetIndex: number, fromDataLogger: boolean): void
     {
@@ -2420,20 +2452,24 @@ private prop: YoctoVisualization.GraphFormProperties;
                         break;
                     }
                 }
+
             }
         }
     }
-    public showRecordedDatachanged(): void
-    {
 
-        if (this.prop == null) return;
+    public loadRecordedDataIfNeeded(): void
+    {   if (this.prop == null) return;
+        if (!this.prop.Graph_showRecordedData) return;
         for (let i: number = 0; i < graphWidget.SeriesCount; i++)
-        {
-            let s: YoctoVisualization.ChartSerie = Reflect.get(this.prop, "Graph_series" + i.toString()) as YoctoVisualization.ChartSerie;
-            this.SourceChanged(s.DataSource_source, i);
+        {   let s: YoctoVisualization.ChartSerie = Reflect.get(this.prop, "Graph_series" + i.toString()) as YoctoVisualization.ChartSerie;
+            s.DataSource_source.startDataloggerload(this);
         }
-
     }
+
+    public removeDataloggerData():void
+    {  //todo :  remove data < (Ysensor) .get_firstLiveDataTimeStamp  from graph
+    }
+/*
     public DataLoggerProgress(): void
     {
         let progress: number = 0;
@@ -2469,25 +2505,21 @@ private prop: YoctoVisualization.GraphFormProperties;
             this.dataloggerProgress.enabled=false;
         }
     }
+    */
+
 
     public DataloggerCompleted(Source: YoctoVisualization.CustomYSensor): void
     {
         if (!this.prop.Graph_showRecordedData) return;
-        this.dataloggerProgress.enabled=false;
         let props: YoctoVisualization.PropertiesList = YoctoVisualization.GenericProperties.getAllProperties(this.prop);
-        for (let i: number = 0; i < props.byIndex.length; i++)
-        {
-            let name = props.byIndex[i].name;
-            if (name.startsWith("Graph_series"))
-            {
-                let s: YoctoVisualization.ChartSerie = Reflect.get(this.prop, name);
-                if (s.DataSource_source == Source)
-                {
-                    let index: number = parseInt(name.substring(12));
-                    this.SourceChanged(Source, index);
+        for (let i: number = 0; i < this.seriesProperties.length; i++)
+        {  if (this.seriesProperties[i].DataSource_source == Source)
+            if (!this.seriesProperties[i].dataloggerAlreadyLoaded)
+             {   this._graph.DisableRedraw();
+                 this.preLoadSensorData(Source, i);
+                 this._graph.AllowRedraw();
+             }
 
-                }
-            }
         }
     }
 

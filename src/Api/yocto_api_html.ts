@@ -1,6 +1,6 @@
 /*********************************************************************
  *
- * $Id: yocto_api_html.ts 51971 2022-11-30 16:39:09Z mvuilleu $
+ * $Id: yocto_api_html.ts 52586 2022-12-29 18:25:50Z mvuilleu $
  *
  * High-level programming interface, common to all modules
  *
@@ -142,6 +142,7 @@ YAPI.imm_setSystemEnv(_HtmlSystemEnv);
 
 class YHttpHtmlHub extends YGenericHub
 {
+    currPos: number = 0;                  // current position in XMLHTTPRequest stream, when reply comes in parts
     notbynRequest: XMLHttpRequest | null                  = null;
     notbynOpenPromise: Promise<YConditionalResult> | null = null;
     notbynOpenTimeoutObj: any = null;   /* actually a number | NodeJS.Timeout */
@@ -287,6 +288,7 @@ class YHttpHtmlHub extends YGenericHub
             this.notbynOpenPromise = new Promise(
                 (resolve, reject) => {
                     if (mstimeout) {
+                        this.stalledTimeoutMs = mstimeout;
                         this.notbynOpenTimeoutObj = setTimeout(() => {
                             resolve({errorType: YAPI.TIMEOUT, errorMsg: "Timeout on HTTP connection"});
                             this.disconnect();
@@ -295,10 +297,11 @@ class YHttpHtmlHub extends YGenericHub
                     this.notbynTryOpen = () => {
                         let xmlHttpRequest: XMLHttpRequest = new XMLHttpRequest();
                         this.notbynRequest = xmlHttpRequest;
+                        this.currPos = 0;
                         this.imm_sendXHR(xmlHttpRequest,
                             'GET', this.urlInfo.url+'not.byn'+args,
                             null,
-                            () => {
+                            async () => {
                                 if (this.disconnecting) {
                                     return;
                                 }
@@ -316,6 +319,14 @@ class YHttpHtmlHub extends YGenericHub
                                             return;
                                         }
                                     } else {
+                                        let newlen = xmlHttpRequest.responseText.length;
+                                        if (xmlHttpRequest.readyState == 3) {
+                                            // when using reconnection mode, ignore state 3
+                                            if (this.notiflen == 1) return;
+                                            // make sure at least some data comes in to declare connectivity OK
+                                            // (notification channel always sends the current position)
+                                            if (newlen == 0) return;
+                                        }
                                         // receiving data properly
                                         if(!this._hubAdded) {
                                             // registration is now complete
@@ -323,22 +334,19 @@ class YHttpHtmlHub extends YGenericHub
                                                 clearTimeout(this.notbynOpenTimeoutObj);
                                                 this.notbynOpenTimeoutObj = null;
                                             }
+                                        }
+                                        if(!this._isHubWorking) {
                                             this.signalHubConnected().then(() => {
                                                 resolve({ errorType: YAPI_SUCCESS, errorMsg: "" });
                                             });
                                         }
-                                        if (xmlHttpRequest.readyState == 3) {
-                                            // when using reconnection mode, ignore state 3
-                                            if (this.notiflen == 1) return;
-                                        }
-                                        let newlen = xmlHttpRequest.responseText.length;
                                         if (newlen > this.currPos) {
-                                            this._yapi.parseEvents(this, xmlHttpRequest.responseText.slice(this.currPos, newlen));
+                                            await this._yapi.parseEvents(this, xmlHttpRequest.responseText.slice(this.currPos, newlen));
+                                            this.currPos = newlen;
                                         }
                                         // trigger immediately a new connection if closed in success
                                         if (xmlHttpRequest.readyState == 4 && (xmlHttpRequest.status >> 0) != 0) {
                                             this.notbynOpenPromise = null;
-                                            this.currPos = 0;
                                             this.testHub(0, errmsg);
                                         }
                                     }

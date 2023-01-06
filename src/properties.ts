@@ -1084,6 +1084,7 @@ export class ChartSerie
 
     private ownerForm: YoctoVisualization.YWidget | null = null;
     private index: number = -1;
+    public  dataloggerAlreadyLoaded = false;
 
     constructor(defaultColor: YDataRendering.YColor)
     { this._color = defaultColor; }
@@ -1097,6 +1098,7 @@ export class ChartSerie
         this.index = serieIndex;
         this.PropagateDataSourceChange(this._DataSource_source);
     }
+
 
     private PropagateDataSourceChange(value: YoctoVisualization.CustomYSensor): void
     {
@@ -2055,7 +2057,7 @@ export class GraphFormProperties extends YoctoVisualization.GenericProperties
             this._Graph_showRecordedData = value;
             if (this.ownerForm != null)
             {
-                this.ownerForm.showRecordedDatachanged();
+                this._Graph_showRecordedData ? this.ownerForm.loadRecordedDataIfNeeded() :this.ownerForm.removeDataloggerData() ;
             }
         }
     }

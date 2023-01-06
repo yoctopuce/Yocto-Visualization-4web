@@ -3344,7 +3344,8 @@ export class YGraph extends YDataRendering.YDataRenderer
         let res: MinMax = MinMaxHandler.DefaultValue();
 
         // Do we need to consider that segment?
-        if (!(data[0].x < end) && (data[count - 1].x > start)) return res; // completely out of view port full zone, abort.
+        if (data[0].x > end) return res; // completely out of view port full zone, abort.
+        if (data[count - 1].x < start) return res; // completely out of view port full zone, abort.
 
         let N1: number = 0;
         let N2: number = 0;

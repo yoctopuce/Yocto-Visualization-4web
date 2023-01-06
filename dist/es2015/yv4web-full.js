@@ -1,4 +1,4 @@
-/* Yocto-Visualization-4web (ES2015 full 1.10.52180) - www.yoctopuce.com */
+/* Yocto-Visualization-4web (ES2015 full 1.10.52602) - www.yoctopuce.com */
 // obj/full/Renderer/YDataRendererCommon.js
 var Vector3 = class {
   constructor(a, b, c) {
@@ -6229,7 +6229,9 @@ var YGraph = class extends YDataRenderer {
   }
   static FindMinMax(start, end, data, count) {
     let res = MinMaxHandler.DefaultValue();
-    if (!(data[0].x < end) && data[count - 1].x > start)
+    if (data[0].x > end)
+      return res;
+    if (data[count - 1].x < start)
       return res;
     let N1 = 0;
     let N2 = 0;
@@ -13491,6 +13493,7 @@ var YGenericHub = class {
     this._lastErrorMsg = "no error";
     this.notiflen = 0;
     this.lastPingStamp = 0;
+    this.stalledTimeoutMs = DEFAULT_NETWORK_TIMEOUT_MS;
     this.timeoutId = null;
     this.isNotifWorking = false;
     this.devListExpires = 0;
@@ -13498,13 +13501,13 @@ var YGenericHub = class {
     this.retryDelay = 15;
     this.notifPos = -1;
     this.notifCarryOver = "";
-    this.currPos = 0;
     this.missing = {};
     this.disconnecting = false;
     this.notbynOpenTimeout = null;
     this.notbynTryOpen = null;
     this._reconnectionTimer = null;
     this._firstArrivalCallback = true;
+    this._isHubWorking = false;
     this._missing = {};
     this._rwAccess = null;
     this._hubAdded = false;
@@ -13537,16 +13540,18 @@ var YGenericHub = class {
         errmsg.msg = yreq.errorMsg;
         return yreq.errorType;
       }
-      if (!this._hubAdded) {
-        yield this.signalHubConnected();
-      }
+      yield this.signalHubConnected();
       return YAPI_SUCCESS;
     });
   }
   signalHubConnected() {
     return __awaiter(this, void 0, void 0, function* () {
+      if (this._yapi._logLevel >= 4) {
+        this._yapi.imm_log("Hub connected");
+      }
       this.notbynOpenTimeout = null;
-      if (this._connectionType != 2) {
+      this._isHubWorking = true;
+      if (!this._hubAdded && this._connectionType != 2) {
         yield this._yapi.ensureUpdateDeviceListNotRunning();
         yield this._yapi._addHub(this);
         this._hubAdded = true;
@@ -13554,6 +13559,7 @@ var YGenericHub = class {
     });
   }
   imm_testHubAgainLater() {
+    this._isHubWorking = false;
     this.isNotifWorking = false;
     this.devListExpires = 0;
     if (this._connectionType == 1 && this._hubAdded) {
@@ -13562,6 +13568,9 @@ var YGenericHub = class {
       this._hubAdded = false;
     }
     if (this._reconnectionTimer) {
+      if (this._yapi._logLevel >= 4) {
+        this._yapi.imm_log("Hub disconnected, reconnection is already scheduled");
+      }
       return true;
     }
     if (this.retryDelay < 15e3)
@@ -13569,15 +13578,24 @@ var YGenericHub = class {
     if (this.notbynOpenTimeout) {
       let now = this._yapi.GetTickCount();
       if (now >= this.notbynOpenTimeout) {
+        if (this._yapi._logLevel >= 4) {
+          this._yapi.imm_log("Hub connection failed (timeout)");
+        }
         return false;
       }
       if (now + this.retryDelay > this.notbynOpenTimeout) {
         this.retryDelay = this.notbynOpenTimeout - now;
       }
     }
+    if (this._yapi._logLevel >= 4) {
+      this._yapi.imm_log("Hub reconnection scheduled in " + this.retryDelay / 1e3 + "s");
+    }
     this._reconnectionTimer = setTimeout(() => {
       this._reconnectionTimer = null;
       if (this.notbynTryOpen) {
+        if (this._yapi._logLevel >= 4) {
+          this._yapi.imm_log("Retry hub connection now");
+        }
         this.notbynTryOpen();
       }
     }, this.retryDelay);
@@ -13854,6 +13872,7 @@ var YGenericHub = class {
     return false;
   }
   imm_disconnectNow() {
+    this._isHubWorking = false;
   }
   imm_isOnline() {
     return Date.now() - this.lastPingStamp < 1e4;
@@ -13918,8 +13937,13 @@ var YWebSocketHub = class extends YGenericHub {
       if (!this.notbynOpenPromise) {
         this.notbynOpenTimeout = mstimeout ? this._yapi.GetTickCount() + mstimeout : null;
         this.notbynOpenPromise = new Promise((resolve, reject) => {
+          let TryOpenID = (Date.now() % 6e5).toString();
           if (mstimeout) {
+            this.stalledTimeoutMs = mstimeout;
             this.notbynOpenTimeoutObj = setTimeout(() => {
+              if (this._yapi._logLevel >= 4) {
+                this._yapi.imm_log("WebSocket connection timeout [" + TryOpenID + "]");
+              }
               resolve({errorType: YAPI_TIMEOUT, errorMsg: "Timeout on WebSocket connection"});
               this.imm_commonDisconnect();
               this.imm_disconnectNow();
@@ -13927,11 +13951,20 @@ var YWebSocketHub = class extends YGenericHub {
           }
           this.notbynTryOpen = () => {
             if (this.disconnecting) {
+              if (this._yapi._logLevel >= 4) {
+                this._yapi.imm_log("WebSocket connect cancelled (disconnecting) [" + TryOpenID + "]");
+              }
               resolve({errorType: YAPI_IO_ERROR, errorMsg: "I/O error"});
             } else {
+              if (this._yapi._logLevel >= 4) {
+                this._yapi.imm_log("Opening websocket connection [" + TryOpenID + "]");
+              }
               this.imm_webSocketOpen(this.urlInfo.url + "not.byn");
               this._firstArrivalCallback = true;
               if (!this.websocket) {
+                if (this._yapi._logLevel >= 4) {
+                  this._yapi.imm_log("Failed to open WebSocket connection [" + TryOpenID + "]");
+                }
                 resolve({errorType: YAPI_IO_ERROR, errorMsg: "I/O error"});
               } else {
                 this.websocket.onmessage = (evt) => {
@@ -13942,7 +13975,13 @@ var YWebSocketHub = class extends YGenericHub {
                       clearTimeout(this.notbynOpenTimeoutObj);
                       this.notbynOpenTimeoutObj = null;
                     }
+                    if (this._yapi._logLevel >= 4) {
+                      this._yapi.imm_log("WebSocket connection established [" + TryOpenID + "]");
+                    }
                     this.signalHubConnected().catch((e) => {
+                      if (this._yapi._logLevel >= 4) {
+                        this._yapi.imm_log("Exception in signalHubConnected [" + TryOpenID + "]");
+                      }
                       this.imm_disconnectNow();
                     }).then(() => {
                       resolve({errorType: YAPI_SUCCESS, errorMsg: ""});
@@ -13965,7 +14004,7 @@ var YWebSocketHub = class extends YGenericHub {
                 };
                 this.websocket.onclose = (evt) => {
                   if (this._yapi._logLevel >= 4) {
-                    this._yapi.imm_log("WebSocket connection closed");
+                    this._yapi.imm_log("WebSocket connection closed [" + TryOpenID + "]");
                   }
                   this._connectionState = 1;
                   this.websocket = null;
@@ -13982,14 +14021,14 @@ var YWebSocketHub = class extends YGenericHub {
                 };
                 this.websocket.onerror = (evt) => {
                   if (evt.message && (!/ ETIMEDOUT /.test(evt.message) || this._yapi._logLevel >= 4)) {
-                    this._yapi.imm_log("WebSocket error: ", evt);
+                    this._yapi.imm_log("WebSocket error [" + TryOpenID + "]: ", evt);
                   }
                   if (this.retryDelay < 0) {
                     this.imm_commonDisconnect();
                   }
                   this.imm_disconnectNow();
                   if (this.disconnecting) {
-                    this._yapi.imm_log("Disconnecting after error");
+                    this._yapi.imm_log("Disconnecting after error [" + TryOpenID + "]");
                     return;
                   }
                   if (!this.imm_testHubAgainLater()) {
@@ -14001,10 +14040,10 @@ var YWebSocketHub = class extends YGenericHub {
                 }
                 this.timeoutId = setTimeout(() => {
                   if (!this.imm_isForwarded()) {
-                    this._yapi.imm_log("WS: connection stalled during open");
+                    this._yapi.imm_log("WS: connection stalled during open [" + TryOpenID + "]");
                     this.imm_disconnectNow();
                   }
-                }, 6e4);
+                }, this.stalledTimeoutMs);
               }
             }
           };
@@ -14350,7 +14389,7 @@ var YWebSocketHub = class extends YGenericHub {
         if (obj_body) {
           let boundary = this.imm_getBoundary();
           let body = this.imm_formEncodeBody(obj_body, boundary);
-          subReq = subReq.slice(0, -2) + "Content-Type: multipart/form-data, boundary=" + boundary + "\r\n\r\n";
+          subReq = subReq.slice(0, -2) + "Content-Type: x-upload, boundary=" + boundary + "\r\n\r\n";
           yreq.toBeSent = new Uint8Array(subReq.length + body.length);
           yreq.toBeSent.set(body, subReq.length);
           yreq.progressCb = obj_body.progressCb;
@@ -14371,7 +14410,10 @@ var YWebSocketHub = class extends YGenericHub {
         }
         if (!ws || this.disconnecting || this._connectionState != 5) {
           if (this._yapi._logLevel >= 4) {
-            this._yapi.imm_log("request @" + yreq._creat + " failed, websocket is down");
+            let wsState = ws ? " websocket=NULL" : "";
+            let dsState = this.disconnecting ? " disconnecting" : "";
+            let cnState = this._connectionState != 5 ? " connState=" + this._connectionState : "";
+            this._yapi.imm_log("request @" + yreq._creat + " failed, websocket is down:" + wsState + dsState + cnState);
           }
           yreq.errorType = YAPI_IO_ERROR;
           yreq.errorMsg = "WebSocket not connected";
@@ -14751,6 +14793,7 @@ var YWebSocketHub = class extends YGenericHub {
     });
   }
   imm_disconnectNow() {
+    super.imm_disconnectNow();
     this._connectionState = 1;
     if (this.websocket) {
       let websocket = this.websocket;
@@ -15170,6 +15213,12 @@ var YAPIContext = class {
           if (!hubDev) {
             continue;
           }
+          if (!hub._isHubWorking) {
+            if (this._logLevel >= 4) {
+              this.imm_log("Skip updateDeviceList for hub " + hub.urlInfo.host + ", currently offline");
+            }
+            continue;
+          }
           if (hub.devListExpires <= this.GetTickCount()) {
             hub._missing = {};
             hubs.push(hub);
@@ -15317,19 +15366,19 @@ var YAPIContext = class {
       }
       hub.timeoutId = setTimeout(() => {
         if (!hub.imm_isForwarded()) {
-          this.imm_log("WS: closing stalled connection");
+          this.imm_log("Closing stalled connection after " + hub.stalledTimeoutMs / 1e3 + "s");
           hub.imm_disconnectNow();
         }
-      }, 6e4);
+      }, hub.stalledTimeoutMs);
       let rows = (hub.notifCarryOver + str_lines).split("\n");
       let nrows = rows.length;
       let value;
       if (str_lines.substr(-1) != "\n") {
         hub.notifCarryOver = rows[--nrows];
       } else {
+        nrows--;
         hub.notifCarryOver = "";
       }
-      nrows--;
       for (let idx = 0; idx < nrows; idx++) {
         let ev = rows[idx];
         if (ev.length == 0)
@@ -15440,9 +15489,9 @@ var YAPIContext = class {
           }
         } else {
           hub.devListExpires = 0;
+          this.imm_log("Bad event on received from server:", ev);
           hub.notifPos = -1;
         }
-        hub.currPos += ev.length + 1;
       }
       if (this._forwardValues > 0) {
         yield this.HandleEvents(new YErrorMsg());
@@ -16302,7 +16351,7 @@ var YAPIContext = class {
     });
   }
   imm_GetAPIVersion() {
-    return "1.10.52180";
+    return "1.10.52602";
   }
   InitAPI(mode, errmsg) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -16509,7 +16558,7 @@ var YAPIContext = class {
       }
       newhub.imm_setConnectionType(1);
       this._pendingHubs[urlInfo.url] = newhub;
-      newhub.testHub(0, errmsg).then((errcode) => {
+      newhub.testHub(this._networkTimeoutMs, errmsg).then((errcode) => {
         if (errcode != YAPI_SUCCESS) {
           if (this._pendingHubs[urlInfo.url]) {
             delete this._pendingHubs[urlInfo.url];
@@ -16671,10 +16720,13 @@ var YAPIContext = class {
   Sleep(ms_duration, errmsg = null) {
     return __awaiter(this, void 0, void 0, function* () {
       let end = this.GetTickCount() + ms_duration;
-      yield this.HandleEvents(errmsg);
-      while (this.GetTickCount() < end) {
-        yield this._microSleep_internal();
-        yield this.HandleEvents(errmsg);
+      let remaining = ms_duration;
+      while (remaining > 0) {
+        let waitTime = Math.min(remaining, 25);
+        yield new Promise((resolve, reject) => {
+          setTimeout(resolve, waitTime);
+        });
+        remaining = end - this.GetTickCount();
       }
       return YAPI_SUCCESS;
     });
@@ -16685,24 +16737,27 @@ var YAPIContext = class {
     });
   }
   SetTimeout(callback, ms_timeout, args) {
-    this._setTimeout_internal(callback, this.GetTickCount() + ms_timeout, args);
+    let endtime = this.GetTickCount() + ms_timeout;
+    let setTimeout_internal = () => __awaiter(this, void 0, void 0, function* () {
+      let delay = endtime - this.GetTickCount();
+      if (delay < 40) {
+        if (delay > 3) {
+          yield new Promise((resolve, reject) => {
+            setTimeout(resolve, delay);
+          });
+        }
+        callback.apply(null, args);
+      } else {
+        if (delay >= 150) {
+          yield this.UpdateDeviceList();
+          delay = Math.min(endtime - YAPI.GetTickCount(), 110);
+        }
+        yield this.Sleep(delay - 20);
+        setTimeout_internal();
+      }
+    });
+    setTimeout_internal();
     return YAPI_SUCCESS;
-  }
-  _setTimeout_internal(callback, endtime, args) {
-    let delay = endtime - YAPI.GetTickCount();
-    if (delay < 0) {
-      callback.apply(null, args);
-    } else if (delay < 100) {
-      this.Sleep(delay).then(() => {
-        this._setTimeout_internal(callback, endtime, args);
-      });
-    } else {
-      this.UpdateDeviceList().then(() => {
-        this.Sleep(90).then(() => {
-          this._setTimeout_internal(callback, endtime, args);
-        });
-      });
-    }
   }
   GetTickCount() {
     return Date.now();
@@ -17058,6 +17113,7 @@ YAPI.imm_setSystemEnv(_HtmlSystemEnv);
 var YHttpHtmlHub = class extends YGenericHub {
   constructor(yapi, urlInfo) {
     super(yapi, urlInfo);
+    this.currPos = 0;
     this.notbynRequest = null;
     this.notbynOpenPromise = null;
     this.notbynOpenTimeoutObj = null;
@@ -17177,6 +17233,7 @@ var YHttpHtmlHub = class extends YGenericHub {
         this.notbynOpenTimeout = mstimeout ? this._yapi.GetTickCount() + mstimeout : null;
         this.notbynOpenPromise = new Promise((resolve, reject) => {
           if (mstimeout) {
+            this.stalledTimeoutMs = mstimeout;
             this.notbynOpenTimeoutObj = setTimeout(() => {
               resolve({errorType: YAPI.TIMEOUT, errorMsg: "Timeout on HTTP connection"});
               this.disconnect();
@@ -17185,7 +17242,8 @@ var YHttpHtmlHub = class extends YGenericHub {
           this.notbynTryOpen = () => {
             let xmlHttpRequest = new XMLHttpRequest();
             this.notbynRequest = xmlHttpRequest;
-            this.imm_sendXHR(xmlHttpRequest, "GET", this.urlInfo.url + "not.byn" + args, null, () => {
+            this.currPos = 0;
+            this.imm_sendXHR(xmlHttpRequest, "GET", this.urlInfo.url + "not.byn" + args, null, () => __awaiter2(this, void 0, void 0, function* () {
               if (this.disconnecting) {
                 return;
               }
@@ -17201,31 +17259,35 @@ var YHttpHtmlHub = class extends YGenericHub {
                     return;
                   }
                 } else {
+                  let newlen = xmlHttpRequest.responseText.length;
+                  if (xmlHttpRequest.readyState == 3) {
+                    if (this.notiflen == 1)
+                      return;
+                    if (newlen == 0)
+                      return;
+                  }
                   if (!this._hubAdded) {
                     if (this.notbynOpenTimeoutObj) {
                       clearTimeout(this.notbynOpenTimeoutObj);
                       this.notbynOpenTimeoutObj = null;
                     }
+                  }
+                  if (!this._isHubWorking) {
                     this.signalHubConnected().then(() => {
                       resolve({errorType: YAPI_SUCCESS, errorMsg: ""});
                     });
                   }
-                  if (xmlHttpRequest.readyState == 3) {
-                    if (this.notiflen == 1)
-                      return;
-                  }
-                  let newlen = xmlHttpRequest.responseText.length;
                   if (newlen > this.currPos) {
-                    this._yapi.parseEvents(this, xmlHttpRequest.responseText.slice(this.currPos, newlen));
+                    yield this._yapi.parseEvents(this, xmlHttpRequest.responseText.slice(this.currPos, newlen));
+                    this.currPos = newlen;
                   }
                   if (xmlHttpRequest.readyState == 4 && xmlHttpRequest.status >> 0 != 0) {
                     this.notbynOpenPromise = null;
-                    this.currPos = 0;
                     this.testHub(0, errmsg);
                   }
                 }
               }
-            }, () => {
+            }), () => {
               if (!this.imm_testHubAgainLater()) {
                 resolve({errorType: YAPI.IO_ERROR, errorMsg: "I/O error"});
               }
@@ -18320,7 +18382,7 @@ YFiles.FREESPACE_INVALID = YAPI.INVALID_UINT;
 // obj/full/constants.js
 var constants = class {
   static get buildVersion() {
-    return "1.10.52180";
+    return "1.10.52602";
   }
   static get deviceScreenWidth() {
     return screen.width * window.devicePixelRatio;
@@ -19287,7 +19349,6 @@ var CustomYSensor = class {
     this._online = false;
     this.preloadDone = false;
     this.loadDone = false;
-    this.dataLoggerFeature = false;
     this.cfgChgNotificationsSupported = false;
     this.mustReloadConfig = false;
     this._readonly = false;
@@ -19297,6 +19358,8 @@ var CustomYSensor = class {
     this.lastGetConfig = 0;
     this.recordedDataLoadProgress = 0;
     this.recordedData = null;
+    this.dataLoggerFeature = false;
+    this.dataLoggerLoadCompleted = false;
     this.loadFailed = false;
     this.loadCanceled = false;
     this.firstLiveDataTimeStamp = 0;
@@ -19304,7 +19367,6 @@ var CustomYSensor = class {
     this.lastDataTimeStamp = 0;
     this.lastDataSource = "";
     this.consecutiveBadTimeStamp = 0;
-    this.globalDataLoadProgress = 0;
     this.minData = [];
     this.curData = [];
     this.maxData = [];
@@ -19314,6 +19376,8 @@ var CustomYSensor = class {
     this._lastAvgValue = Number.NaN;
     this._lastMinValue = Number.NaN;
     this._lastMaxValue = Number.NaN;
+    this._dataloggerLoadisRunning = true;
+    this._dataloggerLoadProgress = 0;
     this.dataLoggerStartReadTime = 0;
     this.Alarms = [];
     this.FormsToNotify = [];
@@ -19337,6 +19401,20 @@ var CustomYSensor = class {
   }
   get isReadOnly() {
     return this._readonly || !this._online;
+  }
+  get dataloggerLoadisRunning() {
+    return this._dataloggerLoadisRunning;
+  }
+  get dataloggerLoadProgress() {
+    return this._dataloggerLoadProgress;
+  }
+  setDataloggerLoadProgress(value) {
+    this._dataloggerLoadProgress = value;
+    for (let i = 0; i < this.FormsToNotify.length; i++) {
+      if (this.FormsToNotify[i] instanceof graphWidget) {
+        this.FormsToNotify[i].dataLoggerLoadprocessIsRunningNotification(this);
+      }
+    }
   }
   static get MaxDataRecords() {
     return CustomYSensor._MaxDataRecords;
@@ -19430,9 +19508,6 @@ var CustomYSensor = class {
     res = res + "</Sensor>\n";
     return res;
   }
-  getGetaLoadProgress() {
-    return this.globalDataLoadProgress;
-  }
   get_firstLiveDataTimeStamp() {
     return this.firstLiveDataTimeStamp;
   }
@@ -19444,20 +19519,23 @@ var CustomYSensor = class {
   }
   preload_DoWork(arg) {
     return __awaiter5(this, void 0, void 0, function* () {
+      if (this._predloadProcessIsBusy) {
+        console.log("!!! multiple datalogger load attempt");
+        return;
+      }
+      if (this.dataLoggerLoadCompleted) {
+        console.log("!!!  datalogger load attempt although datalogger is already loaded.");
+        return;
+      }
       this._predloadProcessIsBusy = true;
       logForm.log(this.hwdName + ": preloading data from " + arg.start.toString() + " to " + arg.stop.toString() + "(delta= " + (arg.stop - arg.start).toFixed(3) + ")");
+      this.setDataloggerLoadProgress(1);
       this.recordedData = yield this.sensor.get_recordedData(arg.start, arg.stop);
       try {
         this.recordedDataLoadProgress = yield this.recordedData.loadMore();
       } catch (e) {
         logForm.log(this.hwdName + ": load more caused an exception " + e.message);
       }
-      for (let i = 0; i < this.FormsToNotify.length; i++) {
-        if (this.FormsToNotify[i] instanceof graphWidget) {
-          this.FormsToNotify[i].startDataPreload(this);
-        }
-      }
-      this.globalDataLoadProgress = this.recordedDataLoadProgress;
       let measures = yield this.recordedData.get_preview();
       this.previewMinData = [];
       this.previewCurData = [];
@@ -19528,7 +19606,7 @@ var CustomYSensor = class {
   preload_Completed(arg) {
     if (this.previewMinData == null)
       return;
-    logForm.log(this.hwdName + " : datalogger preloading completed (" + this.previewMinData.length + " rows )");
+    logForm.log(this.hwdName + " : datalogger preloading completed (" + this.previewMinData.length + " rows)");
     if (this.previewMinData.length > 1) {
       let it = this.findMergeBoundaries(this.previewMinData);
       let insertIndex = it.MergeSourceStart;
@@ -19615,6 +19693,8 @@ var CustomYSensor = class {
       if (this._loadProcessIsBusy)
         return;
       this._loadProcessIsBusy = true;
+      if (this.dataLoggerLoadCompleted)
+        return;
       logForm.log(this.hwdName + " loading main data from datalogger");
       if (this.dataLoggerStartReadTime > 0) {
         this.recordedData = yield this.sensor.get_recordedData(this.dataLoggerStartReadTime, 0);
@@ -19622,13 +19702,13 @@ var CustomYSensor = class {
       let errCount = 0;
       let maxErrorCount = 10;
       let lastT = -1;
-      let lastProgress = 0;
+      let lastProgress = this.recordedDataLoadProgress;
       while (this.recordedDataLoadProgress < 100) {
         if (this._plzCancelDataloggerLoading) {
-          this.globalDataLoadProgress = 100;
           this.loadDone = true;
           this.loadFailed = false;
           this.loadCanceled = true;
+          this.setDataloggerLoadProgress(100);
           break;
         }
         try {
@@ -19637,13 +19717,17 @@ var CustomYSensor = class {
           this.loadFailed = true;
           return;
         }
-        if (this.globalDataLoadProgress != this.recordedDataLoadProgress) {
-          this.globalDataLoadProgress = this.recordedDataLoadProgress;
-          this.reportDataloggerLoadProgress(this.globalDataLoadProgress);
+        if (lastProgress != this.recordedDataLoadProgress) {
+          lastProgress = this.recordedDataLoadProgress;
+          let p = lastProgress;
+          if (p < 1)
+            p = 1;
+          if (p > 99)
+            p = 99;
+          this.setDataloggerLoadProgress(p < 1 ? 1 : p > 99 ? 99 : p);
         }
         if (this.recordedDataLoadProgress - lastProgress >= 2) {
           lastProgress = this.recordedDataLoadProgress;
-          this.load_ProgressChanged();
         }
       }
       let measures = yield this.recordedData.get_measures();
@@ -19673,7 +19757,7 @@ var CustomYSensor = class {
           let dstr = d.toLocaleDateString() + " " + d.toLocaleTimeString();
           let d1str = d1.toLocaleDateString() + " " + d1.toLocaleTimeString();
           let d2str = d2.toLocaleDateString() + " " + d2.toLocaleTimeString();
-          console.log(this.hwdName + " note: skipping measure at " + dstr + ", not in range " + d1str + " ... " + d2str);
+          logForm.log(this.hwdName + " note: skipping measure at " + dstr + ", not in range " + d1str + " ... " + d2str);
         }
       }
       if (CustomYSensor._MaxDataRecords > 0)
@@ -19684,12 +19768,11 @@ var CustomYSensor = class {
         }
       }
       if (this.previewCurData.length > 1) {
-        logForm.log(this.hwdName + " loaded " + this.previewCurData.length.toString() + "/" + measures.length.toString() + " records over " + (this.previewCurData[this.previewCurData.length - 1].DateTime - this.previewCurData[0].DateTime).toFixed(3) + " sec");
+        logForm.log(this.hwdName + " loaded " + this.previewCurData.length.toString() + "/" + measures.length.toString() + " records over " + (this.previewCurData[this.previewCurData.length - 1].DateTime - this.previewCurData[0].DateTime).toFixed(3) + " sec, last timed stamp was " + this.previewCurData[this.previewCurData.length - 1].DateTime);
       } else {
         logForm.log(this.hwdName + " loaded " + this.previewCurData.length.toString() + " records");
       }
       if (this.previewMinData.length > 2) {
-        this.globalDataLoadProgress = 100;
         let lastPreviewTimeStamp = this.previewMinData[this.previewMinData.length - 1].DateTime;
         let it = this.findMergeBoundaries(this.previewMinData);
         let deleteCount = it.MergeSourceStop - it.MergeSourceStart;
@@ -19711,6 +19794,7 @@ var CustomYSensor = class {
     });
   }
   load_Completed() {
+    logForm.log(this.hwdName + ".loadcompleted()");
     if (this.loadFailed) {
       logForm.log(this.hwdName + " : datalogger loading failed");
       this._loadProcessIsBusy = false;
@@ -19731,29 +19815,18 @@ var CustomYSensor = class {
       this.preloadDone = false;
       this.loadDone = false;
     }
-    logForm.log(this.hwdName + " : datalogger loading completed  (" + this.previewMinData.length + " rows )");
-    this.loadDone = true;
-    this.globalDataLoadProgress = 100;
-    if (this.previewMinData.length <= 0) {
-      for (let i = 0; i < this.FormsToNotify.length; i++) {
-        if (this.FormsToNotify[i] instanceof graphWidget) {
-          this.FormsToNotify[i].DataLoggerProgress();
-        }
-      }
-      return;
-    }
+    logForm.log(this.hwdName + " : datalogger loading completed  (" + this.previewMinData.length + " rows)");
+    this.resetDataloggerLoader();
+    this.dataLoggerLoadCompleted = true;
     for (let i = 0; i < this.FormsToNotify.length; i++) {
       if (this.FormsToNotify[i] instanceof graphWidget) {
         this.FormsToNotify[i].DataloggerCompleted(this);
-        this.FormsToNotify[i].DataLoggerProgress();
       }
     }
-    this.previewMinData = [];
-    this.previewCurData = [];
-    this.previewMaxData = [];
-    this.preloadDone = false;
-    this.loadDone = false;
-    this._loadProcessIsBusy = false;
+    this.setDataloggerLoadProgress(100);
+  }
+  get dataloggerWasUsed() {
+    return this.dataLoggerLoadCompleted;
   }
   dataCleanUp() {
     if (CustomYSensor._MaxDataRecords <= 0)
@@ -19776,11 +19849,6 @@ var CustomYSensor = class {
     }
   }
   stopDataloggerloading() {
-  }
-  load_ProgressChanged() {
-    for (let i = 0; i < this.FormsToNotify.length; i++)
-      if (this.FormsToNotify[i] instanceof graphWidget)
-        this.FormsToNotify[i].DataLoggerProgress();
   }
   isOnline() {
     return this._online;
@@ -19826,6 +19894,17 @@ var CustomYSensor = class {
       this.reloadConfig().then();
     return this.resolution;
   }
+  resetDataloggerLoader() {
+    this._predloadProcessIsBusy = false;
+    this._loadProcessIsBusy = false;
+    this.dataLoggerLoadCompleted = false;
+    this.preloadDone = false;
+    this.loadDone = false;
+    this._dataloggerLoadisRunning = false;
+    this.previewMinData = [];
+    this.previewCurData = [];
+    this.previewMaxData = [];
+  }
   loadDatalogger(start, stop) {
     if (!this.dataLoggerFeature)
       return;
@@ -19850,21 +19929,51 @@ var CustomYSensor = class {
       let dt = yield this.sensor.get_dataLogger();
       if (dt == null)
         return;
-      if (this.curData.length > 0) {
+      let now = Math.floor(new Date().getTime() / 1e3);
+      if (this.curData.length > 0 && this.dataLoggerLoadCompleted) {
         let end = yield dt.get_timeUTC();
         let start = this.curData[this.curData.length - 1].DateTime;
         let duration = end - start;
+        if (duration == 0) {
+          start = this.curData[this.curData.length - 2].DateTime;
+          duration = end - start;
+        }
         if (duration > 1) {
           logForm.log(this.hwdName + " is back online trying to load " + duration.toFixed(3) + " sec of data from datalogger ");
+          this.resetDataloggerLoader();
           this.loadDatalogger(start, end);
         }
-      } else {
-        this.loadDatalogger(0, yield dt.get_timeUTC());
       }
       if (this.isReadOnly)
         logForm.log(this.hwdName + " is read only");
       this.notifySensorStateChange();
+      this.notifySensorArrival();
     });
+  }
+  startDataloggerload(source) {
+    return __awaiter5(this, void 0, void 0, function* () {
+      if (!this.dataLoggerFeature)
+        return;
+      if (this.sensor == null)
+        return;
+      if (this._loadProcessIsBusy)
+        return;
+      if (this._predloadProcessIsBusy)
+        return;
+      if (this.dataLoggerLoadCompleted) {
+        source.DataloggerCompleted(this);
+        return;
+      }
+      let dt = yield this.sensor.get_dataLogger();
+      if (dt == null)
+        return;
+      this.loadDatalogger(0, yield dt.get_timeUTC());
+    });
+  }
+  notifySensorArrival() {
+    for (let i = 0; i < this.FormsToNotify.length; i++) {
+      this.FormsToNotify[i].SensorArrivalcallback(this);
+    }
   }
   notifySensorStateChange() {
     for (let i = 0; i < this.FormsToNotify.length; i++) {
@@ -20032,6 +20141,15 @@ var NullYSensor = class extends CustomYSensor {
     super(null, "", null);
     this.hwdName = "NOTAREALSENSOR";
     this._friendlyname = "NOTAREALSENSOR";
+    this.dataLoggerFeature = false;
+  }
+  preload_DoWork(arg) {
+    return __awaiter5(this, void 0, void 0, function* () {
+      return;
+    });
+  }
+  get dataloggerLoadisRunning() {
+    return false;
   }
   get_unit() {
     return "";
@@ -20215,7 +20333,7 @@ var sensorsManager = class {
         let count = yield m.functionCount();
         let serial = yield m.get_serialNumber();
         let luminosity = yield m.get_luminosity();
-        logForm.log("--> Device Arrival " + serial);
+        logForm.log("Device Arrival " + serial);
         let recording = false;
         for (let i = 0; i < count; i++) {
           let ftype = yield m.functionType(i);
@@ -20302,8 +20420,12 @@ var sensorsManager = class {
   static UpdateDeviceList() {
     return __awaiter5(this, void 0, void 0, function* () {
       let err = new YErrorMsg();
-      if ((yield YAPI.UpdateDeviceList(err)) != YAPI_SUCCESS) {
-        logForm.log("UpdateDeviceList failed :" + err.msg);
+      try {
+        if ((yield YAPI.UpdateDeviceList(err)) != YAPI_SUCCESS) {
+          logForm.log("UpdateDeviceList failed :" + err.msg);
+        }
+      } catch (e) {
+        logForm.log("UpdateDeviceList failed :" + e.errorMsg);
       }
     });
   }
@@ -20665,7 +20787,7 @@ var YWidget = class {
     this.PositionX = this._InitialSizeIsRelative ? Math.round(w * (this._relativePositionX / 100)) : left;
     this.PositionY = this._InitialSizeIsRelative ? Math.round(h * (this._relativePositionY / 100)) : top;
     this.Width = this._InitialSizeIsRelative ? Math.round(w * (this._relativeWidth / 100)) : width;
-    this.Height = this._InitialSizeIsRelative ? Math.round(h * (this._relativeWidth / 100)) : height;
+    this.Height = this._InitialSizeIsRelative ? Math.round(h * (this._relativeHeight / 100)) : height;
     this.UIContainer.style.border = "1px solid black";
     this.UIContainer.style.backgroundColor = this._BackColor.htmlCode;
     this.UIContainer.setAttribute("name", "YoctoVisualizationWidget");
@@ -20678,7 +20800,9 @@ var YWidget = class {
   }
   SourceChanged(src, index) {
   }
-  showRecordedDatachanged() {
+  loadRecordedDataIfNeeded() {
+  }
+  removeDataloggerData() {
   }
   delete() {
     this.editStopped();
@@ -20765,6 +20889,8 @@ var YWidget = class {
     else
       this._PositionX = value;
     this.UIContainer.style.left = this._PositionX.toString() + "px";
+    if (this._genRenderer != null)
+      this._genRenderer.clearTransformationMatrix();
     this.DrawHandles(this.UIContainer.offsetLeft, this.UIContainer.offsetTop, this.UIContainer.offsetWidth, this.UIContainer.offsetHeight);
   }
   get PositionY() {
@@ -20778,6 +20904,8 @@ var YWidget = class {
     else
       this._PositionY = value;
     this.UIContainer.style.top = this._PositionY.toString() + "px";
+    if (this._genRenderer != null)
+      this._genRenderer.clearTransformationMatrix();
     this.DrawHandles(this.UIContainer.offsetLeft, this.UIContainer.offsetTop, this.UIContainer.offsetWidth, this.UIContainer.offsetHeight);
   }
   sizeRound(v) {
@@ -20965,6 +21093,8 @@ var YWidget = class {
     this.UIContainer.style.zIndex = n.toString();
     n++;
     YWidget.HandlesDiv.style.zIndex = n.toString();
+  }
+  SensorArrivalcallback(source) {
   }
   SensorStateChangedcallback(source) {
     if (YWidget.currentEdited == this) {
@@ -21785,6 +21915,7 @@ var graphWidget = class extends YWidget {
     this.ApplyRelativeSizeIfRequired();
     if (this.SizeIsRelative)
       this.refreshProperties();
+    this.loadRecordedDataIfNeeded();
     this._graph.AllowRedraw();
   }
   AnnotationCallback(text) {
@@ -21938,12 +22069,15 @@ var graphWidget = class extends YWidget {
     }
     this.updateOfflinePanel();
     this.preLoadSensorData(value, index);
+    this.loadRecordedDataIfNeeded();
     if (value)
       value.registerCallback(this);
     this._graph.AllowRedraw();
   }
+  SensorArrivalcallback(source) {
+    this.loadRecordedDataIfNeeded();
+  }
   preLoadSensorData(value, index) {
-    this.dataloggerProgress.text = graphWidget.DataLoggerLoadingMsg;
     if (value instanceof NullYSensor) {
       this._graph.series[index].clear();
       return;
@@ -22075,7 +22209,6 @@ var graphWidget = class extends YWidget {
   }
   startToClearDataLoggers() {
     return __awaiter6(this, void 0, void 0, function* () {
-      debugger;
       let loggers = [];
       for (let i = 0; i < graphWidget.SeriesCount; i++) {
         let s = Reflect.get(this.prop, "Graph_series" + i.toString());
@@ -22107,12 +22240,23 @@ var graphWidget = class extends YWidget {
       this.prop.Graph_showRecordedData = tmp;
     });
   }
-  startDataPreload(source) {
-    if (!this.prop.Graph_showRecordedData) {
-      this.dataloggerProgress.enabled = false;
+  dataLoggerLoadprocessIsRunningNotification(source) {
+    let loadTotalPercent = 0;
+    let sensorCount = 0;
+    if (!this.prop.Graph_showRecordedData)
       return;
+    for (let i = 0; i < graphWidget.SeriesCount; i++) {
+      let s = Reflect.get(this.prop, "Graph_series" + i.toString());
+      let sensor = s.DataSource_source;
+      if (sensor.dataloggerLoadisRunning) {
+        loadTotalPercent += sensor.dataloggerLoadProgress;
+        sensorCount++;
+      }
     }
-    this.dataloggerProgress.enabled = true;
+    if (sensorCount > 0)
+      this.dataloggerProgress.text = graphWidget.DataLoggerLoadingMsg + " (" + (loadTotalPercent / sensorCount).toFixed(0) + "%)";
+    let showPanel = sensorCount > 0 && loadTotalPercent > 0 && loadTotalPercent < sensorCount * 100;
+    this.dataloggerProgress.enabled = showPanel;
   }
   SensorNewDataBlock(source, sourceFromIndex, sourcetoIndex, targetIndex, fromDataLogger) {
     if (this.prop == null)
@@ -22149,50 +22293,28 @@ var graphWidget = class extends YWidget {
       }
     }
   }
-  showRecordedDatachanged() {
+  loadRecordedDataIfNeeded() {
     if (this.prop == null)
+      return;
+    if (!this.prop.Graph_showRecordedData)
       return;
     for (let i = 0; i < graphWidget.SeriesCount; i++) {
       let s = Reflect.get(this.prop, "Graph_series" + i.toString());
-      this.SourceChanged(s.DataSource_source, i);
+      s.DataSource_source.startDataloggerload(this);
     }
   }
-  DataLoggerProgress() {
-    let progress = 0;
-    let sensorCount = 0;
-    if (!this.prop.Graph_showRecordedData) {
-      this.dataloggerProgress.enabled = false;
-      return;
-    }
-    let props = GenericProperties.getAllProperties(this.prop);
-    for (let i = 0; i < props.byIndex.length; i++) {
-      let name = props.byIndex[i].name;
-      if (name.startsWith("Graph_series")) {
-        let s = Reflect.get(this.prop, name);
-        if (!(s.DataSource_source instanceof NullYSensor)) {
-          progress += s.DataSource_source.getGetaLoadProgress();
-          sensorCount++;
-        }
-      }
-    }
-    if (progress < 100 * sensorCount && sensorCount > 0) {
-      this.dataloggerProgress.text = graphWidget.DataLoggerLoadingMsg + " (" + (progress / sensorCount).toFixed(0) + "%)";
-    } else {
-      this.dataloggerProgress.enabled = false;
-    }
+  removeDataloggerData() {
   }
   DataloggerCompleted(Source) {
     if (!this.prop.Graph_showRecordedData)
       return;
-    this.dataloggerProgress.enabled = false;
     let props = GenericProperties.getAllProperties(this.prop);
-    for (let i = 0; i < props.byIndex.length; i++) {
-      let name = props.byIndex[i].name;
-      if (name.startsWith("Graph_series")) {
-        let s = Reflect.get(this.prop, name);
-        if (s.DataSource_source == Source) {
-          let index = parseInt(name.substring(12));
-          this.SourceChanged(Source, index);
+    for (let i = 0; i < this.seriesProperties.length; i++) {
+      if (this.seriesProperties[i].DataSource_source == Source) {
+        if (!this.seriesProperties[i].dataloggerAlreadyLoaded) {
+          this._graph.DisableRedraw();
+          this.preLoadSensorData(Source, i);
+          this._graph.AllowRedraw();
         }
       }
     }
@@ -24814,6 +24936,7 @@ var ChartSerie = class {
   constructor(defaultColor) {
     this.ownerForm = null;
     this.index = -1;
+    this.dataloggerAlreadyLoaded = false;
     this._DataSource_source = sensorsManager.getNullSensor();
     this._DataType = 0;
     this._thickness = 2;
@@ -26643,7 +26766,7 @@ var GraphFormProperties = class extends GenericProperties {
     if (this._Graph_showRecordedData != value) {
       this._Graph_showRecordedData = value;
       if (this.ownerForm != null) {
-        this.ownerForm.showRecordedDatachanged();
+        this._Graph_showRecordedData ? this.ownerForm.loadRecordedDataIfNeeded() : this.ownerForm.removeDataloggerData();
       }
     }
   }

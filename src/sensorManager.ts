@@ -39,6 +39,8 @@
 import * as YoctoVisualization from "./YoctoVisualizationFull.js";
 import * as YoctoAPI from "./YoctoApiFull.js";
 
+
+
 export const enum HubType { LOCALUSB, LOCALHUB, REMOTEHUB }
 
 export const enum HubState { NOTCONNECTED, CONNECTING, CONNECTED, FAILURE }
@@ -535,7 +537,7 @@ export class CustomYSensor
     private _online: boolean = false;
     private preloadDone: boolean = false;
     private loadDone: boolean = false;
-    private dataLoggerFeature: boolean = false;
+
     private cfgChgNotificationsSupported: boolean = false;
     private mustReloadConfig: boolean = false;
     private _readonly: boolean = false;
@@ -548,6 +550,9 @@ export class CustomYSensor
     private lastGetConfig: number = 0;
     private recordedDataLoadProgress: number = 0;
     private recordedData: YoctoAPI.YDataSet | null = null;
+    protected dataLoggerFeature: boolean = false;
+    private  dataLoggerLoadCompleted : boolean = false;
+
     private loadFailed: boolean = false;
     private loadCanceled: boolean = false;
     private firstLiveDataTimeStamp: number = 0;
@@ -556,7 +561,7 @@ export class CustomYSensor
     private lastDataSource: string = "";
     private consecutiveBadTimeStamp: number = 0;
 
-    private globalDataLoadProgress: number = 0;
+
     public minData: TimedSensorValue[] = [];
     public curData: TimedSensorValue[] = [];
     public maxData: TimedSensorValue[] = [];
@@ -568,6 +573,21 @@ export class CustomYSensor
     private _lastAvgValue: number = Number.NaN;
     private _lastMinValue: number = Number.NaN;
     private _lastMaxValue: number = Number.NaN;
+
+    private _dataloggerLoadisRunning : boolean=true;
+    private _dataloggerLoadProgress : number=0;
+
+    public get dataloggerLoadisRunning():boolean { return this._dataloggerLoadisRunning; }
+    public get dataloggerLoadProgress ():number { return this._dataloggerLoadProgress; }
+
+    private setDataloggerLoadProgress ( value :number)
+    {   this._dataloggerLoadProgress = value;
+        for (let i: number = 0; i < this.FormsToNotify.length; i++)
+        {   if (this.FormsToNotify[i] instanceof YoctoVisualization.graphWidget) {
+                (this.FormsToNotify[i] as YoctoVisualization.graphWidget).dataLoggerLoadprocessIsRunningNotification(this);
+        }}
+    }
+
 
     private dataLoggerStartReadTime: number = 0;
     private Alarms: AlarmSettings[] = [];
@@ -710,15 +730,26 @@ export class CustomYSensor
     }
 //#endif
 
-    public getGetaLoadProgress(): number { return this.globalDataLoadProgress; }
+
     public get_firstLiveDataTimeStamp(): number { return this.firstLiveDataTimeStamp; }
     public get_firstDataloggerTimeStamp(): number { return this.firstDataloggerTimeStamp; }
     public get_lastDataTimeStamp(): number { return this.lastDataTimeStamp; }
 
     protected async preload_DoWork(arg: DataLoggerBoundary)
-    {
+    {   if (this._predloadProcessIsBusy)
+          { console.log("!!! multiple datalogger load attempt");
+              return;
+          }
+        if (this.dataLoggerLoadCompleted)
+        {   console.log("!!!  datalogger load attempt although datalogger is already loaded.");
+            return;
+        }
+
         this._predloadProcessIsBusy = true;
+
+
         YoctoVisualization.logForm.log(this.hwdName + ": preloading data from " + arg.start.toString() + " to " + arg.stop.toString() + "(delta= " + (arg.stop - arg.start).toFixed(3) + ")");
+        this.setDataloggerLoadProgress(1)
         this.recordedData = await (<YoctoAPI.YSensor>this.sensor).get_recordedData(arg.start, arg.stop);
         try
         {
@@ -727,14 +758,10 @@ export class CustomYSensor
         catch (e)
         { YoctoVisualization.logForm.log(this.hwdName + ": load more caused an exception " + (e as Error).message); }
 
-       for (let i: number = 0; i < this.FormsToNotify.length; i++)
-       {
-        if (this.FormsToNotify[i] instanceof YoctoVisualization.graphWidget) {
-            (this.FormsToNotify[i] as YoctoVisualization.graphWidget).startDataPreload(this);
-        }}
 
 
-        this.globalDataLoadProgress = this.recordedDataLoadProgress;
+
+
 
         let measures: YoctoAPI.YMeasure[] = await this.recordedData.get_preview();
 
@@ -774,6 +801,8 @@ export class CustomYSensor
             let b: number = this.previewCurData[this.previewCurData.length - 1].DateTime;
 
             YoctoVisualization.logForm.log(this.hwdName + ": preloaded data from " + a.toString() + " to " + b.toString() + " (delta=" + (b - a).toFixed(3) + ")");
+           // console.log("last preload AVg value = "+this.previewCurData[this.previewCurData.length-1].value+" at "+this.previewCurData[this.previewCurData.length-1].DateTime);
+           // if (this.previewCurData[this.previewCurData.length-1].value==0) debugger
 
             if ((CustomYSensor._MaxLoggerRecords > 0) && (arg.start == 0))
             { // find out where to start reading datalogger to make sure we don't read more the _MaxLoggerRecords records
@@ -829,7 +858,7 @@ export class CustomYSensor
     protected preload_Completed(arg: DataLoggerBoundary)
     {
         if (this.previewMinData == null) return;
-        YoctoVisualization.logForm.log(this.hwdName + " : datalogger preloading completed (" + this.previewMinData.length + " rows )");
+        YoctoVisualization.logForm.log(this.hwdName + " : datalogger preloading completed (" + this.previewMinData.length + " rows)");
 
         if (this.previewMinData.length > 1) // make sure there is enough data not enough data for rendering
         { // find out where datalogger data fit in the already there data
@@ -845,7 +874,7 @@ export class CustomYSensor
             this.curData = this.curData.slice(0, insertIndex).concat(this.previewCurData, this.curData.slice(insertIndex + deleteCount));
             this.maxData = this.maxData.slice(0, insertIndex).concat(this.previewMaxData, this.maxData.slice(insertIndex + deleteCount));
 
-//    this.minData.splice(it.MergeSourceStart, it.MergeSourceStop - it.MergeSourceStart,...this.previewMinData); // will cause a stack overfly if too many data
+//    this.minData.splice(it.MergeSourceStart, it.MergeSourceStop - it.MergeSourceStart,...this.previewMinData); // will cause a stack overflow if too many data
 //    this.curData.splice(it.MergeSourceStart, it.MergeSourceStop - it.MergeSourceStart,...this.previewCurData);
 //    this.maxData.splice(it.MergeSourceStart, it.MergeSourceStop - it.MergeSourceStart,...this.previewMaxData);
             for (let i: number = 0; i < this.FormsToNotify.length; i++)
@@ -960,6 +989,7 @@ export class CustomYSensor
     {
         if (this._loadProcessIsBusy) return;
         this._loadProcessIsBusy = true;
+        if (this.dataLoggerLoadCompleted)  return;
 
         YoctoVisualization.logForm.log(this.hwdName + " loading main data from datalogger");
         if (this.dataLoggerStartReadTime > 0)
@@ -970,17 +1000,20 @@ export class CustomYSensor
        let errCount=0;
        let maxErrorCount =10;
        let lastT :number=-1;
-       let lastProgress:number=0;
+        let lastProgress:number=this.recordedDataLoadProgress;
+
+
 
         while (this.recordedDataLoadProgress < 100)
         {
 
             if (this._plzCancelDataloggerLoading)
             {
-                this.globalDataLoadProgress = 100;
+
                 this.loadDone = true;
                 this.loadFailed = false;
                 this.loadCanceled = true;
+                this.setDataloggerLoadProgress(100);
                 break;
             }
 
@@ -995,15 +1028,17 @@ export class CustomYSensor
                 return;
             }
 
-            if (this.globalDataLoadProgress != (this.recordedDataLoadProgress))
-            {
-                this.globalDataLoadProgress = this.recordedDataLoadProgress;
-                this.reportDataloggerLoadProgress(this.globalDataLoadProgress);
+            if (lastProgress != (this.recordedDataLoadProgress))
+            {   lastProgress =  this.recordedDataLoadProgress;
+               let  p :number= lastProgress;
+               if (p<1) p=1;
+               if (p>99) p=99;
+               this.setDataloggerLoadProgress(p<1?1:(p>99?99:p));
             }
 
             if ((this.recordedDataLoadProgress-lastProgress)>=2)
             {   lastProgress = this.recordedDataLoadProgress;
-                this.load_ProgressChanged();
+                //this.load_ProgressChanged();
             }
         }
 
@@ -1047,9 +1082,11 @@ export class CustomYSensor
                 let dstr: string = d.toLocaleDateString()+" "+d.toLocaleTimeString();
                 let d1str: string = d1.toLocaleDateString()+" "+d1.toLocaleTimeString();
                 let d2str: string = d2.toLocaleDateString()+" "+d2.toLocaleTimeString();
-                console.log(this.hwdName +" note: skipping measure at "+dstr+", not in range "+d1str+" ... "+d2str);
+                YoctoVisualization.logForm.log(this.hwdName +" note: skipping measure at "+dstr+", not in range "+d1str+" ... "+d2str);
             }
         }
+
+
 
         if (CustomYSensor._MaxDataRecords > 0) this.previewDataCleanUp();
 
@@ -1061,18 +1098,21 @@ export class CustomYSensor
             }
         }
 
+
+
         if (this.previewCurData.length > 1)
         {
-            YoctoVisualization.logForm.log(this.hwdName + " loaded " + this.previewCurData.length.toString() + "/" + measures.length.toString() + " records over " + (this.previewCurData[this.previewCurData.length - 1].DateTime - this.previewCurData[0].DateTime).toFixed(3) + " sec");
+            YoctoVisualization.logForm.log(this.hwdName + " loaded " + this.previewCurData.length.toString() + "/" + measures.length.toString() + " records over " + (this.previewCurData[this.previewCurData.length - 1].DateTime - this.previewCurData[0].DateTime).toFixed(3) + " sec, last timed stamp was "+this.previewCurData[this.previewCurData.length - 1].DateTime);
         }
         else
         {
             YoctoVisualization.logForm.log(this.hwdName + " loaded " + this.previewCurData.length.toString() + " records");
         }
 
+
         if (this.previewMinData.length > 2)
         {
-            this.globalDataLoadProgress = 100;
+
             let lastPreviewTimeStamp: number = this.previewMinData[this.previewMinData.length - 1].DateTime;
             //while ((index < minData.Count) && (minData[index].DateTime < lastPreviewTimeStamp)) index++;
             //LogManager.Log(hwdName + " time range is ["+constants.UnixTimeStampToDateTime(previewMinData[0].DateTime)+".."+ constants.UnixTimeStampToDateTime(lastPreviewTimeStamp)+"]");
@@ -1090,6 +1130,8 @@ export class CustomYSensor
             this.firstDataloggerTimeStamp = this.curData[0].DateTime;
         }
 
+
+
         this.loadDone = true;
         this.loadFailed = false;
 
@@ -1103,13 +1145,14 @@ export class CustomYSensor
             }
         }
 
+
         this.load_Completed()
 
     }
 
     protected load_Completed()
     {
-
+        YoctoVisualization.logForm.log(this.hwdName + ".loadcompleted()");
         if (this.loadFailed)
         {
             YoctoVisualization.logForm.log(this.hwdName + " : datalogger loading failed");
@@ -1136,38 +1179,23 @@ export class CustomYSensor
             this.loadDone = false;
 
         }
+        YoctoVisualization.logForm.log(this.hwdName + " : datalogger loading completed  (" + this.previewMinData.length + " rows)");
 
-        YoctoVisualization.logForm.log(this.hwdName + " : datalogger loading completed  (" + this.previewMinData.length + " rows )");
 
-        this.loadDone = true;
-        this.globalDataLoadProgress = 100;
-        if (this.previewMinData.length <= 0)
-        {
-            for (let i: number = 0; i < this.FormsToNotify.length; i++)
-            {
-                if (this.FormsToNotify[i] instanceof YoctoVisualization.graphWidget)
-                {
-                    (this.FormsToNotify[i] as YoctoVisualization.graphWidget).DataLoggerProgress();
-                }
-            }
-            return;
-        }
-
+        // calling order is important
+        this.resetDataloggerLoader();
+        this.dataLoggerLoadCompleted =true;
         for (let i: number = 0; i < this.FormsToNotify.length; i++)
-        {
-            if (this.FormsToNotify[i] instanceof YoctoVisualization.graphWidget)
+        { if (this.FormsToNotify[i] instanceof YoctoVisualization.graphWidget)
             {
                 (this.FormsToNotify[i] as YoctoVisualization.graphWidget).DataloggerCompleted(this);
-                (this.FormsToNotify[i] as YoctoVisualization.graphWidget).DataLoggerProgress();
             }
         }
-        this.previewMinData = [];
-        this.previewCurData = [];
-        this.previewMaxData = [];
-        this.preloadDone = false;
-        this.loadDone = false;
-        this._loadProcessIsBusy = false;
+        this.setDataloggerLoadProgress(100);
+
+
     }
+    public get dataloggerWasUsed() : boolean { return this.dataLoggerLoadCompleted}
 
     private dataCleanUp()
     {
@@ -1211,13 +1239,13 @@ export class CustomYSensor
         load_ProgressChanged(null, null);
        */
     }
-    protected load_ProgressChanged()
+  /*  protected load_ProgressChanged()
     {
        for (let i :number = 0; i < this.FormsToNotify.length; i++)
          if  (this.FormsToNotify[i] instanceof  YoctoVisualization.graphWidget)
-          (this.FormsToNotify[i] as YoctoVisualization.graphWidget) .DataLoggerProgress();
+          (this.FormsToNotify[i] as YoctoVisualization.graphWidget).DataLoggerProgress();
 
-    }
+    }*/
 
     public isOnline(): boolean
     {
@@ -1276,6 +1304,19 @@ export class CustomYSensor
         return this.resolution;
     }
 
+    public resetDataloggerLoader()
+    {   this._predloadProcessIsBusy=false;
+        this._loadProcessIsBusy=false;
+        this.dataLoggerLoadCompleted=false;
+        this.preloadDone = false;
+        this.loadDone = false;
+        this._dataloggerLoadisRunning =false;
+        this.previewMinData = [];
+        this.previewCurData = [];
+        this.previewMaxData = [];
+
+    }
+
     public loadDatalogger(start: number, stop: number)
     {
         if (!this.dataLoggerFeature) return;
@@ -1303,6 +1344,8 @@ export class CustomYSensor
 
     }
 
+
+
     public async arrival(dataloggerOn: boolean): Promise<void>
     {
 
@@ -1311,24 +1354,63 @@ export class CustomYSensor
         await this.reloadConfig();
         let dt: YoctoAPI.YDataLogger | null = await (<YoctoAPI.YSensor>this.sensor).get_dataLogger();
         if (dt == null) return;
-        if (this.curData.length > 0)
+         let now : number =  Math.floor((new Date()).getTime() / 1000);
+        if ((this.curData.length > 0) && (this.dataLoggerLoadCompleted))  // series already contains data and datalogger was used at least once
         {
             let end: number = await dt.get_timeUTC();
             let start: number = this.curData[this.curData.length - 1].DateTime;
             let duration: number = end - start;
+
+            /*** BUG WORKAROUND  (we received a timecallback before the arrivalcallback) ***/
+            //debugger
+            if (duration==0)
+            {    start = this.curData[this.curData.length - 2].DateTime;
+                duration = end - start;
+            }
+            /**********************/
+
+
             if (duration > 1)
             {
                 YoctoVisualization.logForm.log(this.hwdName + " is back online trying to load " + duration.toFixed(3) + " sec of data from datalogger ");
+                this.resetDataloggerLoader();
                 this.loadDatalogger(start, end);
             }
         }
+        /*
         else
         {
-            this.loadDatalogger(0, await dt.get_timeUTC());
-        }
+          //  this.loadDatalogger(0, await dt.get_timeUTC());
+        }*/
         if (this.isReadOnly) YoctoVisualization.logForm.log(this.hwdName + " is read only");
         this.notifySensorStateChange();
+        this.notifySensorArrival();
     }
+
+    public async startDataloggerload( source : YoctoVisualization.graphWidget )
+    {   if (!this.dataLoggerFeature) return;
+        if (this.sensor == null) return;
+        if (this._loadProcessIsBusy) return;
+        if (this._predloadProcessIsBusy) return;
+        if (this.dataLoggerLoadCompleted)
+         {    source.DataloggerCompleted(this);
+              return;
+         }
+
+        let dt: YoctoAPI.YDataLogger | null = await (<YoctoAPI.YSensor>this.sensor).get_dataLogger();
+        if (dt == null) return;
+
+        this.loadDatalogger(0, await dt.get_timeUTC());
+    }
+
+    public notifySensorArrival(): void
+    {
+        for (let i = 0; i < this.FormsToNotify.length; i++)
+        {
+            this.FormsToNotify[i].SensorArrivalcallback(this);
+        }
+    }
+
 
     public notifySensorStateChange(): void
     {
@@ -1444,6 +1526,7 @@ export class CustomYSensor
             let t: number = M.get_endTimeUTC();
             // YoctoVisualization.logForm.log(await source.get_hardwareId() + " :: TimedCallback : " + t.toFixed(3));
 
+
             if (this.firstLiveDataTimeStamp == 0) this.firstLiveDataTimeStamp = t;
             if (t > this.lastDataTimeStamp)
             {
@@ -1524,7 +1607,12 @@ export class NullYSensor extends CustomYSensor
         super(null, "", null)
         this.hwdName = "NOTAREALSENSOR";
         this._friendlyname = "NOTAREALSENSOR";
+        this.dataLoggerFeature =false;
+
     }
+
+    protected async preload_DoWork(arg: DataLoggerBoundary) {return;}
+    public get dataloggerLoadisRunning():boolean { return false; }
     public get_unit(): string { return ""; }
     public registerCallback(Form: YoctoVisualization.YWidget) { }
     public forceUpdate(): void { }
@@ -1736,6 +1824,7 @@ export class sensorsManager
         }
     }
 
+
     public static async deviceArrival(m: YoctoAPI.YModule): Promise<void>
     {
         try
@@ -1744,7 +1833,8 @@ export class sensorsManager
             let serial: string = await m.get_serialNumber();
             let luminosity: number = await m.get_luminosity();
 
-            YoctoVisualization.logForm.log("--> Device Arrival " + serial);
+            YoctoVisualization.logForm.log("Device Arrival " + serial);
+
             let recording: boolean = false;
             // first loop to find network and datalogger settings
             for (let i: number = 0; i < count; i++)
@@ -1872,10 +1962,12 @@ export class sensorsManager
     private static async UpdateDeviceList()
     {
         let err: YoctoAPI.YErrorMsg = new YoctoAPI.YErrorMsg();
-        if (await YoctoAPI.YAPI.UpdateDeviceList(err) != YoctoAPI.YAPI_SUCCESS)
-        {
+        try
+        {  if (await YoctoAPI.YAPI.UpdateDeviceList(err) != YoctoAPI.YAPI_SUCCESS)
+          {
             YoctoVisualization.logForm.log("UpdateDeviceList failed :" + err.msg);
-        }
+          }
+        } catch (e) { YoctoVisualization.logForm.log("UpdateDeviceList failed :" + e.errorMsg);}
     }
 
     private static async _runAsync(): Promise<void>
@@ -1885,15 +1977,15 @@ export class sensorsManager
         await YoctoAPI.YAPI.RegisterDeviceRemovalCallback((m: YoctoAPI.YModule) => {sensorsManager.deviceRemoval(m)});
         await sensorsManager.UpdateDeviceList();
         setInterval(() => { sensorsManager.UpdateDeviceList()}, 2000)
-
     }
 
     public static run()
-    {
+
+    {   //YoctoAPI.YAPI._logLevel = 4;
+        //YoctoAPI.YAPI.RegisterLogFunction((msg:string)=>{YoctoVisualization.logForm.log("YAPI : "+msg);} )
         sensorsManager.NullSensor = new NullYSensor();
         sensorsManager.sensorList = [];
         sensorsManager.sensorList.push(sensorsManager.NullSensor);
-
         this._runAsync().then();
 
     }
