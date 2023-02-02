@@ -3934,7 +3934,7 @@ export class YGraph extends YDataRendering.YDataRenderer
         {
 
             let d: YDate = TimeConverter.FromUnixTime(t);
-            if (scale.step > 30 * 86400)  // resynchronize with the beginning of the month.
+            if (scale.step > 31.1 * 86400)  // resynchronize with the beginning of the month.
             {
                 t = TimeConverter.ToUnixTime(new Date(d.getFullYear(), d.getMonth(), 1));
 

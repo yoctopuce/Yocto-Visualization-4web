@@ -1519,31 +1519,24 @@ export class CustomYSensor
     }
 
     public async TimedCallback(source: YoctoAPI.YSensor, M: YoctoAPI.YMeasure | null): Promise<void>
-    {
-        if (M != null)
-        {
-            this._online = true;
+    { this._online = true;
+        if (M != null) {
+
             let t: number = M.get_endTimeUTC();
             // YoctoVisualization.logForm.log(await source.get_hardwareId() + " :: TimedCallback : " + t.toFixed(3));
 
-
             if (this.firstLiveDataTimeStamp == 0) this.firstLiveDataTimeStamp = t;
-            if (t > this.lastDataTimeStamp)
-            {
+            if (t > this.lastDataTimeStamp) {
                 this.lastDataTimeStamp = t;
                 this.lastDataSource = "last timedReport";
                 this.consecutiveBadTimeStamp = 0;
-            }
-            else
-            {
+            } else {
                 this.consecutiveBadTimeStamp++;
-                if (this.consecutiveBadTimeStamp < 10)
-                {
+                if (this.consecutiveBadTimeStamp < 10) {
                     YoctoVisualization.logForm.log(this.hwdName + ": ignoring bad timestamp " + t.toFixed(3) + " (previous " + this.lastDataSource + " at " + this.lastDataTimeStamp.toFixed(3) + ")");
                 }
             }
-            if ((this.consecutiveBadTimeStamp == 0) || (this.consecutiveBadTimeStamp >= 10))
-            {
+            if ((this.consecutiveBadTimeStamp == 0) || (this.consecutiveBadTimeStamp >= 10)) {
                 this._lastAvgValue = M.get_averageValue();
                 this._lastMinValue = M.get_minValue();
                 this._lastMaxValue = M.get_maxValue();
@@ -1552,15 +1545,13 @@ export class CustomYSensor
                 this.maxData.push(new TimedSensorValue(t, this._lastMaxValue));
                 if (CustomYSensor._MaxDataRecords > 0) this.dataCleanUp();
             }
-            for (let i: number = 0; i < this.Alarms.length; i++)
-            {
+            for (let i: number = 0; i < this.Alarms.length; i++) {
                 this.Alarms[i].check(M);
             }
-        }
 
-        for (let i = 0; i < this.FormsToNotify.length; i++)
-        {
-            this.FormsToNotify[i].SensorValuecallback(this, M);
+            for (let i = 0; i < this.FormsToNotify.length; i++) {
+                this.FormsToNotify[i].SensorValuecallback(this, M);
+            }
         }
 
     }

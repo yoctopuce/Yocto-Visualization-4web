@@ -1,4 +1,4 @@
-/* Yocto-Visualization-4web (ES2015 full 1.10.52602) - www.yoctopuce.com */
+/* Yocto-Visualization-4web (ES2015 full 1.10.53008) - www.yoctopuce.com */
 // obj/full/Renderer/YDataRendererCommon.js
 var Vector3 = class {
   constructor(a, b, c) {
@@ -6680,7 +6680,7 @@ var YGraph = class extends YDataRenderer {
     let t = FirstStep;
     do {
       let d = TimeConverter.FromUnixTime(t);
-      if (scale.step > 30 * 86400) {
+      if (scale.step > 31.1 * 86400) {
         t = TimeConverter.ToUnixTime(new Date(d.getFullYear(), d.getMonth(), 1));
       }
       if (t >= xRange.Min) {
@@ -13721,7 +13721,7 @@ var YGenericHub = class {
         use_self_flash = true;
       } else {
         yreq = yield this.request("GET", "/bySerial/" + serial + "/flash.json?a=state", null, 0);
-        if (yreq.errorType == YAPI_SUCCESS) {
+        if (yreq.errorType == YAPI_SUCCESS && yreq.bin_result.length > 0) {
           use_self_flash = true;
           baseUrl = "/bySerial/" + serial;
         }
@@ -16351,7 +16351,7 @@ var YAPIContext = class {
     });
   }
   imm_GetAPIVersion() {
-    return "1.10.52602";
+    return "1.10.53008";
   }
   InitAPI(mode, errmsg) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -18382,7 +18382,7 @@ YFiles.FREESPACE_INVALID = YAPI.INVALID_UINT;
 // obj/full/constants.js
 var constants = class {
   static get buildVersion() {
-    return "1.10.52602";
+    return "1.10.53008";
   }
   static get deviceScreenWidth() {
     return screen.width * window.devicePixelRatio;
@@ -20075,8 +20075,8 @@ var CustomYSensor = class {
   }
   TimedCallback(source, M) {
     return __awaiter5(this, void 0, void 0, function* () {
+      this._online = true;
       if (M != null) {
-        this._online = true;
         let t = M.get_endTimeUTC();
         if (this.firstLiveDataTimeStamp == 0)
           this.firstLiveDataTimeStamp = t;
@@ -20103,9 +20103,9 @@ var CustomYSensor = class {
         for (let i = 0; i < this.Alarms.length; i++) {
           this.Alarms[i].check(M);
         }
-      }
-      for (let i = 0; i < this.FormsToNotify.length; i++) {
-        this.FormsToNotify[i].SensorValuecallback(this, M);
+        for (let i = 0; i < this.FormsToNotify.length; i++) {
+          this.FormsToNotify[i].SensorValuecallback(this, M);
+        }
       }
     });
   }
@@ -21013,8 +21013,10 @@ var YWidget = class {
       document.body.removeChild(this.UIContainer);
     }
     if (target != null) {
+      this.UIContainer.style.position = "relative";
       target.insertBefore(this.UIContainer, target.firstChild);
     } else {
+      this.UIContainer.style.position = "absolute";
       document.body.insertBefore(this.UIContainer, document.body.firstChild);
     }
     this._genRenderer.clearTransformationMatrix();
@@ -21365,6 +21367,9 @@ var gaugeWidget = class extends YWidget {
     this._gauge.setPatchAnnotationCallback((s) => {
       return this.AnnotationCallback(s);
     });
+    this._gauge.valueFormater = (source, value) => {
+      return this.valueFormater(source, value);
+    };
     this.updateWindowPositionProperties(this.prop);
     this.prop.ApplyAllProperties(this);
     YDataRenderer.minMaxCheckDisabled = true;
@@ -21413,6 +21418,19 @@ var gaugeWidget = class extends YWidget {
   AnnotationCallback(text) {
     let sensor = this.prop.DataSource_source;
     return this.PatchSensorAnnotationCallback(sensor, text);
+  }
+  valueFormater(source, value) {
+    if (this.prop.DataSource_source instanceof NullYSensor) {
+      return "N/A";
+    } else if (!this.prop.DataSource_source.isOnline())
+      return "OFFLINE";
+    let format = this.prop.DataSource_precision;
+    let p = format.indexOf(".");
+    let n = 0;
+    if (p >= 0)
+      n = format.length - p - 1;
+    let unit = this.prop.DataSource_source.get_unit();
+    return value.toFixed(n) + unit;
   }
   PropertyChanged2(src) {
     let info2 = new PropPathinfo();

@@ -404,7 +404,7 @@ export class YWebPage
         }
     }
 
-    public static newDigitalDisplayWidget(): void
+
     public static newDigitalDisplayWidget(): void
     {
         let s = Math.min(window.innerWidth, window.innerHeight) / 8;

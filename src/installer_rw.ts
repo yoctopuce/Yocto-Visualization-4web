@@ -277,7 +277,16 @@ export class YV4W_installer
     {  if (typeof options !== 'undefined')
           if (options!=null)
           {  if (typeof options["protocol"]  === "string") this.DEFAULT_PROTOCOL =  (options["protocol"].toUpperCase() ==  YV4W_installer.HTTPS.toUpperCase()) ? YV4W_installer.HTTPS : YV4W_installer.HTTP;
-              if (typeof options["addr"]  === "string")  this.DEFAULTADDR =  options["addr"];
+              if (typeof options["addr"]  === "string")
+               {
+                  this.DEFAULTADDR = options["addr"];
+                  let n : number = this.DEFAULTADDR.indexOf(":");
+                  if (n>0)
+                    {  this.DEFAULTPORT.substring(n+1);
+                       this.DEFAULTADDR.substring(0,n);
+                    }
+              }
+
               if (typeof options["port"]  === "number")  this.DEFAULTPORT =  options["port"].toString();
               if (typeof options["path"]  === "string")  this.DEFAULTPATH =  options["path"];
               if (typeof options["cancelable"]  === "boolean")    this.DEFAULTCANCELABLE=  options["cancelable"];
@@ -772,6 +781,7 @@ export class YV4W_installer
         TD1.innerHTML = YoctoVisualization.ressources.FailedIcon("64", true, false, false, false, "oops");
         Row.appendChild(TD1);
         this._ErrMsgContainer = document.createElement("TD") as HTMLTableCellElement;
+        this._ErrMsgContainer.style.whiteSpace="normal";
         this._ErrMsgContainer.style.textAlign="justify";
         Row.appendChild(this._ErrMsgContainer);
         Table.appendChild(Row)
@@ -2446,6 +2456,7 @@ export class YV4W_installer
         this.removeAllChilds(<HTMLTableCellElement>this._doneMsgContainer);
 
         let p: HTMLParagraphElement = document.createElement("P") as HTMLParagraphElement;
+        p.style.whiteSpace="normal";
         switch (this._plannedaction)
         {
         case this.ACTIONADDINSTANCE :

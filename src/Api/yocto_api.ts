@@ -1,6 +1,6 @@
 /*********************************************************************
  *
- * $Id: yocto_api.ts 52591 2022-12-30 10:29:12Z mvuilleu $
+ * $Id: yocto_api.ts 52943 2023-01-26 15:46:47Z mvuilleu $
  *
  * High-level programming interface, common to all modules
  *
@@ -1942,7 +1942,7 @@ export class YDataSet
     }
 
     /**
-     * Loads the the next block of measures from the dataLogger, and updates
+     * Loads the next block of measures from the dataLogger, and updates
      * the progress indicator.
      *
      * @return an integer in the range 0 to 100 (percentage of completion),
@@ -9167,7 +9167,7 @@ export abstract class YGenericHub
         } else {
             // check if subdevice support self flashing
             yreq = await this.request('GET', '/bySerial/' + serial + '/flash.json?a=state', null, 0);
-            if(yreq.errorType == YAPI_SUCCESS) {
+            if(yreq.errorType == YAPI_SUCCESS && (<Uint8Array>yreq.bin_result).length > 0) {
                 use_self_flash = true;
                 baseUrl = '/bySerial/' + serial;
             }
@@ -12532,7 +12532,7 @@ export class YAPIContext
 
     imm_GetAPIVersion()
     {
-        return /* version number patched automatically */'1.10.52602';
+        return /* version number patched automatically */'1.10.53008';
     }
 
     /**

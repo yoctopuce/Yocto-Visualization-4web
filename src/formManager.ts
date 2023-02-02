@@ -489,11 +489,11 @@ export class YWidget
             document.body.removeChild(this.UIContainer);
         }
         if (target != null)
-        {
+        {   this.UIContainer.style.position="relative";
             target.insertBefore(this.UIContainer, target.firstChild);
         }
         else
-        {
+        {   this.UIContainer.style.position="absolute";
             document.body.insertBefore(this.UIContainer, document.body.firstChild);
         }
         (<YDataRendering.YDataRenderer>this._genRenderer).clearTransformationMatrix();
@@ -1210,6 +1210,7 @@ export class gaugeWidget extends YWidget
         }
 
         this._gauge.setPatchAnnotationCallback((s: string) => { return this.AnnotationCallback(s)});
+        this._gauge.valueFormater = (source: YDataRendering.YDataRenderer, value: number): string => {return this.valueFormater(source, value)};
         this.updateWindowPositionProperties(this.prop);
         this.prop.ApplyAllProperties(this);
         YDataRendering.YDataRenderer.minMaxCheckDisabled = true;
@@ -1224,6 +1225,23 @@ export class gaugeWidget extends YWidget
 //#endif
         this._gauge.AllowRedraw();
     }
+
+    public valueFormater(source: YDataRendering.YDataRenderer, value: number): string
+        {
+        if (this.prop.DataSource_source instanceof YoctoVisualization.NullYSensor)
+        {
+            return "N/A";
+        }
+        else if (!this.prop.DataSource_source.isOnline()) return "OFFLINE";
+
+        let format: string = this.prop.DataSource_precision;
+        let p: number = format.indexOf('.');
+        let n: number = 0;
+        if (p >= 0) n = format.length - p - 1;
+        let unit: string = this.prop.DataSource_source.get_unit();
+        return value.toFixed(n) + unit;
+
+        }
 
 //#ifndef READONLY
     public PropertyChanged2(src: YoctoVisualization.UIElement): void

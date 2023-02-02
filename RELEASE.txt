@@ -1,11 +1,6 @@
-Yocto-Visualization-4web v1.10.52602
+Yocto-Visualization-4web v1.10.53008
 
-- Datalogger contents loading "on demand" (instead on automatically loading all contents from all data loggers)
-- Datalogger contents automatically loaded after temporary outage
-- Allow upload to VirtualHub-4web from node.js without PHP post_data_reading problem
-- Improve handling of disconnection/reconnection
-- Reduce stack usage
-- Fix occasional bad events when connecting to VirtualHub-4web causing multiple arrival events
-- Fix widget's handle positions after a resize through the properties editor
-- Fix Y auto-scale in case a segment is completely out of view
-- Fix font size not restored properly when widgets size is in relative mode
+- Fix render freeze on some zoom level
+- Fix value formatting in solid gauges.
+- Fix occasional "M is null" exception.
+- Fix embedded mode
