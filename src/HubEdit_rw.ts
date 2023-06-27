@@ -160,7 +160,7 @@ export class HubEdit
             HubEdit._addressInput.style.border = "1px solid grey";
             HubEdit._addressInput.style.fontFamily = YoctoVisualization.constants.generalFontFamily;
             HubEdit._addressInput.style.fontSize = YoctoVisualization.constants.generalFontSize.toString() + "px";
-            HubEdit._addressInput.maxLength = 15;
+            HubEdit._addressInput.maxLength = 512;
             HubEdit._addressInput.size = 15;
             HubEdit._addressInput.value = hub.addr;
             new YoctoVisualization.InputFieldManager(HubEdit._addressInput, YoctoVisualization.InputFieldManager.dataType.DATA_STRING, false, Number.NaN, Number.NaN, null);

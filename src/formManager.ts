@@ -2213,6 +2213,7 @@ export class graphWidget extends YWidget
         {
             this._graph.series[index].InsertPoints(l[i]);
         }
+        this._graph.series[index].rebuildSummaries();
     }
 
 //#ifndef READONLY

@@ -37,7 +37,14 @@
 */
 import * as YDataRendering from "./YDataRendererCommon.js";
 import Timeout = NodeJS.Timeout;
-import {YColor, YPen} from "./YDataRendererCommon.js";
+
+
+// rendering options: hierarchic level of data series summaries,
+// each with   SUMMARY_GRANULARITY factor, be computed to allow
+// a lighting fast graph rendering.  typical value is 100, setting
+// SUMMARY_GRANULARITY to 0 will disable the feature.
+
+const  SUMMARY_GRANULARITY = 100; //100;
 
 export class pointXY
 {
@@ -50,6 +57,27 @@ export class pointXY
     }
     public clone(): pointXY { return new pointXY(this.x, this.y)}
 }
+
+
+
+export class pointsSummary
+    {
+      public x1: number    ;
+      public x2: number    ;
+      public ymin: number  ;
+      public ymax: number  ;
+
+      constructor(X1: number, X2: number, YMIN :number , YMAX :number )
+        {  this.x1   =  X1;
+           this.x2   =  X2;
+           this.ymin =  YMIN;
+           this.ymax =  YMAX;
+       }
+
+      public clone(): pointsSummary { return new pointsSummary(this.x1, this.x2, this.ymin, this.ymin);}
+    }
+
+
 
 export interface PatchMarkerTextCallback {(text: string): string}
 
@@ -163,9 +191,7 @@ export class TimeConverter
 {
 
     public static UTCNow(): YDate { return new YDate(); }
-
     public static ToUnixTime(datetime: Date): number { return datetime.getTime() / 1000.0; }
-
     public static FromUnixTime(unixtime: number): YDate
     {
         let t: YDate = new YDate()
@@ -651,12 +677,7 @@ export class DataSegment
             this.count = p.length;
         }
         else if (p instanceof pointXY)
-        {/*
-       this.data = new Array();
-       this.data.push(p);
-       this.count =1;
-       while (this.data.length <  DataSegment.SegmentGranularity) { this.data.push(new pointXY()); }
-       */
+        {
             this.data = new Array(DataSegment.SegmentGranularity);
             this.data[0] = p;
             this.count = 1;
@@ -669,19 +690,282 @@ export class DataSegment
     }
 
     public grow()
-    { /* let targetCount : number = this.data.length + DataSegment.SegmentGranularity ;
-      while (this.data.length<targetCount)
-        this.data.push(new pointXY())
-   */
+    {
         let targetCount: number = this.data.length + DataSegment.SegmentGranularity;
         while (this.data.length < targetCount)
         {
             this.data.push(null)
         }
+    }
+
+
+}
+// Summary is usd to compute hierarchic  lower resolution data series
+export class Summary
+    {  private static readonly  DBG = false;
+       public segments     : DataSummarySegment[] = []  ;
+       public totalpoints  : number = 0;
+       private Xmin : number  =0;
+       private Xmax : number  =0;
+       private Ymin : number  =0;
+       private Ymax : number  =0;
+       private vtlPtCount : number =0;  // virtual points count
+       private pointSize : number= 0;
+       private isLast : boolean=false;
+       private selfIndex :number;
+       private selfArray :Summary[];
+       private newSummaryLevelTrigger:number = 0;
+
+    public getBufferpoint(): pointsSummary | null
+        {
+          if (this.vtlPtCount<=0) return null;
+          return new  pointsSummary(this.Xmin,this.Xmax,this.Ymin,this.Ymax);
+
+        }
+
+    public Dump()
+        {  console.log("Summary level"+this.selfIndex+", "+(this.segments.length)+" segments, "+this.totalpoints+" points");
+           let lastx=0;
+           for (let s:number =0;s<this.segments.length;s++)
+           { console.log("  segment "+s);
+             for (let i:number =0;i<this.segments[s].ptCount;i++)
+              {     // console.log("    ("+i+") x=["+this.segments[s].data[i]?.x1+","+this.segments[s].data[i]?.x2+"] y=["+this.segments[s].data[i]?.ymin+","+this.segments[s].data[i]?.ymax+"]"  );
+                  console.log(  this.segments[s].data[i]?.x1+","+this.segments[s].data[i]?.ymin+" delataX="+Math.round((this.segments[s].data[i] as pointsSummary).x1-lastx) )
+                  console.log(  this.segments[s].data[i]?.x2+","+this.segments[s].data[i]?.ymax+" delataX="+Math.round((this.segments[s].data[i]as pointsSummary).x2-(this.segments[s].data[i]as pointsSummary).x1))
+                  lastx = (this.segments[s].data[i]as pointsSummary).x2;
+
+
+              }
+           }
+        }
+
+    constructor (index:number, array :Summary[] , pointSize : number )
+        { this.selfIndex = index;
+          this.selfArray = array;
+          this.pointSize = pointSize;
+          this.isLast = true;
+        }
+
+    public processSegments(segments:DataSegment[])
+        {
+           if  (segments.length<=0) return;
+           let last:number = segments.length-1;
+           this.Xmin = (segments[last].data[0] as pointXY).x;
+           this.Xmax = (segments[last].data[0] as pointXY).x;
+           this.Ymin = (segments[last].data[0] as pointXY).y;
+           this.Ymax = (segments[last].data[0] as pointXY).y;
+           this.totalpoints =0;
+           this.vtlPtCount  =0;
+
+            for (let s: number = last;s>=0;s--)
+             {  for (let i: number = 0;i< segments[s].data.length;i++)
+                 {   let p : pointXY = segments[s].data[i] as pointXY
+                     if (p.x < this.Ymin)  this.Ymin = p.y;
+                     if (p.x > this.Ymax)  this.Ymax = p.y;
+                     this.Xmax = p.x;
+                     this.vtlPtCount++;
+                     if (this.vtlPtCount>=this.pointSize )
+                         { this.flush(false);
+                           this.Xmin = p.x;
+                           this.Ymin = p.y;
+                           this.Ymax = p.y;
+                         }
+                 }
+                 if (s>0)
+                  {
+                     let len :number =  segments[s].data.length;
+                     let  p2  : pointXY = segments[s-1].data[0] as pointXY;
+                     let p1 :  pointXY = segments[s].data[len-1] as pointXY;
+                     let lastDelta=1
+                     if (len>1)
+                         {
+                           let p0 :  pointXY = segments[s].data[len-2] as pointXY;
+                           lastDelta = p1.x-p0.x;
+                         }
+
+                     if (p2.x - p1.x  > this.pointSize * lastDelta)
+                         {  this.flush(false);
+                             this.Xmin = p2.x;
+                             this.Ymin = p2.y;
+                             this.Ymax = p2.y;
+                             this.addNewEmptySegment()
+                         }
+                  }
+             }
+         //   debugger;
+            if (this.totalpoints>1)
+                {   let it : Summary = new Summary (this.selfIndex+1, this.selfArray, this.pointSize * SUMMARY_GRANULARITY );
+                    this.selfArray.push(it)
+                    this.isLast=false;
+                    it.processSegments(segments);
+                }
+        }
+
+    public addNewLevel()
+     {  let newIndex : number = this.selfArray.length;
+        if (Summary.DBG) console.log("--- ADDING NEW LEVEL "+newIndex);
+        let it : Summary = new Summary (newIndex, this.selfArray, this.pointSize * SUMMARY_GRANULARITY );
+        this.selfArray.push(it)
+        this.isLast=false;
+
+        let _xmin  = (this.segments[0].data[0] as pointsSummary).x1;
+        let _xmax  = (this.segments[0].data[0] as pointsSummary).x2;
+        let _ymin  = (this.segments[0].data[0] as pointsSummary).ymin;
+        let _ymax  = (this.segments[0].data[0] as pointsSummary).ymax;
+        let _count = 0;
+
+
+
+        for (let  s=0; s<this.segments.length;s++)
+         {   for (let i=0; i< this.segments[s].ptCount; i++)
+             { _xmax =  (this.segments[s].data[i]  as pointsSummary).x2;
+               if (  (this.segments[s].data[i] as pointsSummary).ymin<_ymin) _ymin= (this.segments[s].data[i] as pointsSummary).ymin;
+               if (  (this.segments[s].data[i] as pointsSummary).ymin>_ymax) _ymax= (this.segments[s].data[i] as pointsSummary).ymin;
+             }
+             _count+=this.segments[s].ptCount;
+            if (s<this.segments.length-1)
+            {   if  (this.segments[s].ptCount>2)
+                 {  let lastIndex : number = this.segments[s].ptCount-1;
+                    let lastDelta : number = (this.segments[s].data[lastIndex] as pointsSummary).x1 - (this.segments[s].data[lastIndex-1] as pointsSummary).x2
+                    if  ((this.segments[s+1].data[0] as pointsSummary).x1 - (this.segments[s].data[this.segments[s].ptCount-1] as pointsSummary).x2 > lastDelta *SUMMARY_GRANULARITY )
+                     { it.addNewEmptySegment();
+                        _xmin = (this.segments[s+1].data[0] as pointsSummary).x1;
+                        _xmax = (this.segments[s+1].data[0] as pointsSummary).x2;
+                        _ymin = (this.segments[s+1].data[0] as pointsSummary).ymin;
+                        _ymax = (this.segments[s+1].data[0] as pointsSummary).ymax;
+                       _count =0;
+                     }
+                 }
+            }
+        }
+
+       if (_count!=0)
+        { it.addNewSinglePointSegment(_xmin,_xmax,_ymin,_ymax,_count);
+        }
+
+     }
+
+   public addNewSinglePointSegment(xmin:number,xmax:number,ymin:number,ymax:number,_count:number)
+       {  // if (this.selfIndex==1) debugger
+           if (Summary.DBG) console.log(" ===> level "+this.selfIndex+" new single point segment");
+           this.segments.push(new DataSummarySegment( new pointsSummary(xmin,xmax,ymin,ymax ),_count   ))
+
+
+       }
+
+    public addNewEmptySegment()
+        {   if (Summary.DBG) console.log(" ===> level "+this.selfIndex+" new empty segment");
+            this.segments.push(new DataSummarySegment( null,null));
+
+        }
+
+
+    public addSequentialPoint(p : pointXY, maxHoleSize:number )
+        {
+        if (Summary.DBG)  console.log(" ADD Point, LEVEL "+this.selfIndex+" Vtl point = "+ this.vtlPtCount +"/"+this.pointSize + " TOTAL Points= "+this.totalpoints)
+
+            if (this.isLast &&   (this.totalpoints>=SUMMARY_GRANULARITY))
+              this.addNewLevel()
+
+
+            if (this.vtlPtCount==0)
+             {  this.Xmin  = p.x;
+                this.Xmax  = p.x;
+                this.Ymin  = p.y;
+                this.Ymax  = p.y;
+                this.vtlPtCount = 1;
+                 if (Summary.DBG) if (this.selfIndex==1)console.log(" --> added 1srt virtual pt vtlPtCount="+this.vtlPtCount+"/"+this.pointSize);
+                if (!this.isLast) this.selfArray[this.selfIndex+1].addSequentialPoint(p, maxHoleSize*SUMMARY_GRANULARITY )
+                return
+             }
+           else
+             {  if (Summary.DBG) console.log(" --> level "+this.selfIndex+" delta = " +(p.x- this.Xmax)+"/"+maxHoleSize);
+                if ( (maxHoleSize>0) && (p.x- this.Xmax) > maxHoleSize)
+                  {  if (Summary.DBG) console.log(" --> level "+this.selfIndex+" hole detected");
+                    this.flush(false);
+                    this.addNewEmptySegment( );
+                    this.Xmin  = p.x;
+                    this.Xmax  = p.x;
+                    this.Ymin  = p.y;
+                    this.Ymax  = p.y;
+                    this.vtlPtCount = 1;
+                    if (!this.isLast) this.selfArray[this.selfIndex+1].addSequentialPoint(p, maxHoleSize*SUMMARY_GRANULARITY )
+                    return;
+                  }
+
+                if ( p.y < this.Ymin) this.Ymin =p.y;
+                if ( p.y > this.Ymax) this.Ymax =p.y;
+                this.Xmax  = p.x;
+                this.vtlPtCount++;
+                 if (Summary.DBG) if (this.selfIndex==1) console.log(" --> level "+this.selfIndex+" added subsequent virtual pt vtlPtCount="+this.vtlPtCount+"/"+this.pointSize);
+                if (this.vtlPtCount>= this.pointSize )
+                 {   if (Summary.DBG) if (this.selfIndex==1)console.log(" --> level "+this.selfIndex+" flushing");
+                     this.flush(false)
+                 }
+
+             }
+           if (!this.isLast) this.selfArray[this.selfIndex+1].addSequentialPoint(p, maxHoleSize*SUMMARY_GRANULARITY )
+        }
+
+    public flush(forceNewSegment:boolean)
+         { if   ((this.segments.length==0) || forceNewSegment)
+                this.segments.push( new DataSummarySegment(null,null) )
+           let lastsegment : DataSummarySegment  = this.segments[this.segments.length-1];
+   //is grow neccessary is js ?        if (lastsegment.data.length==lastsegment.ptCount) lastsegment.grow();
+           lastsegment.data[lastsegment.ptCount] = new pointsSummary(this.Xmin, this.Xmax, this.Ymin, this.Ymax);
+           this.totalpoints++;
+           lastsegment.ptCount++;
+           this.vtlPtCount =0;
+
+
+          }
+
 
     }
 
-}
+
+export class DataSummarySegment
+    {
+    public static readonly SegmentGranularity: number = 1000;
+    public data: (pointsSummary|null)[] = [];
+    public ptCount: number = 0;
+
+    public static ArrayCopy(sourceArray: Array<pointsSummary | null>, sourceIndex: number, destinationArray: Array<pointsSummary | null>, destinationIndex: number, length: number): void
+        {   // FIXME : there is probably a much smarter/faster way to do this
+          for (let i = 0; i < length; i++)
+           {
+              destinationArray[destinationIndex + i] = (<pointsSummary>sourceArray[sourceIndex + i]).clone();
+           }
+        }
+
+    constructor(p: any,virtualPointCount:any)
+      {  if (p instanceof Array)
+        {   this.data = new Array(p.length)
+            DataSummarySegment.ArrayCopy(p, 0, this.data, 0, p.length);
+            this.ptCount = p.length;
+        } else if (p instanceof pointsSummary)
+        {   this.data = new Array(DataSummarySegment.SegmentGranularity);
+            this.data[0] = p;
+            this.ptCount = 1;
+        }
+        else if  (p==null)
+        {  this.data = new Array(DataSummarySegment.SegmentGranularity);
+           this.ptCount = 0;
+
+         }
+        }
+
+    public grow()
+        {
+          let targetCount: number = this.data.length + DataSummarySegment.SegmentGranularity;
+          while (this.data.length < targetCount)
+           {
+            this.data.push(null)
+           }
+        }
+
+    }
+
 
 export class DataSerie
 {
@@ -712,6 +996,8 @@ export class DataSerie
         this.parent = parent;
 
     }
+
+
 
     private _yAxisIndex: number = 0;
     public get yAxisIndex(): number { return this._yAxisIndex;}
@@ -819,7 +1105,10 @@ export class DataSerie
         this.parent.redraw();
     }
 
-    public segments: DataSegment[] = [];
+    public segments:     DataSegment[] = [];
+    public summaries:    Summary[] | null = null;
+
+
     private AddNewSegment(p: pointXY): void
     {
         this.segments.splice(0, 0, new DataSegment(p));
@@ -835,36 +1124,72 @@ export class DataSerie
       return this.segments[this.segments.length - 1].data[this.segments[this.segments.length - 1].count - 1] as pointXY;
     }
 
+private handleSummary(p: pointXY, delta: number)
+    {  if (this.summaries == null)
+        {   this.summaries = []
+            this.summaries.push(new Summary(0, this.summaries, SUMMARY_GRANULARITY));
+        }
+        if (this.summaries != null)
+            this.summaries[0].addSequentialPoint(p, delta)
+    }
+
     public AddPoint(p: pointXY): void
     {
         this._timeRange = MinMaxHandler.CombineWithNumber(this._timeRange, p.x);
         this._valueRange = MinMaxHandler.CombineWithNumber(this._valueRange, p.y);
 
-        if (this.segments.length <= 0)
-        {
-            this.AddNewSegment(p);
+        let delta1: number =-1;
+        let delta2: number =-1;
+
+    if (this.segments.length <= 0)
+        {   this.AddNewSegment(p);
             this.totalPointCount++;
+            if (SUMMARY_GRANULARITY>0) this.handleSummary(p,delta1);
             return;
         }
+
         else if (this.segments[0].count > 1)
         {
-            let delta1: number = (<pointXY>this.segments[0].data[this.segments[0].count - 1]).x - (<pointXY>this.segments[0].data[this.segments[0].count - 2]).x;
-            let delta2: number = p.x - (<pointXY>this.segments[0].data[this.segments[0].count - 1]).x;
+            delta1= (<pointXY>this.segments[0].data[this.segments[0].count - 1]).x - (<pointXY>this.segments[0].data[this.segments[0].count - 2]).x;
+            delta2= p.x - (<pointXY>this.segments[0].data[this.segments[0].count - 1]).x;
             if ((delta2 > 0.1) && ((delta2 < 0) || (delta2 > 2 * delta1)))
             {
                 this.AddNewSegment(p);
+                if (SUMMARY_GRANULARITY>0) this.handleSummary(p,delta1);
                 return;
             }
-            else if (this.segments[0].count >= this.segments[0].data.length) this.segments[0].grow();
+            //is grow neccessary is js ?      else if (this.segments[0].count >= this.segments[0].data.length) this.segments[0].grow();
 
         }
+        if (SUMMARY_GRANULARITY>0) this.handleSummary(p,delta1);
 
         this.segments[0].data[this.segments[0].count] = p;
         this.segments[0].count++;
         this.totalPointCount++;
-        if ((DataSerie._MaxPointsPerSeries > 0) && (this.totalPointCount > DataSerie._MaxPointsPerSeries)) this.dataCleanUp();
+
+        if ((DataSerie._MaxPointsPerSeries > 0) && (this.totalPointCount > DataSerie._MaxPointsPerSeries))
+          {
+            this.dataCleanUp();
+            this.rebuildSummaries();
+          }
+
         this.parent.adjustGlobalTimeRange(p.x);
         this.parent.redraw();
+    }
+    public rebuildSummaries()
+     {   if (SUMMARY_GRANULARITY<=0) return;
+         this.summaries = []
+         this.summaries.push(new Summary(0, this.summaries, SUMMARY_GRANULARITY));
+         this.summaries[0].processSegments(this.segments);
+         //this.summaries[1].Dump();
+         //debugger
+      }
+
+public dumpSummaries()
+    { if (this.summaries!=null)
+          for (let i:number=0;i<this.summaries.length;i++)
+              this.summaries[i].Dump();
+       else console.log("****No summaries ****")
     }
 
     public dataCleanUp(): void
@@ -941,7 +1266,7 @@ export class DataSerie
 
         if (InsertAtBegining >= 0)  // insert at the beginning of segments[InsertAtBeginning]
         {
-            if (this.segments[InsertAtBegining].count + points.length >= this.segments[InsertAtBegining].data.length) this.segments[InsertAtBegining].grow();
+            //is grow neccessary is js ?   if (this.segments[InsertAtBegining].count + points.length >= this.segments[InsertAtBegining].data.length) this.segments[InsertAtBegining].grow();
             DataSegment.ArrayCopy(this.segments[InsertAtBegining].data, 0, this.segments[InsertAtBegining].data, points.length, this.segments[InsertAtBegining].count);
             DataSegment.ArrayCopy(points, 0, this.segments[InsertAtBegining].data, 0, points.length);
             this.segments[InsertAtBegining].count += points.length;
@@ -951,14 +1276,21 @@ export class DataSerie
         else if (InsertAtEnd >= 0) // insert at the end of segments[InsertAtEnd]
         {
 
-            if (this.segments[InsertAtEnd].count + points.length >= this.segments[InsertAtEnd].data.length) this.segments[InsertAtEnd].grow();
+            //is grow neccessary is js ?     if (this.segments[InsertAtEnd].count + points.length >= this.segments[InsertAtEnd].data.length) this.segments[InsertAtEnd].grow();
             DataSegment.ArrayCopy(points, 0, this.segments[InsertAtEnd].data, this.segments[InsertAtEnd].count, points.length);
             this.segments[InsertAtEnd].count += points.length;
             this.totalPointCount += points.length;
         }
-        else // create a whole new segment
-        {
-            this.segments.push(new DataSegment(points));
+        else // create a whole new segment and insert it at the right place
+         {   let inserted:boolean=false;
+             for (let i=0;i<this.segments.length;i++)
+                 {  if (((this.segments[i].data[this.segments[i].data .length-1]as pointXY).x <points[0].x ) && (! inserted))
+                     { this.segments.splice(i,0,new DataSegment(points) );
+                       inserted=true;
+                     }
+                 }
+
+            if (!inserted) this.segments.push(new DataSegment(points));
             this.totalPointCount += points.length;
         }
 
@@ -2032,7 +2364,7 @@ export abstract class GenericAxis
     public get AxisChanged(): axisChangedCallBack | null { return this._AxisChanged;}
     public set AxisChanged(value: axisChangedCallBack | null) {this._AxisChanged = value;}
 
-    constructor(parent: YGraph, directParent: object)
+    protected constructor(parent: YGraph, directParent: object)
     {
         this._zones = [];
         this._directParent = directParent;
@@ -3324,6 +3656,27 @@ export class YGraph extends YDataRendering.YDataRenderer
         return new YDataRendering.Point(xx >> 0, yy >> 0);
     }
 
+   private static IRLPointSummaryToViewPort(viewport: YDataRendering.ViewPortSettings, p: pointsSummary, IRLy?: number, zoomy?: number): YDataRendering.minMaxPoint
+    {
+    if (IRLy === undefined)
+    {
+        let x1: number = viewport.Lmargin + Math.round((p.x1 - viewport.IRLx) * viewport.zoomx);
+        let ymin: number = viewport.Height - viewport.Bmargin - Math.round((p.ymin - viewport.IRLy) * viewport.zoomy);
+        let x2: number = viewport.Lmargin + Math.round((p.x2 - viewport.IRLx) * viewport.zoomx);
+        let ymax: number = viewport.Height - viewport.Bmargin - Math.round((p.ymax - viewport.IRLy) * viewport.zoomy);
+
+
+        return new YDataRendering.minMaxPoint(x1,ymin,x2,ymax);
+    }
+    let x1: number = viewport.Lmargin + Math.round((p.x1 - viewport.IRLx) * viewport.zoomx);
+    let ymin: number = viewport.Height - viewport.Bmargin - Math.round((p.ymin - IRLy) * <number>zoomy);
+    let x2: number = viewport.Lmargin + Math.round((p.x2 - viewport.IRLx) * viewport.zoomx);
+    let ymax: number = viewport.Height - viewport.Bmargin - Math.round((p.ymax - IRLy) * <number>zoomy);
+
+    return new YDataRendering.minMaxPoint(x1,ymin,x2,ymax);
+    }
+
+
     private static ViewPortPointToIRL(viewport: YDataRendering.ViewPortSettings, p: YDataRendering.Point, IRLy?: number, zoomy?: number): pointXY
     {
         if (IRLy === undefined)
@@ -3633,16 +3986,15 @@ export class YGraph extends YDataRendering.YDataRenderer
         }
     }
 
+
+
+
     private static DoSegmentRendering(w: YDataRendering.ViewPortSettings, g: YDataRendering.YGraphics, p: YDataRendering.YPen, data: pointXY[], count: number , xTimeStart :number, xTimeEnd :number )
     {// Do we need to draw that segment?
 
         if ((data[0].x  >xTimeEnd ) ||(data[count - 1].x < xTimeStart))  return  0 ;
 
 
-       // let Bottomleft: pointXY = YGraph.ViewPortPointToIRL(w, new YDataRendering.Point(w.Lmargin, w.Height - w.Bmargin));
-       // let TopRight: pointXY = YGraph.ViewPortPointToIRL(w, new YDataRendering.Point(w.Width - w.Rmargin, w.Tmargin));
-        // Do we need to draw that segment?
-       // if ((data[0].x > TopRight.x) || (data[count - 1].x < Bottomleft.x)) return 0; // completely out of view port display zone, abort.
         let isSVG: boolean = g instanceof YDataRendering.YGraphicsSVG;
         let N1: number = 0;
         let N2: number = 0;
@@ -3707,21 +4059,7 @@ export class YGraph extends YDataRendering.YDataRenderer
                 }
 
 
-                /*
-                let min: number = Current.Y;
-                let max: number = Current.Y;
-                ToDraw[n++] = new YDataRendering.PointF(Current.X, Current.Y);
-                do
-                {
-                    New = YGraph.IRLPointToViewPort(w, data[i]);
-                    if (New.Y > max) max = New.Y;
-                    if (New.Y < min) min = New.Y;
-                    i++;
-                } while ((i < Last) && (Current.X == New.X));
 
-                ToDraw[n++] = new YDataRendering.PointF(Current.X, min);
-                ToDraw[n++] = new YDataRendering.PointF(Current.X, max);
-                */
                 Current =  YGraph.IRLPointToViewPort(w, data[i]);
             }
 
@@ -3755,7 +4093,107 @@ export class YGraph extends YDataRendering.YDataRenderer
 
     }
 
-    private DrawYAxisZones(w: YDataRendering.ViewPortSettings, g: YDataRendering.YGraphics, scale: YAxis): void
+
+private static DoSummarySegmentRendering(w: YDataRendering.ViewPortSettings, g: YDataRendering.YGraphics, p: YDataRendering.YPen, data: pointsSummary[], count: number , finalPoint: pointsSummary | null, xTimeStart :number, xTimeEnd :number )
+  {
+
+    let ToDraw: YDataRendering.PointF[] = new Array(2*count+1);
+    let n: number = 0;
+    if (count>0)
+    {
+        // Do we need to draw that segment?
+        if ((data[0].x1  >xTimeEnd ) ||(data[count - 1].x2 < xTimeStart))  return  0 ;
+        let isSVG: boolean = g instanceof YDataRendering.YGraphicsSVG;
+        let N1: number = 0;
+        let N2: number = 0;
+
+        // data clipping: find out the first point to draw;
+        let First: number = 0;
+        if (data[0].x1 < xTimeStart)
+        {
+            N1 = 0;
+            N2 = count - 1;
+            while (N2 - N1 > 1)
+            {
+                let N: number = (N1 + N2) >> 1;
+                if (data[N].x1 > xTimeStart) N2 = N; else N1 = N;
+            }
+            First = N1 - 1;
+            if (First < 0) First = 0;
+        }
+        // data clipping: find out the last point to draw;
+        let Last: number = count - 1;
+        if (data[Last].x2 > xTimeEnd)
+        {
+            N1 = 0;
+            N2 = count - 1;
+            while (N2 - N1 > 1)
+            {
+                let N: number = (N1 + N2) >> 1;
+                if (data[N].x2 < xTimeEnd) N1 = N; else N2 = N;
+            }
+            Last = N2 + 1;
+            if (Last > count - 1) Last = count - 1;
+        }
+
+        let Current: YDataRendering.minMaxPoint;
+
+        let New: YDataRendering.Point;
+        let i: number = First ;
+
+        let max :number;
+        let min :number;
+        let limit:number;
+        Current     =  YGraph.IRLPointSummaryToViewPort(w,  data[i]);
+        ToDraw[n++] = new YDataRendering.PointF(Current.X1, Current.YMIN);
+        let ymin : number = Current.YMAX;
+        let ymax : number = Current.YMIN;
+        let x    : number = Current.X1;
+        let buffered : number  =0;
+
+        while (i <= Last)
+        { Current     =  YGraph.IRLPointSummaryToViewPort(w,  data[i]);
+          if  ( ymin > Current.YMAX) ymin=Current.YMAX;
+          if  ( ymax < Current.YMIN) ymax=Current.YMIN;
+          buffered++
+         // if (i==Last) debugger;
+          if  (Current.X2>x)
+              {
+                 ToDraw[n++] = new YDataRendering.PointF(x, ymin);
+                if (ymax-ymin>2) ToDraw[n++] = new YDataRendering.PointF((x + Current.X2)>>1, ymax);
+                x = Current.X2;
+                ymin  = Current.YMAX;
+                ymax  = Current.YMIN;
+                buffered = 0;
+              }
+          i++;
+
+        }
+
+        if (buffered>0)
+            { ToDraw[n++] = new YDataRendering.PointF(x, Current.YMIN);
+              ToDraw[n++] = new YDataRendering.PointF((x + Current.X2)>>1, Current.YMAX);
+             }
+
+    }
+    // finalPoint is the summary buffer
+    if (finalPoint)
+      {  let Current: YDataRendering.minMaxPoint = YGraph.IRLPointSummaryToViewPort(w, finalPoint);
+         ToDraw[n++] = new YDataRendering.PointF(Current.X1, Current.YMIN);
+         ToDraw[n++] = new YDataRendering.PointF( Current.X2, Current.YMAX);
+     }
+
+    if (n > 1)
+        { ToDraw = ToDraw.slice(0, n);
+          g.DrawLines(p, ToDraw);
+        }
+    return n;
+
+    }
+
+
+
+private DrawYAxisZones(w: YDataRendering.ViewPortSettings, g: YDataRendering.YGraphics, scale: YAxis): void
     {
         if (!scale.visible) return;
 
@@ -4602,6 +5040,116 @@ export class YGraph extends YDataRendering.YDataRenderer
         }
     }
 
+    // find the index of a series segment containing a specific timestamp
+    // non integer indexes (XX.5) means the timestamp is located between
+    // segements XX and XX+1
+    private findSegmentIndex(serieIndex: number, timeStamp: number, debug:boolean): number
+      {
+
+        let s: DataSerie = this._series[serieIndex];
+        if (s.segments.length <= 0) return -1;
+        // segment are reverse order, timestamp wise
+        let start: number = 0;        // most recent segement
+        let end: number = s.segments.length - 1; // oldest segment
+
+        if (debug)
+          { console.log("looking for "+timeStamp)
+             for (let i:number=  0; i<s.segments.length;i++)
+            console.log("seg "+i+" ["+(s.segments[i].data[0] as pointXY).x+".."+ (s.segments[i].data[s.segments[i].count-1] as pointXY).x+"]"  )
+            debugger
+          }
+        while (true)
+          { let startSeg: DataSegment =  s.segments[start];
+            let endSeg: DataSegment =  s.segments[end];
+
+            if (timeStamp> (startSeg.data[startSeg.count-1] as pointXY).x) return start -0.5; // timestamp is after start segment
+            if (timeStamp< (endSeg.data[0] as pointXY).x) return end+0.5; // timestamp is before start segment
+
+            if (timeStamp>= (startSeg.data[0] as pointXY).x) return start ; // timestamp is inside  start segment
+            if (timeStamp<= (endSeg.data[endSeg.count-1] as pointXY).x) return end; // timestamp is inside  end segment
+
+            if (end==start)  { debugger;  return -99; } // shouldn't happen
+
+            if (end-start==1) return start +0.5; // start and end segment are contiguous, timestamp is between them
+
+            // are this point timestamp is somewhere between start and end segments
+
+            let middle :number  =  (start+end) >> 1;
+
+            let middleSeg : DataSegment =  s.segments[middle];
+            if (timeStamp<= (middleSeg.data[middleSeg.count-1] as pointXY).x)
+              { end = end-1; //  timestamp somewhere in ]end..middle]
+                start=middle;
+              }
+              else
+              { end =middle-1; //  timestamp somewhere in ]middle..start[
+                start =start+1;
+              }
+          }
+
+
+        /*
+        -----   Y A UN BUG LA DEDANS ----
+           let s:DataSerie = this._series[serieIndex];
+           if (s.segments.length <=0) return -1;
+           let start : number =0 ;
+           let end   :number = s.segments.length-1;
+           //debugger;
+           while (start!=end)
+            {  if (timeStamp< (s.segments[end].data[0] as pointXY).x) return end+0.5;
+               if (timeStamp> (s.segments[start].data[s.segments[start].count-1] as pointXY).x) return start-0.5;
+               let middleindex : number = (start+end) >>1;
+
+               if (end-start==1)
+               { if    ( ( timeStamp>=(s.segments[start].data[0] as pointXY).x)
+                     &&  ( timeStamp<=(s.segments[start].data[s.segments[start].count-1] as pointXY).x)) return start;
+
+                 if    ( ( timeStamp>=(s.segments[end].data[0] as pointXY).x)
+                     &&  ( timeStamp<=(s.segments[end].data[s.segments[end].count-1] as pointXY).x)) return end;
+
+                 return start+0.5;
+               }
+
+               let firstx =  (s.segments[middleindex].data[0] as pointXY).x;
+               let lastx =  (s.segments[middleindex].data[s.segments[middleindex].count-1] as pointXY).x;
+
+               if (timeStamp<lastx) start = middleindex;
+               if (timeStamp>firstx) end =  middleindex;
+            }
+            if (timeStamp<(s.segments[start].data[0] as pointXY).x) return start+0.5;
+            if (timeStamp>(s.segments[start].data[s.segments[start].count-1] as pointXY).x) return start-0.5;
+
+            return start;
+
+         */
+      }
+
+    private  findTimestampIndexInSegment(serieIndex :number,segmentIndex :number,timeStamp:number) :number
+        {
+
+          let seg: DataSegment =  this._series[serieIndex].segments[segmentIndex];
+          if (!seg)
+              debugger
+          if  (timeStamp<=(seg.data[0] as pointXY).x) return 0;
+          let count :number = this._series[serieIndex].segments[segmentIndex].count;
+          if  (timeStamp>=(seg.data[count-1] as pointXY).x) return count-1;
+
+          let start = 0;
+          let end = count-1;
+          let middle =0;
+          while (true)
+          {  if (end-start<=1)
+              {  if   (timeStamp<= (seg.data[start] as pointXY).x) return start;
+                 return end;
+              }
+              middle = (start+end)>>1;
+              if  (timeStamp<= (seg.data[middle] as pointXY).x) end=middle
+                  else start =middle;
+
+          }
+        }
+
+
     protected Render(g: YDataRendering.YGraphics, UIw: number, UIh: number): number
     { //console.log("START OF GRAPH")
         if ((UIw < 50) || (UIh < 50)) return 0; // too small size is likely to cause endless loops
@@ -4772,12 +5320,12 @@ export class YGraph extends YDataRendering.YDataRenderer
         let TopRight: pointXY = YGraph.ViewPortPointToIRL(this.mainViewPort, new YDataRendering.Point(this.mainViewPort.Width - this.mainViewPort.Rmargin, this.mainViewPort.Tmargin));
         let xTimeStart : number = Bottomleft.x;
         let xTimeEnd   : number = TopRight.x;
-
+        let availabelPixelWidth :number  = this.mainViewPort.Width - this.mainViewPort.Rmargin - this.mainViewPort.Lmargin;
 
 
         for (let k: number = 0; k < this._series.length; k++)
         {
-            if ((this._series[k].visible) && !(this._series[k].disabled))
+            if ((this._series[k].visible) && !(this._series[k].disabled) && (this._series[k].segments.length>0))
             {   //#ifdef PROFILING
                 let perf : number  = performance.now();
                 //#endif
@@ -4796,13 +5344,92 @@ export class YGraph extends YDataRendering.YDataRenderer
                 this._yAxes[this._series[k].yAxisIndex].zoom = this.mainViewPort.zoomy;
                 g.comment("** main view-port series " + k.toString());
 
-                for (let i: number = 0; i < this._series[k].segments.length; i++)
-                {
-                    lineCount += YGraph.DoSegmentRendering(this.mainViewPort, g, mypenb, <pointXY[]>this._series[k].segments[i].data, this._series[k].segments[i].count,xTimeStart,xTimeEnd);
-                    pointCount += this._series[k].segments[i].count;
-                }
+
+                let FirstSegmentIndexTmp : number  = this.findSegmentIndex(k,xTimeEnd,false)  ;
+                let LastSegmentIndexTmp  : number  = this.findSegmentIndex(k,xTimeStart,false)  ;
+
+
+                let inside:boolean = true;
+                let maxIndex : number = this._series[k].segments.length-1;
+                if ((FirstSegmentIndexTmp<0) && (LastSegmentIndexTmp<0))  {  inside=false;}
+                if ((FirstSegmentIndexTmp>maxIndex) && (LastSegmentIndexTmp>maxIndex)) { inside=false;}
+
+              if (inside)
+                { let FirstSegmentIndex    : number  = Math.floor(FirstSegmentIndexTmp+ 0.5) ;
+                  let LastSegmentIndex     : number  = Math.floor(LastSegmentIndexTmp  )  ;
+
+                  // not sure this is needed
+                  if (LastSegmentIndex<0)
+                    { //this.findSegmentIndex(k,xTimeEnd,true)  ;
+                      throw new Error('findSegmentIndex return an invalid index ('+LastSegmentIndex+')');
+                    }
+                  if (FirstSegmentIndex<0)
+                    { //this.findSegmentIndex(k,xTimeStart,true)  ;
+                      throw new Error('findSegmentIndex return an invalid index ('+FirstSegmentIndex+')!');
+                    }
+                  if (FirstSegmentIndex>this._series[k].segments.length-1)
+                    { //debugger;
+                      //this.findSegmentIndex(k,xTimeStart,true)
+                      throw new Error('findSegmentIndex return an invalid index ('+FirstSegmentIndex+')!!');
+                    }
+                  if (LastSegmentIndex>this._series[k].segments.length-1)
+                    { //debugger;
+                      //this.findSegmentIndex(k,xTimeEnd,true)
+                      throw new Error('findSegmentIndex return an invalid index ('+LastSegmentIndex+')!!!');
+                    }
+
+
+                  let firstDataIndex : number  = this.findTimestampIndexInSegment(k,FirstSegmentIndex,xTimeEnd)
+                  let lastDataIndex : number  = this.findTimestampIndexInSegment(k,LastSegmentIndex,xTimeStart)
+
+
+                  let totalPointsToDraw :number = 0;
+                  if (FirstSegmentIndex==LastSegmentIndex) totalPointsToDraw=   firstDataIndex-lastDataIndex;
+                  else if (FirstSegmentIndex<LastSegmentIndex)
+                    {  totalPointsToDraw = this._series[k].segments[LastSegmentIndex].count-lastDataIndex + firstDataIndex;
+                       for (let i:number = FirstSegmentIndex+1; i<LastSegmentIndex;i++)
+                        totalPointsToDraw +=this._series[k].segments[i].count
+                    }
+
+                  let density = Math.round(totalPointsToDraw / availabelPixelWidth);
+
+                  //#ifdef PROFILING
+                  console.log("Serie "+k+ " planing to draw "+ totalPointsToDraw +" points, density is ~"+density+" pts/px");
+                  //#endif
+
+
+                  if ((density <SUMMARY_GRANULARITY) || (SUMMARY_GRANULARITY<=0))
+                    {   //#ifdef PROFILING
+                      console.log("Serie "+k+ " drawing regular data");
+                      //#endif
+                      for (let i: number = 0; i < this._series[k].segments.length; i++)
+                        {
+                          lineCount += YGraph.DoSegmentRendering(this.mainViewPort, g, mypenb, <pointXY[]>this._series[k].segments[i].data, this._series[k].segments[i].count,xTimeStart,xTimeEnd);
+                          pointCount += this._series[k].segments[i].count;
+                        }
+                    }
+
+                  else
+                    {  let level :number  = Math.floor(Math.log(density) / Math.log( SUMMARY_GRANULARITY)) -1  ;
+                      //#ifdef PROFILING
+                      console.log("Serie "+k+ " drawing summarized data, level "+level);
+                      //#endif
+                      let s:Summary =  (<Summary[]>this._series[k].summaries)[level] as Summary;
+                      let finalpoint:pointsSummary | null = null
+                      for (let i: number = 0; i <s.segments.length; i++)
+                        {   if (i==s.segments.length-1)
+                          {
+                            finalpoint = s.getBufferpoint();  // the last point is still in the sumary acculator
+                          }
+                          lineCount += YGraph.DoSummarySegmentRendering(this.mainViewPort, g, mypenb, <pointsSummary[]>s.segments[i].data, s.segments[i].ptCount,finalpoint,xTimeStart,xTimeEnd);
+                          pointCount += s.segments[i].ptCount;
+                        }
+
+                    }
+                } else console.log("Data are ouside dataview");
+
                 //#ifdef PROFILING
-                console.log("Serie "+k+" rendering took  "+(performance.now()-perf).toString()+"ms ("+this._series[k].segments.length+" segments)");
+                console.log("Serie "+k+" rendering took  "+(performance.now()-perf).toString()+"ms ("+this._series[k].segments.length+" segments, "+lineCount+" lines )");
                 //#endif
 
             }
@@ -4852,9 +5479,9 @@ export class YGraph extends YDataRendering.YDataRenderer
                     ng = new YDataRendering.YGraphics(this.navigatorCache, v.Width, v.Height, 90);
 
                 }
+                //   **** HERE ****
+                ng.SetClip(new YDataRendering.YRectangle(v.Lmargin, v.Tmargin, v.Width - v.Rmargin - v.Lmargin, v.Height - v.Bmargin - v.Tmargin));
 
-                //ng.SetClip(new Rectangle(v.Lmargin, v.Tmargin, v.Width - v.Rmargin - v.Lmargin, v.Height - v.Bmargin - v.Tmargin));
-                //ng.ResetClip();
                 ng.FillRectangleXYHW(this._navigator.bgBrush, v.Lmargin, v.Tmargin, v.Width - v.Rmargin - v.Lmargin, v.Height - v.Bmargin - v.Tmargin);
 
                 if ((this.xAxis.zones.length > 0) && this._navigator.showXAxisZones)
@@ -4919,10 +5546,35 @@ export class YGraph extends YDataRendering.YDataRenderer
                                 }
                                 v.IRLy = Min;
                                 v.zoomy = (v.Height - v.Tmargin - v.Bmargin) / (Max - Min);
+
+                                let availableWidth :number = v.Width - v.Lmargin  - v.Rmargin;
+                                let totalPoint :number = 0;
                                 for (let i: number = 0; i < this._series[k].segments.length; i++)
-                                {
+                                    totalPoint += this._series[k].segments[i].count;
+                                let density : number =  Math.round(totalPoint/availableWidth);
+
+                                if ((density <SUMMARY_GRANULARITY) || (SUMMARY_GRANULARITY<=0))
+                                {   //#ifdef PROFILING
+                                    console.log("Navigator (YAXIS=AUTO), Serie "+k+ ", density is ~"+density+"pts/pixel drawing regular data");
+                                    //#endif
+                                  for (let i: number = 0; i < this._series[k].segments.length; i++)
+                                  {
                                     lineCount += YGraph.DoSegmentRendering(v, ng, mypenb, <pointXY[]>this._series[k].segments[i].data, this._series[k].segments[i].count,xTimeStart,xTimeEnd);
+                                  }
                                 }
+                                else
+                                {  let level : number = Math.floor(Math.log(density)/Math.log(SUMMARY_GRANULARITY))-1
+                                    //#ifdef PROFILING
+                                    console.log("Navigator (YAXIS=AUTO), Serie "+k+ ", density is ~"+density+"pts/pixel drawing summarized data level "+level);
+                                   //#endif
+                                   let s:Summary =  (<Summary[]>this._series[k].summaries)[level] as Summary;
+                                    let finalpoint:pointsSummary | null = null
+                                    for (let i: number = 0; i < s.segments.length; i++)
+                                      { if (i==s.segments.length-1) finalpoint = s.getBufferpoint();  // the last point is still in the sumary acculator
+                                        lineCount += YGraph.DoSummarySegmentRendering(v, ng, mypenb, <pointsSummary[]>s.segments[i].data, s.segments[i].ptCount,finalpoint,xTimeStart,xTimeEnd);
+                                      }
+                                }
+
                             }
                         }
                     }
@@ -4961,10 +5613,36 @@ export class YGraph extends YDataRendering.YDataRenderer
                                 {
                                     ng.comment("** navigator series " + j.toString());
                                     mypenb = this._series[j].navigatorpen;
-                                    for (let k: number = 0; k < this._series[j].segments.length; k++)
-                                    {
-                                        lineCount += YGraph.DoSegmentRendering(v, ng, mypenb, <pointXY[]>this._series[j].segments[k].data, this._series[j].segments[k].count,xTimeStart,xTimeEnd);
-                                    }
+
+
+                                    let availableWidth :number = v.Width - v.Lmargin  - v.Rmargin;
+                                    let totalPoint :number = 0;
+                                    for (let i: number = 0; i < this._series[j].segments.length; i++)
+                                        totalPoint += this._series[j].segments[i].count;
+                                    let density : number =  Math.round(totalPoint/availableWidth);
+
+                                    if ((density <SUMMARY_GRANULARITY) || (SUMMARY_GRANULARITY<=0))
+                                        {   //#ifdef PROFILING
+                                            console.log("Navigator (YAXIS=INHERIT), Serie "+j+ ", density is ~"+density+"pts/pixel drawing regular data");
+                                            //#endif
+                                            for (let i: number = 0; i < this._series[j].segments.length; i++)
+                                                {
+                                                    lineCount += YGraph.DoSegmentRendering(v, ng, mypenb, <pointXY[]>this._series[j].segments[i].data, this._series[j].segments[i].count,xTimeStart,xTimeEnd);
+                                                }
+                                        }
+                                    else
+                                        {  let level : number = Math.floor(Math.log(density)/Math.log(SUMMARY_GRANULARITY))-1
+                                            console.log("Navigator (YAXIS=INHERIT), Serie "+j+ ", density is ~"+density+"pts/pixel drawing summarized data level "+level);
+                                            let s:Summary =  (<Summary[]>this._series[j].summaries)[level] as Summary;
+                                            let finalpoint:pointsSummary | null = null
+                                            for (let i: number = 0; i < s.segments.length; i++)
+                                                { if (i==s.segments.length-1) finalpoint = s.getBufferpoint();  // the last point is still in the sumary acculator
+                                                    lineCount += YGraph.DoSummarySegmentRendering(v, ng, mypenb, <pointsSummary[]>s.segments[i].data, s.segments[i].ptCount,finalpoint,xTimeStart,xTimeEnd);
+                                                }
+                                        }
+
+
+
                                 }
                             }
                         }
@@ -4990,6 +5668,7 @@ export class YGraph extends YDataRendering.YDataRenderer
                     this._navigator.setIRLPosition(v.IRLx, v.IRLy, v.zoomx, v.zoomy);
 
                 }
+                ng.ResetClip();
                 if (!(g instanceof YDataRendering.YGraphicsSVG)) ng.Dispose();
 
             }

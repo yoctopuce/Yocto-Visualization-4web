@@ -303,7 +303,7 @@ if(args.length == 0) {
                 bundle('obj/full', 'es2017', 'yv4web-full', '/* Yocto-Visualization-4web (ES2017 full ' + json.version + ') - www.yoctopuce.com */')
             ]).then(() =>
             {
-                bundleInstaller('obj/full', 'es2017', 'yv4web-installer', '/* Yocto-Visualization-4web installer (version ' + json.version + ') - www.yoctopuce.com */');
+                bundleInstaller('obj/full', 'es2017', 'yv4w-installer', '/* Yocto-Visualization-4web installer (version ' + json.version + ') - www.yoctopuce.com */');
             });
         }
         break;

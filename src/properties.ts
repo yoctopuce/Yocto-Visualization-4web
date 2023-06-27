@@ -2018,7 +2018,7 @@ export class GraphFormProperties extends YoctoVisualization.GenericProperties
     public get ATTR_Graph_series0__ReadOnlyAttribute(): boolean {return true}
     public get ATTR_Graph_series0__DescriptionAttribute(): string {return "First data series, expand for more."}
     public get Graph_series0(): ChartSerie { return this._Graph_series0 }
-    public set Graph_series0(value: ChartSerie) { this._Graph_series1 = value }
+    public set Graph_series0(value: ChartSerie) { this._Graph_series0 = value }
 
     private _Graph_series1: ChartSerie = new ChartSerie(YDataRendering.YColor.DodgerBlue);
     public get ATTR_Graph_series1__DisplayName(): string {return "Series 2"}

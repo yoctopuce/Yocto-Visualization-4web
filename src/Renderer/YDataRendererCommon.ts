@@ -1281,6 +1281,24 @@ export class Point
 
 }
 
+export class minMaxPoint
+    {
+    public X1: number;
+    public YMIN: number;
+    public X2: number;
+    public YMAX: number;
+
+    constructor(valueX1: number, valueYMIN: number,valueX2: number, valueYMAX: number)
+        {
+          this.X1   = valueX1 >> 0;
+          this.YMIN = valueYMIN >> 0;
+          this.X2   = valueX2 >> 0;
+          this.YMAX = valueYMAX >> 0;
+
+        }
+
+    }
+
 export class PointF
 {
     public X: number;
@@ -2119,25 +2137,16 @@ export abstract class YDataRenderer
         let g: YGraphics = new YGraphics(offscreenCanvas, w, h, 90);
         let start: number = performance.now();
 
-        try
-        {
-            this.Render(g, w, h);
-            /*
-          let p: Point | null = this.mouseLocalPosition();
-          if (p!=null)
-          {
-            let ctx: CanvasRenderingContext2D = <CanvasRenderingContext2D>offscreenCanvas.getContext("2d");
-            ctx.fillStyle = "red";
-            ctx.font = " 24px Arial";
-            ctx.fillText(p.X.toString()+","+p.Y.toString(), 1, 1);
-          }*/
 
-        }
+
+        try { this.Render(g, w, h);}
         catch (e)
         {
             debugger
             this.log("Rendering error: " + (e as Error).message);
         }
+
+
 
         let elapsed: number = performance.now() - start;
         let drawArea: CanvasRenderingContext2D = <CanvasRenderingContext2D>this.UIContainer.getContext('2d');

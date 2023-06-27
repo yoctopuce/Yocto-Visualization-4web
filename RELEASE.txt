@@ -1,6 +1,3 @@
-Yocto-Visualization-4web v1.10.53008
+Yocto-Visualization-4web v1.10.55319
 
-- Fix render freeze on some zoom level
-- Fix value formatting in solid gauges.
-- Fix occasional "M is null" exception.
-- Fix embedded mode
+- Improve graph rendering speed for large data sets
