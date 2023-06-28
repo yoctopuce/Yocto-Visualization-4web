@@ -1958,7 +1958,7 @@ export class sensorsManager
           {
             YoctoVisualization.logForm.log("UpdateDeviceList failed :" + err.msg);
           }
-        } catch (e) { YoctoVisualization.logForm.log("UpdateDeviceList failed :" + e.errorMsg);}
+        } catch (e) { YoctoVisualization.logForm.log("UpdateDeviceList failed :" +(e as Error).message);}
     }
 
     private static async _runAsync(): Promise<void>

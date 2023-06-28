@@ -974,27 +974,27 @@ export abstract class GenericProperties
                 path.push(propname);
                 if ((target instanceof YoctoVisualization.YWidget) && (propType == "Form"))
                 {
-                    this.ApplyProperties(this, target, fullpropname, Reflect.get(this, fullpropname), path, direction);
+                    this.ApplyProperties(this, target, fullpropname, <object>Reflect.get(this, fullpropname), path, direction);
                 }
 
                 if ((target instanceof YDataRendering.YAngularGauge) && (propType == "AngularGauge"))
                 {
-                    this.ApplyProperties(this, target, fullpropname, Reflect.get(this, fullpropname), path, direction);
+                    this.ApplyProperties(this, target, fullpropname, <object>Reflect.get(this, fullpropname), path, direction);
                 }
 
                 if ((target instanceof YDataRendering.YDigitalDisplay) && (propType == "display"))
                 {
-                    this.ApplyProperties(this, target, fullpropname, Reflect.get(this, fullpropname), path, direction);
+                    this.ApplyProperties(this, target, fullpropname, <object>Reflect.get(this, fullpropname), path, direction);
                 }
 
                 if ((target instanceof YDataRendering.YSolidGauge) && (propType == "SolidGauge"))
                 {
-                    this.ApplyProperties(this, target, fullpropname, Reflect.get(this, fullpropname), path, direction);
+                    this.ApplyProperties(this, target, fullpropname, <object>Reflect.get(this, fullpropname), path, direction);
                 }
 
                 if ((target instanceof YDataRendering.YGraph) && (propType == "Graph"))
                 {
-                    this.ApplyProperties(this, target, fullpropname, Reflect.get(this, fullpropname), path, direction);
+                    this.ApplyProperties(this, target, fullpropname, <object>Reflect.get(this, fullpropname), path, direction);
                 }
 
             }

@@ -2069,7 +2069,7 @@ export class YV4W_installer
         })
         status.innerText = 'done';
 
-        if (success != YoctoAPI.YAPI_SUCCESS) throw "Upload failed (Error" + success.toString() + ")";
+        if (success != YoctoAPI.YAPI_SUCCESS) throw "Upload failed (Error" + success.toString() + ").";
 
     }
 
@@ -2096,7 +2096,7 @@ export class YV4W_installer
                     status.innerText = Math.round(100 * curr / total).toString() + "%"
                 })
                 status.innerText = 'done';
-                if (success != YoctoAPI.YAPI_SUCCESS) throw "Upload failed (Error" + success.toString() + ")";
+                if (success != YoctoAPI.YAPI_SUCCESS) throw "Upload failed! (Error" + success.toString() + ")";
                 status = log('Deleting ' + this._webPageinstances[i].fs_filename);
                 await (<YoctoAPI.YFiles>this._currentfs).remove(this._webPageinstances[i].fs_filename);
                 status.innerText = "done."
@@ -2115,7 +2115,7 @@ export class YV4W_installer
                     status.innerText = Math.round(100 * curr / total).toString() + "%"
                 })
                 status.innerText = 'done';
-                if (success != YoctoAPI.YAPI_SUCCESS) throw "Upload failed (Error" + success.toString() + ")";
+                if (success != YoctoAPI.YAPI_SUCCESS) throw "Upload failed!! (Error" + success.toString() + ")";
                 status = log('Deleting ' + this._webPageinstances[i].http_filename);
                 await (<YoctoAPI.YFiles>this._currentfs).remove(this._webPageinstances[i].http_filename);
 
@@ -2255,7 +2255,7 @@ export class YV4W_installer
         {
             status.innerText = Math.round(100 * curr / total).toString() + "%"
         })
-        if (success != YoctoAPI.YAPI_SUCCESS) throw "Upload failed (Error" + success.toString() + ")";
+        if (success != YoctoAPI.YAPI_SUCCESS) throw "Upload failed. (Error" + success.toString() + ").";
         status.innerText = 'done.';
     }
 

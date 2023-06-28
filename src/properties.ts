@@ -97,7 +97,7 @@ export class yAxisDescription
             switch (i)
             {
             case 0:
-                this._AllowedValues.push("1srt Y axis");
+                this._AllowedValues.push("1rst Y axis");
                 break;
             case 1:
                 this._AllowedValues.push("2nd Y axis");
