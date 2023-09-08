@@ -1,6 +1,6 @@
 /*********************************************************************
  *
- * $Id: yocto_api.ts 55359 2023-06-28 09:25:04Z seb $
+ * $Id: yocto_api.ts 56393 2023-09-05 08:36:51Z seb $
  *
  * High-level programming interface, common to all modules
  *
@@ -55,6 +55,9 @@ export const YAPI_UNAUTHORIZED              : number = -12;     // unauthorized 
 export const YAPI_RTC_NOT_READY             : number = -13;     // real-time clock has not been initialized (or time was lost)
 export const YAPI_FILE_NOT_FOUND            : number = -14;     // the file is not found
 export const YAPI_SSL_ERROR                 : number = -15;     // Error reported by mbedSSL
+export const YAPI_RFID_SOFT_ERROR           : number = -16;     // Recoverable error with RFID tag (eg. tag out of reach), check YRfidStatus for details
+export const YAPI_RFID_HARD_ERROR           : number = -17;     // Serious RFID error (eg. write-protected, out-of-boundary), check YRfidStatus for details
+export const YAPI_BUFFER_TOO_SMALL          : number = -18;     // The buffer provided is too small
 export const YAPI_INVALID_INT               : number = 0x7fffffff;
 export const YAPI_INVALID_UINT              : number = -1;
 export const YAPI_INVALID_LONG              : number = 0x7fffffffffffffff;
@@ -5051,12 +5054,13 @@ export class YModule extends YFunction
     }
 
     /**
-     * Retrieves the type of the <i>n</i>th function on the module.
+     * Retrieves the type of the <i>n</i>th function on the module. Yoctopuce functions type names match
+     * their class names without the <i>Y</i> prefix, for instance <i>Relay</i>, <i>Temperature</i> etc..
      *
      * @param functionIndex : the index of the function for which the information is desired, starting at
      * 0 for the first function.
      *
-     * @return a string corresponding to the type of the function
+     * @return a string corresponding to the type of the function.
      *
      * On failure, throws an exception or returns an empty string.
      */
@@ -5940,7 +5944,7 @@ export class YModule extends YFunction
         let release: number;
         let tmp_res: string;
         if (onlynew) {
-            release = this._yapi.imm_atoi(await this.get_firmwareRelease());
+            release = YAPIContext.imm_atoi(await this.get_firmwareRelease());
         } else {
             release = 0;
         }
@@ -6023,7 +6027,7 @@ export class YModule extends YFunction
         templist = await this.get_functionIds('Temperature');
         sep = '';
         for (let ii in templist) {
-            if (this._yapi.imm_atoi(await this.get_firmwareRelease()) > 9000) {
+            if (YAPIContext.imm_atoi(await this.get_firmwareRelease()) > 9000) {
                 url = 'api/' + templist[ii] + '/sensorType';
                 t_type = this._yapi.imm_bin2str(await this._download(url));
                 if (t_type == 'RES_NTC' || t_type == 'RES_LINEAR') {
@@ -6264,7 +6268,7 @@ export class YModule extends YFunction
             if (sensorType == '') {
                 return 16;
             }
-            if (this._yapi.imm_atoi(sensorType) < 8) {
+            if (YAPIContext.imm_atoi(sensorType) < 8) {
                 return 16;
             } else {
                 return 100;
@@ -6323,7 +6327,7 @@ export class YModule extends YFunction
                 }
             } else {
                 if (funVer == 1) {
-                    if (currentFuncValue == '' || (this._yapi.imm_atoi(currentFuncValue) > 10)) {
+                    if (currentFuncValue == '' || (YAPIContext.imm_atoi(currentFuncValue) > 10)) {
                         funScale = 0;
                     }
                 }
@@ -6358,7 +6362,7 @@ export class YModule extends YFunction
                 if (paramVer == 1) {
                     words_str = (param).split(',');
                     for (let ii in words_str) {
-                        words.push(this._yapi.imm_atoi(words_str[ii]));
+                        words.push(YAPIContext.imm_atoi(words_str[ii]));
                     }
                     if (param == '' || (words[0] > 10)) {
                         paramScale = 0;
@@ -11916,6 +11920,9 @@ export class YAPIContext
     public readonly RTC_NOT_READY: number = -13;
     public readonly FILE_NOT_FOUND: number = -14;
     public readonly SSL_ERROR: number = -15;
+    public readonly RFID_SOFT_ERROR: number = -16;
+    public readonly RFID_HARD_ERROR: number = -17;
+    public readonly BUFFER_TOO_SMALL: number = -18;
     defaultCacheValidity: number = 5;
 
     // API symbols as static members
@@ -11935,6 +11942,9 @@ export class YAPIContext
     public static readonly RTC_NOT_READY: number = -13;
     public static readonly FILE_NOT_FOUND: number = -14;
     public static readonly SSL_ERROR: number = -15;
+    public static readonly RFID_SOFT_ERROR: number = -16;
+    public static readonly RFID_HARD_ERROR: number = -17;
+    public static readonly BUFFER_TOO_SMALL: number = -18;
     //--- (end of generated code: YAPIContext attributes declaration)
 
     // API symbols
@@ -12871,7 +12881,7 @@ export class YAPIContext
      * @param str_data {string}
      * @return {number}
      */
-    imm_atoi(str_data: string): number
+    static imm_atoi(str_data: string): number
     {
         let num = parseInt(str_data);
         if (isNaN(num)) {
@@ -13736,7 +13746,7 @@ export class YAPIContext
 
     imm_GetAPIVersion(): string
     {
-        return /* version number patched automatically */'1.10.55367';
+        return /* version number patched automatically */'1.10.56436';
     }
 
     /**

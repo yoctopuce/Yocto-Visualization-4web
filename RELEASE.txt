@@ -1,4 +1,3 @@
-Yocto-Visualization-4web v1.10.55367
+Yocto-Visualization-4web v1.10.56436
 
-- Improve graph rendering speed for very large datasets
-- Fix new compilation warnings
+- Add custom arrival / removal callbacks

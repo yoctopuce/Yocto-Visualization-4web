@@ -1634,7 +1634,12 @@ export class sensorsManager
     private static KnownSensors: YoctoVisualization.YXmlNode | null = null;  // sensors list picked up from XML configuration file
     private static _hubList: YoctoVisualization.Hub[] = [];
 
-    private static _changeCallback: SensorManagerChangeCallback | null = null;
+    private static _customArrivalCallback : YoctoAPI.YDeviceUpdateCallback | null   = null;
+    private static _customRemovalCallback : YoctoAPI.YDeviceUpdateCallback | null   = null;
+
+
+
+  private static _changeCallback: SensorManagerChangeCallback | null = null;
     private static _changeExternalCallback: YoctoVisualization.ConfigChangeHandler | null = null;
 
     public static async clearHublist()
@@ -1896,11 +1901,14 @@ export class sensorsManager
             Instead, we use setTimeout: */
             setTimeout(() => { sensorsManager.deviceConfigChanged(m); }, 100);
             if (sensorsManager._changeCallback != null) sensorsManager._changeCallback();
+
+
         }
         catch (e)
         {
             YoctoVisualization.logForm.log("Device Arrival Error: " + (e as Error).message);
         }
+        if (sensorsManager._customArrivalCallback!=null)  sensorsManager._customArrivalCallback(m);
     }
 
     public static async deviceRemoval(m: YoctoAPI.YModule): Promise<void>
@@ -1926,8 +1934,16 @@ export class sensorsManager
         })
 
         if (sensorsManager._changeCallback != null) sensorsManager._changeCallback();
-
+        if (sensorsManager._customRemovalCallback!=null)  sensorsManager._customRemovalCallback(m);
     }
+
+    public static RegisterDeviceArrivalCallback(arrivalCallback: YoctoAPI.YDeviceUpdateCallback | null)
+      {  sensorsManager._customArrivalCallback = arrivalCallback;
+      }
+
+    public static RegisterDeviceRemovalCallback(removalCallback: YoctoAPI.YDeviceUpdateCallback | null)
+      { sensorsManager._customRemovalCallback = removalCallback;
+      }
 
     public static AddNewSensor(hwdID: string): CustomYSensor
     {
@@ -1969,6 +1985,9 @@ export class sensorsManager
         await sensorsManager.UpdateDeviceList();
         setInterval(() => { sensorsManager.UpdateDeviceList()}, 2000)
     }
+
+
+
 
     public static run()
 

@@ -198,6 +198,19 @@ export class YWebPage
         }
     }
 
+
+    private static RegisterDeviceArrivalCallback(arrivalCallback: YoctoAPI.YDeviceUpdateCallback | null)
+      {  YoctoVisualization.sensorsManager.RegisterDeviceArrivalCallback(arrivalCallback);
+
+      }
+
+    private static RegisterDeviceRemovalCallback(removalCallback: YoctoAPI.YDeviceUpdateCallback | null)
+      {  YoctoVisualization.sensorsManager.RegisterDeviceRemovalCallback(removalCallback);
+
+      }
+
+
+
 //#ifndef READONLY
     private static WidgetsSubMenuIsOpening(mouseX: number, mouseY: number)
     {

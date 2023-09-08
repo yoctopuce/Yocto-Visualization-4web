@@ -1,4 +1,4 @@
-/* Yocto-Visualization-4web (ES2017 read-only 1.10.55367) - www.yoctopuce.com */
+/* Yocto-Visualization-4web (ES2017 read-only 1.10.56436) - www.yoctopuce.com */
 // obj/rdonly/Renderer/YDataRendererCommon.js
 var Vector3 = class {
   constructor(a, b, c) {
@@ -8503,6 +8503,9 @@ var YAPI_UNAUTHORIZED = -12;
 var YAPI_RTC_NOT_READY = -13;
 var YAPI_FILE_NOT_FOUND = -14;
 var YAPI_SSL_ERROR = -15;
+var YAPI_RFID_SOFT_ERROR = -16;
+var YAPI_RFID_HARD_ERROR = -17;
+var YAPI_BUFFER_TOO_SMALL = -18;
 var YAPI_INVALID_INT = 2147483647;
 var YAPI_INVALID_UINT = -1;
 var YAPI_INVALID_LONG = 9223372036854776e3;
@@ -11767,7 +11770,7 @@ var YModule = class extends YFunction {
     let release;
     let tmp_res;
     if (onlynew) {
-      release = this._yapi.imm_atoi(await this.get_firmwareRelease());
+      release = YAPIContext.imm_atoi(await this.get_firmwareRelease());
     } else {
       release = 0;
     }
@@ -11816,7 +11819,7 @@ var YModule = class extends YFunction {
     templist = await this.get_functionIds("Temperature");
     sep = "";
     for (let ii in templist) {
-      if (this._yapi.imm_atoi(await this.get_firmwareRelease()) > 9e3) {
+      if (YAPIContext.imm_atoi(await this.get_firmwareRelease()) > 9e3) {
         url = "api/" + templist[ii] + "/sensorType";
         t_type = this._yapi.imm_bin2str(await this._download(url));
         if (t_type == "RES_NTC" || t_type == "RES_LINEAR") {
@@ -12008,7 +12011,7 @@ var YModule = class extends YFunction {
       if (sensorType == "") {
         return 16;
       }
-      if (this._yapi.imm_atoi(sensorType) < 8) {
+      if (YAPIContext.imm_atoi(sensorType) < 8) {
         return 16;
       } else {
         return 100;
@@ -12060,7 +12063,7 @@ var YModule = class extends YFunction {
         }
       } else {
         if (funVer == 1) {
-          if (currentFuncValue == "" || this._yapi.imm_atoi(currentFuncValue) > 10) {
+          if (currentFuncValue == "" || YAPIContext.imm_atoi(currentFuncValue) > 10) {
             funScale = 0;
           }
         }
@@ -12093,7 +12096,7 @@ var YModule = class extends YFunction {
         if (paramVer == 1) {
           words_str = param.split(",");
           for (let ii in words_str) {
-            words.push(this._yapi.imm_atoi(words_str[ii]));
+            words.push(YAPIContext.imm_atoi(words_str[ii]));
           }
           if (param == "" || words[0] > 10) {
             paramScale = 0;
@@ -15630,6 +15633,9 @@ var YAPIContext = class {
     this.RTC_NOT_READY = -13;
     this.FILE_NOT_FOUND = -14;
     this.SSL_ERROR = -15;
+    this.RFID_SOFT_ERROR = -16;
+    this.RFID_HARD_ERROR = -17;
+    this.BUFFER_TOO_SMALL = -18;
     this.defaultCacheValidity = 5;
     this.INVALID_INT = YAPI_INVALID_INT;
     this.INVALID_UINT = YAPI_INVALID_UINT;
@@ -16413,7 +16419,7 @@ var YAPIContext = class {
     }
     return idata;
   }
-  imm_atoi(str_data) {
+  static imm_atoi(str_data) {
     let num = parseInt(str_data);
     if (isNaN(num)) {
       return 0;
@@ -16976,7 +16982,7 @@ var YAPIContext = class {
     return this.imm_GetAPIVersion();
   }
   imm_GetAPIVersion() {
-    return "1.10.55367";
+    return "1.10.56436";
   }
   async InitAPI(mode, errmsg) {
     this._detectType = mode;
@@ -17667,6 +17673,9 @@ YAPIContext.UNAUTHORIZED = -12;
 YAPIContext.RTC_NOT_READY = -13;
 YAPIContext.FILE_NOT_FOUND = -14;
 YAPIContext.SSL_ERROR = -15;
+YAPIContext.RFID_SOFT_ERROR = -16;
+YAPIContext.RFID_HARD_ERROR = -17;
+YAPIContext.BUFFER_TOO_SMALL = -18;
 var YAPI = new YAPIContext();
 
 // obj/rdonly/Api/yocto_api_html.js
@@ -18474,7 +18483,7 @@ YNetwork.POECURRENT_INVALID = YAPI.INVALID_UINT;
 // obj/rdonly/constants.js
 var constants = class {
   static get buildVersion() {
-    return "1.10.55367";
+    return "1.10.56436";
   }
   static get deviceScreenWidth() {
     return screen.width * window.devicePixelRatio;
@@ -20288,6 +20297,8 @@ var sensorsManager = class {
     } catch (e) {
       logForm.log("Device Arrival Error: " + e.message);
     }
+    if (sensorsManager._customArrivalCallback != null)
+      sensorsManager._customArrivalCallback(m);
   }
   static async deviceRemoval(m) {
     let serial = await m.get_serialNumber();
@@ -20304,6 +20315,14 @@ var sensorsManager = class {
     });
     if (sensorsManager._changeCallback != null)
       sensorsManager._changeCallback();
+    if (sensorsManager._customRemovalCallback != null)
+      sensorsManager._customRemovalCallback(m);
+  }
+  static RegisterDeviceArrivalCallback(arrivalCallback) {
+    sensorsManager._customArrivalCallback = arrivalCallback;
+  }
+  static RegisterDeviceRemovalCallback(removalCallback) {
+    sensorsManager._customRemovalCallback = removalCallback;
   }
   static AddNewSensor(hwdID) {
     for (let i = 0; i < sensorsManager.sensorList.length; i++) {
@@ -20353,6 +20372,8 @@ var sensorsManager = class {
 sensorsManager.counter = 0;
 sensorsManager.KnownSensors = null;
 sensorsManager._hubList = [];
+sensorsManager._customArrivalCallback = null;
+sensorsManager._customRemovalCallback = null;
 sensorsManager._changeCallback = null;
 sensorsManager._changeExternalCallback = null;
 
@@ -27810,6 +27831,12 @@ var YWebPage = class {
       });
     }
   }
+  static RegisterDeviceArrivalCallback(arrivalCallback) {
+    sensorsManager.RegisterDeviceArrivalCallback(arrivalCallback);
+  }
+  static RegisterDeviceRemovalCallback(removalCallback) {
+    sensorsManager.RegisterDeviceRemovalCallback(removalCallback);
+  }
   static showLogsWindow() {
     logForm.show();
   }
@@ -28268,6 +28295,7 @@ export {
   XaxisDescription,
   YAPI,
   YAPIContext,
+  YAPI_BUFFER_TOO_SMALL,
   YAPI_DEVICE_BUSY,
   YAPI_DEVICE_NOT_FOUND,
   YAPI_DOUBLE_ACCES,
@@ -28285,6 +28313,8 @@ export {
   YAPI_NOT_INITIALIZED,
   YAPI_NOT_SUPPORTED,
   YAPI_NO_MORE_DATA,
+  YAPI_RFID_HARD_ERROR,
+  YAPI_RFID_SOFT_ERROR,
   YAPI_RTC_NOT_READY,
   YAPI_SSL_ERROR,
   YAPI_SUCCESS,

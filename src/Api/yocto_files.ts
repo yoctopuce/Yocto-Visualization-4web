@@ -1,6 +1,6 @@
 /*********************************************************************
  *
- *  $Id: yocto_files.ts 55359 2023-06-28 09:25:04Z seb $
+ *  $Id: yocto_files.ts 56027 2023-08-14 09:32:59Z mvuilleu $
  *
  *  Implements the high-level API for FileRecord functions
  *
@@ -108,9 +108,10 @@ export namespace YFileRecord {
     //--- (end of generated code: YFileRecord definitions)
 }
 
+//--- (generated code: YFiles class start)
 /**
  * YFiles Class: filesystem control interface, available for instance in the Yocto-Color-V2, the
- * Yocto-Serial, the YoctoHub-Ethernet or the YoctoHub-Wireless-n
+ * Yocto-SPI, the YoctoHub-Ethernet or the YoctoHub-GSM-4G
  *
  * The YFiles class is used to access the filesystem embedded on
  * some Yoctopuce devices. This filesystem makes it
