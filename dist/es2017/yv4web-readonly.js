@@ -1,4 +1,4 @@
-/* Yocto-Visualization-4web (ES2017 read-only 1.10.56436) - www.yoctopuce.com */
+/* Yocto-Visualization-4web (ES2017 read-only 1.10.57314) - www.yoctopuce.com */
 // obj/rdonly/Renderer/YDataRendererCommon.js
 var Vector3 = class {
   constructor(a, b, c) {
@@ -16982,7 +16982,7 @@ var YAPIContext = class {
     return this.imm_GetAPIVersion();
   }
   imm_GetAPIVersion() {
-    return "1.10.56436";
+    return "1.10.57314";
   }
   async InitAPI(mode, errmsg) {
     this._detectType = mode;
@@ -18483,7 +18483,7 @@ YNetwork.POECURRENT_INVALID = YAPI.INVALID_UINT;
 // obj/rdonly/constants.js
 var constants = class {
   static get buildVersion() {
-    return "1.10.56436";
+    return "1.10.57314";
   }
   static get deviceScreenWidth() {
     return screen.width * window.devicePixelRatio;
