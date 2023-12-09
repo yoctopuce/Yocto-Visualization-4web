@@ -1,3 +1,4 @@
-Yocto-Visualization-4web v1.10.57386
+Yocto-Visualization-4web v1.10.58391
 
-- Fix for MqttBridge support
+- Add missing log notifications for log on virtualhub itself
+- Remove broken link to apple icon

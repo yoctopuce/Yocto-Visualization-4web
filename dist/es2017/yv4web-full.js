@@ -1,4 +1,4 @@
-/* Yocto-Visualization-4web (ES2017 full 1.10.57386) - www.yoctopuce.com */
+/* Yocto-Visualization-4web (ES2017 full 1.10.58391) - www.yoctopuce.com */
 // obj/full/Renderer/YDataRendererCommon.js
 var Vector3 = class {
   constructor(a, b, c) {
@@ -10017,6 +10017,8 @@ var YDevice = class {
     this._logCallback = callback;
     if (callback != null) {
       this.imm_triggerLogPull();
+    } else {
+      this._logpos = 0;
     }
   }
   imm_setTimeRef(float_timestamp, float_duration) {
@@ -10531,27 +10533,31 @@ var YFirmwareUpdate = class {
       this.imm_progress(-1, e.message);
       return this._yapi._throw(YAPI_IO_ERROR, e.message, YAPI_IO_ERROR);
     }
-    this.imm_progress(80, "Wait for the device to restart");
-    let timeout = this._yapi.GetTickCount() + 6e4;
-    await module.clearCache();
-    while (!await module.isOnline() && timeout > this._yapi.GetTickCount()) {
-      await this._yapi.Sleep(500);
-      await this._yapi.UpdateDeviceList();
-    }
-    if (await module.isOnline()) {
-      if (this._settings != null) {
-        this.imm_progress(95, "Restoring device settings");
-        await module.set_allSettingsAndFiles(this._settings);
-        await module.saveToFlash();
-      }
-      let real_fw = await module.get_firmwareRelease();
-      if (real_fw == firmware.imm_getFirmwareRelease()) {
-        this.imm_progress(100, "Success");
-      } else {
-        this.imm_progress(-1, "Unable to update firmware");
-      }
+    if (module._cache.parentHub) {
+      this.imm_progress(100, "Firmware update scheduled successfully");
     } else {
-      this.imm_progress(-1, "Device did not reboot correctly");
+      this.imm_progress(80, "Wait for the device to restart");
+      let timeout = this._yapi.GetTickCount() + 6e4;
+      await module.clearCache();
+      while (!await module.isOnline() && timeout > this._yapi.GetTickCount()) {
+        await this._yapi.Sleep(500);
+        await this._yapi.UpdateDeviceList();
+      }
+      if (await module.isOnline()) {
+        if (this._settings != null) {
+          this.imm_progress(95, "Restoring device settings");
+          await module.set_allSettingsAndFiles(this._settings);
+          await module.saveToFlash();
+        }
+        let real_fw = await module.get_firmwareRelease();
+        if (real_fw == firmware.imm_getFirmwareRelease()) {
+          this.imm_progress(100, "Success");
+        } else {
+          this.imm_progress(-1, "Unable to update firmware");
+        }
+      } else {
+        this.imm_progress(-1, "Device did not reboot correctly");
+      }
     }
     return YAPI_SUCCESS;
   }
@@ -16982,7 +16988,7 @@ var YAPIContext = class {
     return this.imm_GetAPIVersion();
   }
   imm_GetAPIVersion() {
-    return "1.10.57386";
+    return "1.10.58391";
   }
   async InitAPI(mode, errmsg) {
     this._detectType = mode;
@@ -18672,7 +18678,7 @@ YFiles.FREESPACE_INVALID = YAPI.INVALID_UINT;
 // obj/full/constants.js
 var constants = class {
   static get buildVersion() {
-    return "1.10.57386";
+    return "1.10.58391";
   }
   static get deviceScreenWidth() {
     return screen.width * window.devicePixelRatio;
