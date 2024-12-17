@@ -282,8 +282,8 @@ export class YV4W_installer
                   this.DEFAULTADDR = options["addr"];
                   let n : number = this.DEFAULTADDR.indexOf(":");
                   if (n>0)
-                    {  this.DEFAULTPORT.substring(n+1);
-                       this.DEFAULTADDR.substring(0,n);
+                    {  this.DEFAULTPORT = this.DEFAULTADDR.substring(n+1);
+                       this.DEFAULTADDR = this.DEFAULTADDR.substring(0,n);
                     }
               }
 

@@ -43,7 +43,7 @@ npm run build
 	
 ## How to test it ?
 After compilation You are supposed to  upload the contents of es2015 or
-es2017 to a web server. If you don't any web server at hand, we provided
+es2017 to a web server. If you don't have any web server at hand, we provided
 a simple one for testing purpose , just go to the top level and type:
 
 ```   

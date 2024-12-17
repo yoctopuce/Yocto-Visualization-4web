@@ -1,6 +1,6 @@
 /*********************************************************************
  *
- * $Id: yocto_api.ts 58362 2023-12-08 08:35:08Z mvuilleu $
+ * $Id: yocto_api.ts 63704 2024-12-16 10:05:02Z seb $
  *
  * High-level programming interface, common to all modules
  *
@@ -58,11 +58,18 @@ export const YAPI_SSL_ERROR                 : number = -15;     // Error reporte
 export const YAPI_RFID_SOFT_ERROR           : number = -16;     // Recoverable error with RFID tag (eg. tag out of reach), check YRfidStatus for details
 export const YAPI_RFID_HARD_ERROR           : number = -17;     // Serious RFID error (eg. write-protected, out-of-boundary), check YRfidStatus for details
 export const YAPI_BUFFER_TOO_SMALL          : number = -18;     // The buffer provided is too small
+export const YAPI_DNS_ERROR                 : number = -19;     // Error during name resolutions (invalid hostname or dns communication error)
+export const YAPI_SSL_UNK_CERT              : number = -20;     // The certificate is not correctly signed by the trusted CA
 export const YAPI_INVALID_INT               : number = 0x7fffffff;
 export const YAPI_INVALID_UINT              : number = -1;
 export const YAPI_INVALID_LONG              : number = 0x7fffffffffffffff;
 export const YAPI_INVALID_DOUBLE            : number = -Number.MAX_VALUE;
 export const YAPI_INVALID_STRING            : string = '!INVALID!';
+    // TLS / SSL definitions
+export const YAPI_NO_TRUSTED_CA_CHECK       : number = 1;       // Disables certificate checking
+export const YAPI_NO_EXPIRATION_CHECK       : number = 2;       // Disables certificate expiration date checking
+export const YAPI_NO_HOSTNAME_CHECK         : number = 4;       // Disable hostname checking
+export const YAPI_LEGACY                    : number = 8;       // Allow non secure connection (similar to v1.10)
 //--- (end of generated code: YFunction return codes)
 export const YAPI_MIN_DOUBLE: number = -Number.MAX_VALUE;
 export const YAPI_MAX_DOUBLE: number = Number.MAX_VALUE;
@@ -162,23 +169,236 @@ export interface YProgressCallback {(progress: number, msg: string): void}
 
 export interface yCalibrationHandler {(rawValue: number, calibType: number, parameters: number[], rawValues: number[], refValues: number[]): number}
 
-export interface YHubDiscoveryCallback {(serial: string, urlToRegister: string | null, urlToUnregister: string | null): void}
+export interface YHubDiscoveryCallback {(serial: string, urlToRegister: string | null): void}
 
 export interface YDeviceUpdateCallback {(module: YModule): void}
 
 export interface YUnhandledPromiseRejectionCallback {(reason: object, promise: PromiseLike<any>): void}
 
-export interface _YY_UrlInfo
-{
+export type PortInfo = {
     proto: string;
-    user: string;
-    pass: string;
-    host: string;
-    port: string;
-    domain: string;  // this is the subdirectory, not the DNS domain!
-    authUrl: string; // full URL, including authentication information
-    rootUrl: string; // full URL, but without authentication information
-    orgUrl: string;  // the original URL that create this object
+    port: number;
+}
+
+export class _YY_UrlInfo
+{
+    private proto: string;
+    private user: string;
+    private pass: string;
+    private host: string;
+    private port: number;
+    private domain: string;  // this is the subdirectory, not the DNS domain!
+    private orgUrl: string;  // the original URL that create this object
+
+    constructor(str_url: string)
+    {
+        this.orgUrl = str_url
+        let proto: string = 'auto';
+        let user: string = '';
+        let pass: string = '';
+        let port: number = 4444;
+        let host: string;
+        let dom: string = '';
+
+        if (str_url.slice(0, 7) == 'http://') {
+            proto = 'http';
+            str_url = str_url.slice(7);
+        } else if (str_url.slice(0, 5) == 'ws://') {
+            proto = 'ws';
+            str_url = str_url.slice(5);
+        } else if (str_url.slice(0, 8) == 'https://') {
+            proto = 'https';
+            port = 4443;
+            str_url = str_url.slice(8);
+        } else if (str_url.slice(0, 6) == 'wss://') {
+            proto = 'wss';
+            port = 4443;
+            str_url = str_url.slice(6);
+        } else if (str_url.slice(0, 7) == 'auto://') {
+            str_url = str_url.slice(7);
+        } else if (str_url.slice(0, 9) == 'secure://') {
+            str_url = str_url.slice(9);
+            port = 4443;
+            proto = 'secure';
+        }
+        str_url = str_url.replace('/not.byn', '');
+        if (str_url[str_url.length - 1] == '/') {
+            str_url = str_url.slice(0, str_url.length - 1);
+        }
+        let pos = str_url.indexOf('/');
+        if (pos > 0) {
+            dom = str_url.slice(pos);
+            str_url = str_url.slice(0, pos);
+        }
+        let authpos = str_url.indexOf('@');
+        if (authpos >= 0) {
+            let auth = str_url.slice(0, authpos);
+            let passpos = auth.indexOf(':');
+            if (passpos >= 0) {
+                user = auth.slice(0, passpos);
+                pass = auth.slice(passpos + 1);
+            } else {
+                user = auth;
+            }
+            str_url = str_url.slice(authpos + 1);
+        }
+
+        let endv6: number = str_url.indexOf(']');
+        pos = str_url.indexOf(':');
+        if (pos > 0 && endv6 > 0 && pos < endv6) {
+            // ipv6 URL
+            pos = str_url.indexOf(':', endv6);
+        }
+
+        if (pos < 0) {
+            host = str_url;
+            if (dom != '') {
+                if (proto == 'http') {
+                    port = 80;
+                } else if (proto == 'https') {
+                    port = 443;
+                }
+            }
+        } else {
+            host = str_url.slice(0, pos);
+            port = YAPIContext.imm_atoi(str_url.slice(pos + 1));
+        }
+        if (host == 'callback') {
+            port = 4444;
+        }
+        this.proto = proto;
+        this.user = user;
+        this.pass = pass;
+        this.host = host;
+        this.port = port;
+        this.domain = dom;
+    }
+
+    imm_getHost(): string
+    {
+        return this.host;
+    }
+
+    imm_getPass(): string
+    {
+        return this.pass;
+    }
+
+    imm_getPort(): number
+    {
+        return this.port;
+    }
+
+    imm_getUser(): string
+    {
+        return this.user;
+    }
+
+    imm_getUrl(withProto: boolean = false, withUserPass: boolean = true, withEndSlash: boolean = false): string
+    {
+        if (this.proto == "usb") {
+            return "usb";
+        }
+        let url: string = "";
+        if (withProto) {
+            url += this.proto + "://";
+        }
+        if (withUserPass && this.user != "") {
+            url += this.user;
+            if (this.pass != "") {
+                url += ":";
+                url += this.pass;
+            }
+            url += "@";
+        }
+        url += this.host;
+        url += ":";
+        url += this.port;
+        url += this.domain;
+        if (withEndSlash && url[url.length - 1] != '/') {
+            url += '/';
+        }
+        return url;
+    }
+
+    imm_getRootUrl(): string
+    {
+        return this.imm_getUrl(true, false, true);
+    }
+
+    imm_getProto(): string
+    {
+        return this.proto;
+    }
+
+    imm_useWebSocket(): boolean
+    {
+        return this.proto.startsWith("ws") || this.proto == "auto" || this.proto == "secure";
+    }
+
+    /**
+     * @return subdomain (starting with a /)
+     */
+    imm_getSubDomain(): string
+    {
+        let dom: string = this.domain;
+        return dom;
+    }
+
+    imm_hasAuthParam(): boolean
+    {
+        return this.user != "";
+    }
+
+    imm_useSecureSocket(): boolean
+    {
+        return "wss" == this.proto || "https" == this.proto || "secure" == this.proto;
+    }
+
+    imm_testInfoJson(): boolean
+    {
+        return this.proto == "auto" || this.proto == "secure" || this.proto == "http" || this.proto == "https";
+    }
+
+    imm_updateBestProto(proto: string, port: number): void
+    {
+        this.port = port;
+        if (this.proto != "http" && this.proto != "https") {
+            this.proto = proto;
+        }
+    }
+
+    imm_updateForRedirect(host: string, port: number, is_secure: boolean): void
+    {
+        this.host = host;
+        this.port = port;
+        if (this.imm_useWebSocket()) {
+            this.proto = is_secure ? "wss" : "ws";
+        } else {
+            this.proto = is_secure ? "https" : "http";
+        }
+    }
+
+    imm_updatePortInfo(proto: string, port: number): void
+    {
+        this.proto = proto;
+        this.port = port;
+    }
+
+    imm_getOriginalURL(): string
+    {
+        return this.orgUrl;
+    }
+    imm_updateFrom(urlInfo: _YY_UrlInfo): void
+    {
+        this.proto = urlInfo.proto;
+        this.user = urlInfo.user;
+        this.pass = urlInfo.pass;
+        this.host = urlInfo.host;
+        this.port = urlInfo.port;
+        this.domain = urlInfo.domain;
+        this.orgUrl = urlInfo.orgUrl;
+    }
 }
 
 export interface YConditionalResult
@@ -1039,15 +1259,15 @@ export class YDataStream
         let fRef: number;
         let iCalib: number[] = [];
         // decode sequence header to extract data
-        this._runNo = encoded[0] + (((encoded[1]) << (16)));
-        this._utcStamp = encoded[2] + (((encoded[3]) << (16)));
+        this._runNo = encoded[0] + ((encoded[1] << 16));
+        this._utcStamp = encoded[2] + ((encoded[3] << 16));
         val = encoded[4];
-        this._isAvg = (((val) & (0x100)) == 0);
-        samplesPerHour = ((val) & (0xff));
-        if (((val) & (0x100)) != 0) {
+        this._isAvg = ((val & 0x100) == 0);
+        samplesPerHour = (val & 0xff);
+        if ((val & 0x100) != 0) {
             samplesPerHour = samplesPerHour * 3600;
         } else {
-            if (((val) & (0x200)) != 0) {
+            if ((val & 0x200) != 0) {
                 samplesPerHour = samplesPerHour * 60;
             }
         }
@@ -1119,9 +1339,9 @@ export class YDataStream
         }
         // decode min/avg/max values for the sequence
         if (this._nRows > 0) {
-            this._avgVal = this.imm_decodeAvg(encoded[8] + (((((encoded[9]) ^ (0x8000))) << (16))), 1);
-            this._minVal = this.imm_decodeVal(encoded[10] + (((encoded[11]) << (16))));
-            this._maxVal = this.imm_decodeVal(encoded[12] + (((encoded[13]) << (16))));
+            this._avgVal = this.imm_decodeAvg(encoded[8] + (((encoded[9] ^ 0x8000) << 16)), 1);
+            this._minVal = this.imm_decodeVal(encoded[10] + ((encoded[11] << 16)));
+            this._maxVal = this.imm_decodeVal(encoded[12] + ((encoded[13] << 16)));
         }
         return 0;
     }
@@ -1150,9 +1370,9 @@ export class YDataStream
                     dat.push(NaN);
                     dat.push(NaN);
                 } else {
-                    dat.push(this.imm_decodeVal(udat[idx + 2] + (((udat[idx + 3]) << (16)))));
-                    dat.push(this.imm_decodeAvg(udat[idx] + (((((udat[idx + 1]) ^ (0x8000))) << (16))), 1));
-                    dat.push(this.imm_decodeVal(udat[idx + 4] + (((udat[idx + 5]) << (16)))));
+                    dat.push(this.imm_decodeVal(udat[idx + 2] + (((udat[idx + 3]) << 16))));
+                    dat.push(this.imm_decodeAvg(udat[idx] + ((((udat[idx + 1]) ^ 0x8000) << 16)), 1));
+                    dat.push(this.imm_decodeVal(udat[idx + 4] + (((udat[idx + 5]) << 16))));
                 }
                 idx = idx + 6;
                 this._values.push(dat.slice());
@@ -1163,7 +1383,7 @@ export class YDataStream
                 if ((udat[idx] == 65535) && (udat[idx + 1] == 65535)) {
                     dat.push(NaN);
                 } else {
-                    dat.push(this.imm_decodeAvg(udat[idx] + (((((udat[idx + 1]) ^ (0x8000))) << (16))), 1));
+                    dat.push(this.imm_decodeAvg(udat[idx] + ((((udat[idx + 1]) ^ 0x8000) << 16)), 1));
                 }
                 this._values.push(dat.slice());
                 idx = idx + 2;
@@ -1799,9 +2019,8 @@ export class YDataSet
         let suffixes: string[] = [];
         let idx: number;
         let bulkFile: Uint8Array;
-        let streamStr: string[] = [];
         let urlIdx: number;
-        let streamBin: Uint8Array;
+        let streamBin: Uint8Array[] = [];
 
         if (progress != this._progress) {
             return this._progress;
@@ -1875,14 +2094,13 @@ export class YDataSet
                 idx = idx + 1;
             }
             bulkFile = await this._parent._download(url);
-            streamStr = this._parent.imm_json_get_array(bulkFile);
+            streamBin = this._parent.imm_json_get_array(bulkFile);
             urlIdx = 0;
             idx = this._progress;
-            while ((idx < this._streams.length) && (urlIdx < suffixes.length) && (urlIdx < streamStr.length)) {
+            while ((idx < this._streams.length) && (urlIdx < suffixes.length) && (urlIdx < streamBin.length)) {
                 stream = this._streams[idx];
                 if ((stream.imm_get_baseurl() == baseurl) && (stream.imm_get_urlsuffix() == suffixes[urlIdx])) {
-                    streamBin = this._yapi.imm_str2bin(streamStr[urlIdx]);
-                    stream.imm_parseStream(streamBin);
+                    stream.imm_parseStream(streamBin[urlIdx]);
                     urlIdx = urlIdx + 1;
                 }
                 idx = idx + 1;
@@ -2007,7 +2225,7 @@ export class YDataSet
         if (this._progress >= this._streams.length) {
             return 100;
         }
-        return (((1 + (1 + this._progress) * 98 ) / ((1 + this._streams.length))) >> 0);
+        return (((1 + (1 + this._progress) * 98) / ((1 + this._streams.length))) >> 0);
     }
 
     /**
@@ -2659,6 +2877,7 @@ class YDevice
             this.imm_triggerLogPull();
         } else {
             this._logpos = 0;
+            this._logIsPulling = false;
         }
     }
 
@@ -3054,6 +3273,17 @@ class YDevice
         await this.updateFromReq(yreq, <_YY_HubApi>yreq.obj_result);
         return YAPI_SUCCESS;
     }
+    async waitPendingQueries(): Promise<void>
+    {
+        let newPromise = this._pendingQueries;
+        if (newPromise != null) {
+            try {
+                await newPromise;
+            } catch (e) {
+                console.log(e)
+            }
+        }
+    }
 }
 
 /**
@@ -3341,7 +3571,7 @@ export class YFirmwareUpdate
         this.imm_progress(0, 'Firmware update started');
         if (typeof this._firmwarepath == 'string' && this._firmwarepath.indexOf('yoctopuce.com') >= 0) {
             this.imm_progress(1, 'Downloading firmware');
-            bytes = await this._yapi.system_env.downloadfile(this._firmwarepath);
+            bytes = await this._yapi.system_env.downloadfile(this._firmwarepath, this._yapi);
         } else {
             this.imm_progress(1, 'Loading firmware');
             bytes = await this._yapi.system_env.loadfile(this._firmwarepath);
@@ -3365,7 +3595,7 @@ export class YFirmwareUpdate
             if (byPos >= 0) {
                 baseUrl = baseUrl.slice(0, byPos + 1);
             } else if (baseUrl.slice(-1) != '/') baseUrl = baseUrl + '/';
-            let urlInfo = this._yapi.imm_parseRegisteredUrl(baseUrl);
+            let urlInfo: _YY_UrlInfo = new _YY_UrlInfo(baseUrl);
             hub = this._yapi.imm_getHub(urlInfo);
         } else {
             // test if already in bootloader
@@ -3391,7 +3621,7 @@ export class YFirmwareUpdate
             this.imm_progress(-1, (e as Error).message);
             return this._yapi._throw(YAPI_IO_ERROR, (e as Error).message, YAPI_IO_ERROR);
         }
-        if(module._cache.parentHub) {
+        if (module._cache.parentHub) {
             // this device is hosted on VirtualHub for Web
             this.imm_progress(100, 'Firmware update scheduled successfully');
         } else {
@@ -3427,35 +3657,35 @@ export class YFirmwareUpdate
          * FIXME: move recursion to yocto_api_nodejs
          ***
          if(YAPI.system_env.isNodeJS) {
-            // Node.js can recurse into directory
-            let stats = fs.statSync(file);
-            if(stats.isDirectory()) {
-                let dirPromise = new Promise<YFirmwareFile|null>((resolve, reject) => {
-                    let join = YAPI._nodeRequire('path').join;
-                    let dir = file;
-                    fs.readdir(dir, (err: string, files: string[]) => {
-                        if(err) resolve(null);
-                        let tasks = files.map((fname) => {
-                            // intentionally return a promise here!
-                            return YFirmwareUpdate.checkFirmware_r(join(dir, fname), serial_base, force)
-                        });
-                        Promise.all(tasks).then((results) => {
-                            let bestFirmware: YFirmwareFile | null = null;
-                            results.forEach((firmware) => {
-                                if (!firmware) return;
-                                if (!bestFirmware || bestFirmware.imm_getFirmwareReleaseAsInt() < firmware.imm_getFirmwareReleaseAsInt()) {
-                                    bestFirmware = firmware;
-                                }
-                            });
-                            resolve(bestFirmware);
-                        });
-                    });
-                });
-                return dirPromise;
-            } else if(!stats.isFile()) {
-                return null;
-            }
-        }
+         // Node.js can recurse into directory
+         let stats = fs.statSync(file);
+         if(stats.isDirectory()) {
+         let dirPromise = new Promise<YFirmwareFile|null>((resolve, reject) => {
+         let join = YAPI._nodeRequire('path').join;
+         let dir = file;
+         fs.readdir(dir, (err: string, files: string[]) => {
+         if(err) resolve(null);
+         let tasks = files.map((fname) => {
+         // intentionally return a promise here!
+         return YFirmwareUpdate.checkFirmware_r(join(dir, fname), serial_base, force)
+         });
+         Promise.all(tasks).then((results) => {
+         let bestFirmware: YFirmwareFile | null = null;
+         results.forEach((firmware) => {
+         if (!firmware) return;
+         if (!bestFirmware || bestFirmware.imm_getFirmwareReleaseAsInt() < firmware.imm_getFirmwareReleaseAsInt()) {
+         bestFirmware = firmware;
+         }
+         });
+         resolve(bestFirmware);
+         });
+         });
+         });
+         return dirPromise;
+         } else if(!stats.isFile()) {
+         return null;
+         }
+         }
          ***/
         // common version: load from a single file
         if (file.substr(-4).toLowerCase() != '.byn') return null;
@@ -3488,7 +3718,7 @@ export class YFirmwareUpdate
 
         if (typeof path == 'string' && path.indexOf('yoctopuce.com') >= 0) {
             try {
-                let data = await YAPI.system_env.downloadfile('http://www.yoctopuce.com/FR/common/getLastFirmwareLink.php?serial=' + serial);
+                let data = await YAPI.system_env.downloadfile('http://www.yoctopuce.com/FR/common/getLastFirmwareLink.php?serial=' + serial, YAPI);
                 let obj = JSON.parse(YAPI.imm_bin2str(data));
                 link = obj['link'];
                 best_rev = obj['version'];
@@ -3631,9 +3861,9 @@ export class YFirmwareUpdate
         let leng: number;
         err = this._yapi.imm_bin2str(this._settings);
         leng = (err).length;
-        if ((leng >= 6) && ('error:' == (err).substr(0, 6))) {
+        if ((leng >= 6) && ('error:' == err.substr(0, 6))) {
             this._progress = -1;
-            this._progress_msg = (err).substr(6, leng - 6);
+            this._progress_msg = err.substr(6, leng - 6);
         } else {
             this._progress = 0;
             this._progress_c = 0;
@@ -3811,13 +4041,13 @@ export class YFunction
     /**
      * Retrieves a function for a given identifier.
      * The identifier can be specified using several formats:
-     * <ul>
-     * <li>FunctionLogicalName</li>
-     * <li>ModuleSerialNumber.FunctionIdentifier</li>
-     * <li>ModuleSerialNumber.FunctionLogicalName</li>
-     * <li>ModuleLogicalName.FunctionIdentifier</li>
-     * <li>ModuleLogicalName.FunctionLogicalName</li>
-     * </ul>
+     *
+     * - FunctionLogicalName
+     * - ModuleSerialNumber.FunctionIdentifier
+     * - ModuleSerialNumber.FunctionLogicalName
+     * - ModuleLogicalName.FunctionIdentifier
+     * - ModuleLogicalName.FunctionLogicalName
+     *
      *
      * This function does not require that the function is online at the time
      * it is invoked. The returned object is nevertheless valid.
@@ -3842,7 +4072,7 @@ export class YFunction
         obj = <YFunction> YFunction._FindFromCache('Function', func);
         if (obj == null) {
             obj = new YFunction(YAPI, func);
-            YFunction._AddToCache('Function',  func, obj);
+            YFunction._AddToCache('Function', func, obj);
         }
         return obj;
     }
@@ -3850,13 +4080,13 @@ export class YFunction
     /**
      * Retrieves a function for a given identifier in a YAPI context.
      * The identifier can be specified using several formats:
-     * <ul>
-     * <li>FunctionLogicalName</li>
-     * <li>ModuleSerialNumber.FunctionIdentifier</li>
-     * <li>ModuleSerialNumber.FunctionLogicalName</li>
-     * <li>ModuleLogicalName.FunctionIdentifier</li>
-     * <li>ModuleLogicalName.FunctionLogicalName</li>
-     * </ul>
+     *
+     * - FunctionLogicalName
+     * - ModuleSerialNumber.FunctionIdentifier
+     * - ModuleSerialNumber.FunctionLogicalName
+     * - ModuleLogicalName.FunctionIdentifier
+     * - ModuleLogicalName.FunctionLogicalName
+     *
      *
      * This function does not require that the function is online at the time
      * it is invoked. The returned object is nevertheless valid.
@@ -3875,10 +4105,10 @@ export class YFunction
     static FindFunctionInContext(yctx: YAPIContext, func: string): YFunction
     {
         let obj: YFunction | null;
-        obj = <YFunction> YFunction._FindFromCacheInContext(yctx,  'Function', func);
+        obj = <YFunction> YFunction._FindFromCacheInContext(yctx, 'Function', func);
         if (obj == null) {
             obj = new YFunction(yctx, func);
-            YFunction._AddToCache('Function',  func, obj);
+            YFunction._AddToCache('Function', func, obj);
         }
         return obj;
     }
@@ -4259,65 +4489,65 @@ export class YFunction
      // Helper for initializing standard attributes (used in particular by built-in classes)
      async _i(): Promise<void>
      {
-        let arr_attrNames: string[] = this.constructor._attrList;
-        this._className = this.constructor.name.slice(1);
-        for(let i = 0; i < arr_attrNames.length; i++) {
-            this['_'+arr_attrNames[i]] = this.constructor[arr_attrNames[i].toUpperCase()+'_INVALID'];
-        }
-    }
+     let arr_attrNames: string[] = this.constructor._attrList;
+     this._className = this.constructor.name.slice(1);
+     for(let i = 0; i < arr_attrNames.length; i++) {
+     this['_'+arr_attrNames[i]] = this.constructor[arr_attrNames[i].toUpperCase()+'_INVALID'];
+     }
+     }
 
      // Helper for simple accessors (used in particular by built-in classes)
      async _g(str_attr): Promise<object>
      {
-        if (this._cacheExpiration <= this._yapi.GetTickCount()) {
-            if (await this.load(this._yapi.defaultCacheValidity) != YAPI_SUCCESS) {
-                return this.constructor[str_attr.toLocaleUpperCase()+'_INVALID'];
-            }
-        }
-        return this['_'+str_attr];
-    }
+     if (this._cacheExpiration <= this._yapi.GetTickCount()) {
+     if (await this.load(this._yapi.defaultCacheValidity) != YAPI_SUCCESS) {
+     return this.constructor[str_attr.toLocaleUpperCase()+'_INVALID'];
+     }
+     }
+     return this['_'+str_attr];
+     }
 
      // Helper for simple accessors (used in particular by built-in classes)
      async _s(str_attr, obj_val): Promise<number>
      {
-        return this._setAttr(str_attr, String(obj_val));
-    }
+     return this._setAttr(str_attr, String(obj_val));
+     }
 
      // Helper for completing and exporting the class; used by built-in classes
      static _E(arr_attrlist)
      {
-        let className = this.name.slice(1);
-        this._attrList = arr_attrlist;
-        for(let i = 0; i < arr_attrlist.length; i++) {
-            let attrname = arr_attrlist[i];
-            let getMethod = 'get_'+attrname;
-            this.prototype[getMethod] = async function(): Promise<object> { return this._g(attrname); };
-        }
-        this['Find'+className] = function(func) {
-            let str_classname = this.name.slice(1);
-            let obj: YFunction;
-            obj = YFunction._FindFromCache(str_classname, func);
-            if (obj == null) {
-                obj = new this(YAPI, func);
-                YFunction._AddToCache(str_classname, func, obj);
-            }
-            return obj;
-        };
-        this['First'+className] = function() {
-            let str_classname = this.name.slice(1);
-            let next_hwid = YAPI.imm_getFirstHardwareId(str_classname);
-            if(next_hwid == null) return null;
-            return this['Find'+className](next_hwid);
-        };
-        this.prototype['next'+className] = function() {
-            let resolve = this._yapi.imm_resolveFunction(this._className, this._func);
-            if(resolve.errorType != YAPI.SUCCESS) return null;
-            let next_hwid = this._yapi.imm_getNextHardwareId(this._className, resolve.result);
-            if(next_hwid == null) return null;
-            return this.constructor['Find'+className](next_hwid);
-        };
-        this.imm_Init();
-    }
+     let className = this.name.slice(1);
+     this._attrList = arr_attrlist;
+     for(let i = 0; i < arr_attrlist.length; i++) {
+     let attrname = arr_attrlist[i];
+     let getMethod = 'get_'+attrname;
+     this.prototype[getMethod] = async function(): Promise<object> { return this._g(attrname); };
+     }
+     this['Find'+className] = function(func) {
+     let str_classname = this.name.slice(1);
+     let obj: YFunction;
+     obj = YFunction._FindFromCache(str_classname, func);
+     if (obj == null) {
+     obj = new this(YAPI, func);
+     YFunction._AddToCache(str_classname, func, obj);
+     }
+     return obj;
+     };
+     this['First'+className] = function() {
+     let str_classname = this.name.slice(1);
+     let next_hwid = YAPI.imm_getFirstHardwareId(str_classname);
+     if(next_hwid == null) return null;
+     return this['Find'+className](next_hwid);
+     };
+     this.prototype['next'+className] = function() {
+     let resolve = this._yapi.imm_resolveFunction(this._className, this._func);
+     if(resolve.errorType != YAPI.SUCCESS) return null;
+     let next_hwid = this._yapi.imm_getNextHardwareId(this._className, resolve.result);
+     if(next_hwid == null) return null;
+     return this.constructor['Find'+className](next_hwid);
+     };
+     this.imm_Init();
+     }
 
      ********/
 
@@ -4600,48 +4830,62 @@ export class YFunction
      * @param bin_jsonbuff {Uint8Array}
      * @return {string[]}
      **/
-    imm_json_get_array(bin_jsonbuff: Uint8Array): string[]
+    imm_json_get_array(bin_jsonbuff: Uint8Array): Uint8Array[]
     {
         let loadval = JSON.parse(this._yapi.imm_bin2str(bin_jsonbuff));
-        let res = [];
+        let res:Uint8Array[] = [];
         for (let idx in loadval) {
-            res.push(JSON.stringify(loadval[idx]));
+            res.push(this._yapi.imm_str2bin(JSON.stringify(loadval[idx])));
         }
         return res;
     }
 
     /** Get an array of strings from a JSON buffer
      *
-     * @param str_json {string}
+     * @param bin_json {string}
      * @param str_path {string}
      * @return {string}
      **/
-    imm_get_json_path(str_json: string, str_path: string): string
+    imm_get_json_path(bin_json: Uint8Array, str_path: string): Uint8Array
     {
-        let json = JSON.parse(str_json);
+        let json = JSON.parse(this._yapi.imm_bin2str(bin_json));
         let paths = str_path.split('|');
         for (let i = 0; i < paths.length; i++) {
             let tmp = paths[i];
             json = json[tmp];
             if (json == undefined) {
-                return '';
+                return new Uint8Array();
             }
         }
-        return JSON.stringify(json);
+        return this._yapi.imm_str2bin(JSON.stringify(json));
     }
 
     /** Get a string from a JSON string
      *
-     * @param str_json {string}
+     * @param bin_json {string}
      * @return {string}
      **/
-    imm_decode_json_string(str_json: string): string
+    imm_decode_json_string(bin_json: Uint8Array): string
     {
-        if (str_json === "") {
+        if (bin_json.length ==0) {
             return '';
         }
-        return JSON.parse(str_json);
+        return JSON.parse(this._yapi.imm_bin2str(bin_json));
     }
+
+    /** Get a integer from a JSON string
+     *
+     * @param bin_json {string}
+     * @return {number}
+     **/
+    imm_decode_json_int(bin_json: Uint8Array): number
+    {
+        if (bin_json.length ==0) {
+            return 0;
+        }
+        return JSON.parse(this._yapi.imm_bin2str(bin_json));
+    }
+
 
     // Method used to cache DataStream objects (new DataLogger)
     //
@@ -5194,7 +5438,7 @@ export class YModule extends YFunction
         let hub: YGenericHub | null = null;
         let hubUrl: string = '';
         for (let i: number = 0; i < this._yapi._connectedHubs.length; i++) {
-            hubUrl = this._yapi._connectedHubs[i].urlInfo.rootUrl;
+            hubUrl = this._yapi._connectedHubs[i].imm_getRootUrl();
             if (baseUrl.slice(0, hubUrl.length) == hubUrl) {
                 hub = this._yapi._connectedHubs[i];
                 break;
@@ -5225,7 +5469,7 @@ export class YModule extends YFunction
         }
         let hub: YGenericHub | null = null;
         for (let i: number = 0; i < this._yapi._connectedHubs.length; i++) {
-            let hubUrl: string = this._yapi._connectedHubs[i].urlInfo.rootUrl;
+            let hubUrl: string = this._yapi._connectedHubs[i].imm_getRootUrl();
             if (baseUrl.slice(0, hubUrl.length) == hubUrl) {
                 hub = this._yapi._connectedHubs[i];
                 break;
@@ -5666,7 +5910,7 @@ export class YModule extends YFunction
         obj = <YModule> YFunction._FindFromCache('Module', cleanHwId);
         if (obj == null) {
             obj = new YModule(YAPI, cleanHwId);
-            YFunction._AddToCache('Module',  cleanHwId, obj);
+            YFunction._AddToCache('Module', cleanHwId, obj);
         }
         return obj;
     }
@@ -5674,13 +5918,13 @@ export class YModule extends YFunction
     /**
      * Retrieves a module for a given identifier in a YAPI context.
      * The identifier can be specified using several formats:
-     * <ul>
-     * <li>FunctionLogicalName</li>
-     * <li>ModuleSerialNumber.FunctionIdentifier</li>
-     * <li>ModuleSerialNumber.FunctionLogicalName</li>
-     * <li>ModuleLogicalName.FunctionIdentifier</li>
-     * <li>ModuleLogicalName.FunctionLogicalName</li>
-     * </ul>
+     *
+     * - FunctionLogicalName
+     * - ModuleSerialNumber.FunctionIdentifier
+     * - ModuleSerialNumber.FunctionLogicalName
+     * - ModuleLogicalName.FunctionIdentifier
+     * - ModuleLogicalName.FunctionLogicalName
+     *
      *
      * This function does not require that the module is online at the time
      * it is invoked. The returned object is nevertheless valid.
@@ -5706,10 +5950,10 @@ export class YModule extends YFunction
         if (modpos != ((func).length - 7)) {
             cleanHwId = func + '.module';
         }
-        obj = <YModule> YFunction._FindFromCacheInContext(yctx,  'Module', cleanHwId);
+        obj = <YModule> YFunction._FindFromCacheInContext(yctx, 'Module', cleanHwId);
         if (obj == null) {
             obj = new YModule(yctx, cleanHwId);
-            YFunction._AddToCache('Module',  cleanHwId, obj);
+            YFunction._AddToCache('Module', cleanHwId, obj);
         }
         return obj;
     }
@@ -5838,8 +6082,10 @@ export class YModule extends YFunction
      * Registers a device log callback function. This callback will be called each time
      * that a module sends a new log message. Mostly useful to debug a Yoctopuce module.
      *
-     * @param callback : the callback function to call, or a null pointer. The callback function should take two
-     *         arguments: the module object that emitted the log message, and the character string containing the log.
+     * @param callback : the callback function to call, or a null pointer.
+     *         The callback function should take two
+     *         arguments: the module object that emitted the log message,
+     *         and the character string containing the log.
      *         On failure, throws an exception or returns a negative error code.
      */
     async registerLogCallback(callback: YModule.LogCallback | null): Promise<number>
@@ -5957,7 +6203,7 @@ export class YModule extends YFunction
         }
         //may throw an exception
         serial = await this.get_serialNumber();
-        tmp_res = await YFirmwareUpdate.CheckFirmware(serial,  path, release);
+        tmp_res = await YFirmwareUpdate.CheckFirmware(serial, path, release);
         if ((tmp_res).indexOf('error:') == 0) {
             this._throw(YAPI_INVALID_ARGUMENT, tmp_res);
         }
@@ -6017,13 +6263,13 @@ export class YModule extends YFunction
         let name: string;
         let item: string;
         let t_type: string;
-        let id: string;
+        let pageid: string;
         let url: string;
         let file_data: string;
         let file_data_bin: Uint8Array;
         let temp_data_bin: Uint8Array;
         let ext_settings: string;
-        let filelist: string[] = [];
+        let filelist: Uint8Array[] = [];
         let templist: string[] = [];
 
         settings = await this._download('api.json');
@@ -6038,11 +6284,11 @@ export class YModule extends YFunction
                 url = 'api/' + templist[ii] + '/sensorType';
                 t_type = this._yapi.imm_bin2str(await this._download(url));
                 if (t_type == 'RES_NTC' || t_type == 'RES_LINEAR') {
-                    id = (templist[ii]).substr(11, (templist[ii]).length - 11);
-                    if (id == '') {
-                        id = '1';
+                    pageid = templist[ii].substr(11, (templist[ii]).length - 11);
+                    if (pageid == '') {
+                        pageid = '1';
                     }
-                    temp_data_bin = await this._download('extra.json?page=' + id);
+                    temp_data_bin = await this._download('extra.json?page=' + pageid);
                     if ((temp_data_bin).length > 0) {
                         item = sep + '{"fid":"' + templist[ii] + '", "json":' + this._yapi.imm_bin2str(temp_data_bin) + '}\n';
                         ext_settings = ext_settings + item;
@@ -6060,7 +6306,7 @@ export class YModule extends YFunction
             filelist = this.imm_json_get_array(json);
             sep = '';
             for (let ii in filelist) {
-                name = this.imm_json_get_key(this._yapi.imm_str2bin(filelist[ii]), 'name');
+                name = this.imm_json_get_key(filelist[ii], 'name');
                 if (((name).length > 0) && !(name == 'startupConf.json')) {
                     file_data_bin = await this._download(this.imm_escapeAttr(name));
                     file_data = this._yapi.imm_bin2hexstr(file_data_bin);
@@ -6076,10 +6322,12 @@ export class YModule extends YFunction
 
     async loadThermistorExtra(funcId: string, jsonExtra: string): Promise<number>
     {
-        let values: string[] = [];
+        let values: Uint8Array[] = [];
         let url: string;
         let curr: string;
+        let binCurr: Uint8Array;
         let currTemp: string;
+        let binCurrTemp: Uint8Array;
         let ofs: number;
         let size: number;
         url = 'api/' + funcId + '.json?command=Z';
@@ -6090,8 +6338,10 @@ export class YModule extends YFunction
         ofs = 0;
         size = values.length;
         while (ofs + 1 < size) {
-            curr = values[ofs];
-            currTemp = values[ofs + 1];
+            binCurr = values[ofs];
+            binCurrTemp = values[ofs + 1];
+            curr = this.imm_json_get_string(binCurr);
+            currTemp = this.imm_json_get_string(binCurrTemp);
             url = 'api/' + funcId + '.json?command=m' + curr + ':' + currTemp;
             await this._download(url);
             ofs = ofs + 2;
@@ -6101,16 +6351,17 @@ export class YModule extends YFunction
 
     async set_extraSettings(jsonExtra: string): Promise<number>
     {
-        let extras: string[] = [];
+        let extras: Uint8Array[] = [];
+        let tmp: Uint8Array;
         let functionId: string;
-        let data: string;
+        let data: Uint8Array;
         extras = this.imm_json_get_array(this._yapi.imm_str2bin(jsonExtra));
         for (let ii in extras) {
-            functionId = this.imm_get_json_path(extras[ii], 'fid');
-            functionId = this.imm_decode_json_string(functionId);
+            tmp = this.imm_get_json_path(extras[ii], 'fid');
+            functionId = this.imm_json_get_string(tmp);
             data = this.imm_get_json_path(extras[ii], 'json');
             if (await this.hasFunction(functionId)) {
-                await this.loadThermistorExtra(functionId, data);
+                await this.loadThermistorExtra(functionId, this._yapi.imm_bin2str(data));
             }
         }
         return YAPI_SUCCESS;
@@ -6132,41 +6383,41 @@ export class YModule extends YFunction
     async set_allSettingsAndFiles(settings: Uint8Array): Promise<number>
     {
         let down: Uint8Array;
-        let json: string;
-        let json_api: string;
-        let json_files: string;
-        let json_extra: string;
+        let json_bin: Uint8Array;
+        let json_api: Uint8Array;
+        let json_files: Uint8Array;
+        let json_extra: Uint8Array;
         let fuperror: number;
         let globalres: number;
         fuperror = 0;
-        json = this._yapi.imm_bin2str(settings);
-        json_api = this.imm_get_json_path(json, 'api');
-        if (json_api == '') {
+        json_api = this.imm_get_json_path(settings, 'api');
+        if ((json_api).length == 0) {
             return await this.set_allSettings(settings);
         }
-        json_extra = this.imm_get_json_path(json, 'extras');
-        if (!(json_extra == '')) {
-            await this.set_extraSettings(json_extra);
+        json_extra = this.imm_get_json_path(settings, 'extras');
+        if ((json_extra).length > 0) {
+            await this.set_extraSettings(this._yapi.imm_bin2str(json_extra));
         }
-        await this.set_allSettings(this._yapi.imm_str2bin(json_api));
+        await this.set_allSettings(json_api);
         if (await this.hasFunction('files')) {
-            let files: string[] = [];
+            let files: Uint8Array[] = [];
             let res: string;
+            let tmp: Uint8Array;
             let name: string;
             let data: string;
             down = await this._download('files.json?a=format');
-            res = this.imm_get_json_path(this._yapi.imm_bin2str(down), 'res');
-            res = this.imm_decode_json_string(res);
+            down = this.imm_get_json_path(down, 'res');
+            res = this.imm_json_get_string(down);
             if (!(res == 'ok')) {
                 return this._throw(YAPI_IO_ERROR, 'format failed', YAPI_IO_ERROR);
             }
-            json_files = this.imm_get_json_path(json, 'files');
-            files = this.imm_json_get_array(this._yapi.imm_str2bin(json_files));
+            json_files = this.imm_get_json_path(settings, 'files');
+            files = this.imm_json_get_array(json_files);
             for (let ii in files) {
-                name = this.imm_get_json_path(files[ii], 'name');
-                name = this.imm_decode_json_string(name);
-                data = this.imm_get_json_path(files[ii], 'data');
-                data = this.imm_decode_json_string(data);
+                tmp = this.imm_get_json_path(files[ii], 'name');
+                name = this.imm_json_get_string(tmp);
+                tmp = this.imm_get_json_path(files[ii], 'data');
+                data = this.imm_json_get_string(tmp);
                 if (name == '') {
                     fuperror = fuperror + 1;
                 } else {
@@ -6175,7 +6426,7 @@ export class YModule extends YFunction
             }
         }
         // Apply settings a second time for file-dependent settings and dynamic sensor nodes
-        globalres = await this.set_allSettings(this._yapi.imm_str2bin(json_api));
+        globalres = await this.set_allSettings(json_api);
         if (!(fuperror == 0)) {
             return this._throw(YAPI_IO_ERROR, 'Error during file upload', YAPI_IO_ERROR);
         }
@@ -6387,7 +6638,7 @@ export class YModule extends YFunction
                     }
                 } else {
                     if (paramVer == 0) {
-                        ratio = parseFloat(param);
+                        ratio = YAPIContext.imm_atof(param);
                         if (ratio > 0) {
                             calibData.push(0.0);
                             calibData.push(0.0);
@@ -6429,7 +6680,7 @@ export class YModule extends YFunction
                 param = (30 + calibType).toString();
                 i = 0;
                 while (i < calibData.length) {
-                    if (((i) & (1)) > 0) {
+                    if ((i & 1) > 0) {
                         param = param + ':';
                     } else {
                         param = param + ' ';
@@ -6503,12 +6754,12 @@ export class YModule extends YFunction
     {
         let restoreLast: string[] = [];
         let old_json_flat: Uint8Array;
-        let old_dslist: string[] = [];
+        let old_dslist: Uint8Array[] = [];
         let old_jpath: string[] = [];
         let old_jpath_len: number[] = [];
         let old_val_arr: string[] = [];
         let actualSettings: Uint8Array;
-        let new_dslist: string[] = [];
+        let new_dslist: Uint8Array[] = [];
         let new_jpath: string[] = [];
         let new_jpath_len: number[] = [];
         let new_val_arr: string[] = [];
@@ -6524,9 +6775,11 @@ export class YModule extends YFunction
         let fun: string;
         let attr: string;
         let value: string;
+        let old_serial: string;
+        let new_serial: string;
         let url: string;
         let tmp: string;
-        let new_calib: string;
+        let binTmp: Uint8Array;
         let sensorType: string;
         let unit_name: string;
         let newval: string;
@@ -6536,17 +6789,17 @@ export class YModule extends YFunction
         let do_update: boolean;
         let found: boolean;
         res = YAPI_SUCCESS;
-        tmp = this._yapi.imm_bin2str(settings);
-        tmp = this.imm_get_json_path(tmp, 'api');
-        if (!(tmp == '')) {
-            settings = this._yapi.imm_str2bin(tmp);
+        binTmp = this.imm_get_json_path(settings, 'api');
+        if ((binTmp).length > 0) {
+            settings = binTmp;
         }
+        old_serial = '';
         oldval = '';
         newval = '';
         old_json_flat = this.imm_flattenJsonStruct(settings);
         old_dslist = this.imm_json_get_array(old_json_flat);
         for (let ii in old_dslist) {
-            each_str = this.imm_json_get_string(this._yapi.imm_str2bin(old_dslist[ii]));
+            each_str = this.imm_json_get_string(old_dslist[ii]);
             // split json path and attr
             leng = (each_str).length;
             eqpos = (each_str).indexOf('=');
@@ -6554,12 +6807,15 @@ export class YModule extends YFunction
                 this._throw(YAPI_INVALID_ARGUMENT, 'Invalid settings');
                 return YAPI_INVALID_ARGUMENT;
             }
-            jpath = (each_str).substr(0, eqpos);
+            jpath = each_str.substr(0, eqpos);
             eqpos = eqpos + 1;
-            value = (each_str).substr(eqpos, leng - eqpos);
+            value = each_str.substr(eqpos, leng - eqpos);
             old_jpath.push(jpath);
             old_jpath_len.push((jpath).length);
             old_val_arr.push(value);
+            if (jpath == 'module/serialNumber') {
+                old_serial = value;
+            }
         }
 
         try {
@@ -6569,11 +6825,15 @@ export class YModule extends YFunction
             await YAPI.Sleep(500);
             actualSettings = await this._download('api.json');
         }
+        new_serial = await this.get_serialNumber();
+        if (old_serial == new_serial || old_serial == '') {
+            old_serial = '_NO_SERIAL_FILTER_';
+        }
         actualSettings = this.imm_flattenJsonStruct(actualSettings);
         new_dslist = this.imm_json_get_array(actualSettings);
         for (let ii in new_dslist) {
             // remove quotes
-            each_str = this.imm_json_get_string(this._yapi.imm_str2bin(new_dslist[ii]));
+            each_str = this.imm_json_get_string(new_dslist[ii]);
             // split json path and attr
             leng = (each_str).length;
             eqpos = (each_str).indexOf('=');
@@ -6581,9 +6841,9 @@ export class YModule extends YFunction
                 this._throw(YAPI_INVALID_ARGUMENT, 'Invalid settings');
                 return YAPI_INVALID_ARGUMENT;
             }
-            jpath = (each_str).substr(0, eqpos);
+            jpath = each_str.substr(0, eqpos);
             eqpos = eqpos + 1;
-            value = (each_str).substr(eqpos, leng - eqpos);
+            value = each_str.substr(eqpos, leng - eqpos);
             new_jpath.push(jpath);
             new_jpath_len.push((jpath).length);
             new_val_arr.push(value);
@@ -6596,140 +6856,140 @@ export class YModule extends YFunction
             if ((cpos < 0) || (leng == 0)) {
                 continue;
             }
-            fun = (njpath).substr(0, cpos);
+            fun = njpath.substr(0, cpos);
             cpos = cpos + 1;
-            attr = (njpath).substr(cpos, leng - cpos);
+            attr = njpath.substr(cpos, leng - cpos);
             do_update = true;
             if (fun == 'services') {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'firmwareRelease')) {
+            if (do_update && (attr == 'firmwareRelease')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'usbCurrent')) {
+            if (do_update && (attr == 'usbCurrent')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'upTime')) {
+            if (do_update && (attr == 'upTime')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'persistentSettings')) {
+            if (do_update && (attr == 'persistentSettings')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'adminPassword')) {
+            if (do_update && (attr == 'adminPassword')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'userPassword')) {
+            if (do_update && (attr == 'userPassword')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'rebootCountdown')) {
+            if (do_update && (attr == 'rebootCountdown')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'advertisedValue')) {
+            if (do_update && (attr == 'advertisedValue')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'poeCurrent')) {
+            if (do_update && (attr == 'poeCurrent')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'readiness')) {
+            if (do_update && (attr == 'readiness')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'ipAddress')) {
+            if (do_update && (attr == 'ipAddress')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'subnetMask')) {
+            if (do_update && (attr == 'subnetMask')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'router')) {
+            if (do_update && (attr == 'router')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'linkQuality')) {
+            if (do_update && (attr == 'linkQuality')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'ssid')) {
+            if (do_update && (attr == 'ssid')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'channel')) {
+            if (do_update && (attr == 'channel')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'security')) {
+            if (do_update && (attr == 'security')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'message')) {
+            if (do_update && (attr == 'message')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'signalValue')) {
+            if (do_update && (attr == 'signalValue')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'currentValue')) {
+            if (do_update && (attr == 'currentValue')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'currentRawValue')) {
+            if (do_update && (attr == 'currentRawValue')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'currentRunIndex')) {
+            if (do_update && (attr == 'currentRunIndex')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'pulseTimer')) {
+            if (do_update && (attr == 'pulseTimer')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'lastTimePressed')) {
+            if (do_update && (attr == 'lastTimePressed')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'lastTimeReleased')) {
+            if (do_update && (attr == 'lastTimeReleased')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'filesCount')) {
+            if (do_update && (attr == 'filesCount')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'freeSpace')) {
+            if (do_update && (attr == 'freeSpace')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'timeUTC')) {
+            if (do_update && (attr == 'timeUTC')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'rtcTime')) {
+            if (do_update && (attr == 'rtcTime')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'unixTime')) {
+            if (do_update && (attr == 'unixTime')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'dateTime')) {
+            if (do_update && (attr == 'dateTime')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'rawValue')) {
+            if (do_update && (attr == 'rawValue')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'lastMsg')) {
+            if (do_update && (attr == 'lastMsg')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'delayedPulseTimer')) {
+            if (do_update && (attr == 'delayedPulseTimer')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'rxCount')) {
+            if (do_update && (attr == 'rxCount')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'txCount')) {
+            if (do_update && (attr == 'txCount')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'msgCount')) {
+            if (do_update && (attr == 'msgCount')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'rxMsgCount')) {
+            if (do_update && (attr == 'rxMsgCount')) {
                 do_update = false;
             }
-            if ((do_update) && (attr == 'txMsgCount')) {
+            if (do_update && (attr == 'txMsgCount')) {
                 do_update = false;
             }
             if (do_update) {
                 do_update = false;
-                newval = new_val_arr[i];
                 j = 0;
                 found = false;
+                newval = new_val_arr[i];
                 while ((j < old_jpath.length) && !(found)) {
                     if ((new_jpath_len[i] == old_jpath_len[j]) && (new_jpath[i] == old_jpath[j])) {
                         found = true;
                         oldval = old_val_arr[j];
-                        if (!(newval == oldval)) {
+                        if (!(newval == oldval) && !(oldval == old_serial)) {
                             do_update = true;
                         }
                     }
@@ -6741,7 +7001,6 @@ export class YModule extends YFunction
                     old_calib = '';
                     unit_name = '';
                     sensorType = '';
-                    new_calib = newval;
                     j = 0;
                     found = false;
                     while ((j < old_jpath.length) && !(found)) {
@@ -6771,7 +7030,7 @@ export class YModule extends YFunction
                         }
                         j = j + 1;
                     }
-                    newval = await this.calibConvert(old_calib,  new_val_arr[i],  unit_name, sensorType);
+                    newval = await this.calibConvert(old_calib, new_val_arr[i], unit_name, sensorType);
                     url = 'api/' + fun + '.json?' + attr + '=' + this.imm_escapeAttr(newval);
                     subres = await this._tryExec(url);
                     if ((res == YAPI_SUCCESS) && (subres != YAPI_SUCCESS)) {
@@ -6852,7 +7111,7 @@ export class YModule extends YFunction
 
     /**
      * Returns the icon of the module. The icon is a PNG image and does not
-     * exceeds 1536 bytes.
+     * exceed 1536 bytes.
      *
      * @return a binary buffer with module icon, in png format.
      *         On failure, throws an exception or returns  YAPI.INVALID_STRING.
@@ -7016,7 +7275,7 @@ export namespace YModule
  * The YSensor class is the parent class for all Yoctopuce sensor types. It can be
  * used to read the current value and unit of any sensor, read the min/max
  * value, configure autonomous recording frequency and access recorded data.
- * It also provide a function to register a callback invoked each time the
+ * It also provides a function to register a callback invoked each time the
  * observed value changes, or at a predefined interval. Using this class rather
  * than a specific subclass makes it possible to create generic applications
  * that work with any Yoctopuce sensor, even those that do not yet exist.
@@ -7475,11 +7734,10 @@ export class YSensor extends YFunction
     }
 
     /**
-     * Returns the sensor health state code, which is zero when there is an up-to-date measure
+     * Returns the sensor state code, which is zero when there is an up-to-date measure
      * available or a positive code if the sensor is not able to provide a measure right now.
      *
-     * @return an integer corresponding to the sensor health state code, which is zero when there is an
-     * up-to-date measure
+     * @return an integer corresponding to the sensor state code, which is zero when there is an up-to-date measure
      *         available or a positive code if the sensor is not able to provide a measure right now
      *
      * On failure, throws an exception or returns YSensor.SENSORSTATE_INVALID.
@@ -7499,13 +7757,13 @@ export class YSensor extends YFunction
     /**
      * Retrieves a sensor for a given identifier.
      * The identifier can be specified using several formats:
-     * <ul>
-     * <li>FunctionLogicalName</li>
-     * <li>ModuleSerialNumber.FunctionIdentifier</li>
-     * <li>ModuleSerialNumber.FunctionLogicalName</li>
-     * <li>ModuleLogicalName.FunctionIdentifier</li>
-     * <li>ModuleLogicalName.FunctionLogicalName</li>
-     * </ul>
+     *
+     * - FunctionLogicalName
+     * - ModuleSerialNumber.FunctionIdentifier
+     * - ModuleSerialNumber.FunctionLogicalName
+     * - ModuleLogicalName.FunctionIdentifier
+     * - ModuleLogicalName.FunctionLogicalName
+     *
      *
      * This function does not require that the sensor is online at the time
      * it is invoked. The returned object is nevertheless valid.
@@ -7530,7 +7788,7 @@ export class YSensor extends YFunction
         obj = <YSensor> YFunction._FindFromCache('Sensor', func);
         if (obj == null) {
             obj = new YSensor(YAPI, func);
-            YFunction._AddToCache('Sensor',  func, obj);
+            YFunction._AddToCache('Sensor', func, obj);
         }
         return obj;
     }
@@ -7538,13 +7796,13 @@ export class YSensor extends YFunction
     /**
      * Retrieves a sensor for a given identifier in a YAPI context.
      * The identifier can be specified using several formats:
-     * <ul>
-     * <li>FunctionLogicalName</li>
-     * <li>ModuleSerialNumber.FunctionIdentifier</li>
-     * <li>ModuleSerialNumber.FunctionLogicalName</li>
-     * <li>ModuleLogicalName.FunctionIdentifier</li>
-     * <li>ModuleLogicalName.FunctionLogicalName</li>
-     * </ul>
+     *
+     * - FunctionLogicalName
+     * - ModuleSerialNumber.FunctionIdentifier
+     * - ModuleSerialNumber.FunctionLogicalName
+     * - ModuleLogicalName.FunctionIdentifier
+     * - ModuleLogicalName.FunctionLogicalName
+     *
      *
      * This function does not require that the sensor is online at the time
      * it is invoked. The returned object is nevertheless valid.
@@ -7563,10 +7821,10 @@ export class YSensor extends YFunction
     static FindSensorInContext(yctx: YAPIContext, func: string): YSensor
     {
         let obj: YSensor | null;
-        obj = <YSensor> YFunction._FindFromCacheInContext(yctx,  'Sensor', func);
+        obj = <YSensor> YFunction._FindFromCacheInContext(yctx, 'Sensor', func);
         if (obj == null) {
             obj = new YSensor(yctx, func);
-            YFunction._AddToCache('Sensor',  func, obj);
+            YFunction._AddToCache('Sensor', func, obj);
         }
         return obj;
     }
@@ -7934,7 +8192,7 @@ export class YSensor extends YFunction
         rawValues.length = 0;
         refValues.length = 0;
         // Load function parameters if not yet loaded
-        if (this._scale == 0) {
+        if ((this._scale == 0) || (this._cacheExpiration <= this._yapi.GetTickCount())) {
             if (await this.load(this._yapi.defaultCacheValidity) != YAPI_SUCCESS) {
                 return YAPI_DEVICE_NOT_FOUND;
             }
@@ -8044,7 +8302,7 @@ export class YSensor extends YFunction
                 poww = poww * 0x100;
                 i = i + 1;
             }
-            if (((byteVal) & (0x80)) != 0) {
+            if ((byteVal & 0x80) != 0) {
                 avgRaw = avgRaw - poww;
             }
             avgVal = avgRaw / 1000.0;
@@ -8057,7 +8315,7 @@ export class YSensor extends YFunction
             maxVal = avgVal;
         } else {
             // averaged report: avg,avg-min,max-avg
-            sublen = 1 + ((report[1]) & (3));
+            sublen = 1 + (report[1] & 3);
             poww = 1;
             avgRaw = 0;
             byteVal = 0;
@@ -8069,10 +8327,10 @@ export class YSensor extends YFunction
                 i = i + 1;
                 sublen = sublen - 1;
             }
-            if (((byteVal) & (0x80)) != 0) {
+            if ((byteVal & 0x80) != 0) {
                 avgRaw = avgRaw - poww;
             }
-            sublen = 1 + ((((report[1]) >> (2))) & (3));
+            sublen = 1 + ((report[1] >> 2) & 3);
             poww = 1;
             difRaw = 0;
             while ((sublen > 0) && (i < report.length)) {
@@ -8083,7 +8341,7 @@ export class YSensor extends YFunction
                 sublen = sublen - 1;
             }
             minRaw = avgRaw - difRaw;
-            sublen = 1 + ((((report[1]) >> (4))) & (3));
+            sublen = 1 + ((report[1] >> 4) & 3);
             poww = 1;
             difRaw = 0;
             while ((sublen > 0) && (i < report.length)) {
@@ -8338,7 +8596,7 @@ export namespace YMeasure
  * sensors. Recording can happen automatically, without requiring a permanent
  * connection to a computer.
  * The YDataLogger class controls the global parameters of the internal data
- * logger. Recording control (start/stop) as well as data retreival is done at
+ * logger. Recording control (start/stop) as well as data retrieval is done at
  * sensor objects level.
  */
 //--- (end of generated code: YDataLogger class start)
@@ -8645,13 +8903,13 @@ export class YDataLogger extends YFunction
     /**
      * Retrieves a data logger for a given identifier.
      * The identifier can be specified using several formats:
-     * <ul>
-     * <li>FunctionLogicalName</li>
-     * <li>ModuleSerialNumber.FunctionIdentifier</li>
-     * <li>ModuleSerialNumber.FunctionLogicalName</li>
-     * <li>ModuleLogicalName.FunctionIdentifier</li>
-     * <li>ModuleLogicalName.FunctionLogicalName</li>
-     * </ul>
+     *
+     * - FunctionLogicalName
+     * - ModuleSerialNumber.FunctionIdentifier
+     * - ModuleSerialNumber.FunctionLogicalName
+     * - ModuleLogicalName.FunctionIdentifier
+     * - ModuleLogicalName.FunctionLogicalName
+     *
      *
      * This function does not require that the data logger is online at the time
      * it is invoked. The returned object is nevertheless valid.
@@ -8676,7 +8934,7 @@ export class YDataLogger extends YFunction
         obj = <YDataLogger> YFunction._FindFromCache('DataLogger', func);
         if (obj == null) {
             obj = new YDataLogger(YAPI, func);
-            YFunction._AddToCache('DataLogger',  func, obj);
+            YFunction._AddToCache('DataLogger', func, obj);
         }
         return obj;
     }
@@ -8684,13 +8942,13 @@ export class YDataLogger extends YFunction
     /**
      * Retrieves a data logger for a given identifier in a YAPI context.
      * The identifier can be specified using several formats:
-     * <ul>
-     * <li>FunctionLogicalName</li>
-     * <li>ModuleSerialNumber.FunctionIdentifier</li>
-     * <li>ModuleSerialNumber.FunctionLogicalName</li>
-     * <li>ModuleLogicalName.FunctionIdentifier</li>
-     * <li>ModuleLogicalName.FunctionLogicalName</li>
-     * </ul>
+     *
+     * - FunctionLogicalName
+     * - ModuleSerialNumber.FunctionIdentifier
+     * - ModuleSerialNumber.FunctionLogicalName
+     * - ModuleLogicalName.FunctionIdentifier
+     * - ModuleLogicalName.FunctionLogicalName
+     *
      *
      * This function does not require that the data logger is online at the time
      * it is invoked. The returned object is nevertheless valid.
@@ -8709,10 +8967,10 @@ export class YDataLogger extends YFunction
     static FindDataLoggerInContext(yctx: YAPIContext, func: string): YDataLogger
     {
         let obj: YDataLogger | null;
-        obj = <YDataLogger> YFunction._FindFromCacheInContext(yctx,  'DataLogger', func);
+        obj = <YDataLogger> YFunction._FindFromCacheInContext(yctx, 'DataLogger', func);
         if (obj == null) {
             obj = new YDataLogger(yctx, func);
-            YFunction._AddToCache('DataLogger',  func, obj);
+            YFunction._AddToCache('DataLogger', func, obj);
         }
         return obj;
     }
@@ -8791,17 +9049,17 @@ export class YDataLogger extends YFunction
         return await this.parse_dataSets(await this._download('logger.json'));
     }
 
-    async parse_dataSets(json: Uint8Array): Promise<YDataSet[]>
+    async parse_dataSets(jsonbuff: Uint8Array): Promise<YDataSet[]>
     {
-        let dslist: string[] = [];
+        let dslist: Uint8Array[] = [];
         let dataset: YDataSet | null;
         let res: YDataSet[] = [];
 
-        dslist = this.imm_json_get_array(json);
+        dslist = this.imm_json_get_array(jsonbuff);
         res.length = 0;
         for (let ii in dslist) {
             dataset = new YDataSet(this);
-            await dataset._parse(dslist[ii]);
+            await dataset._parse(this._yapi.imm_bin2str(dslist[ii]));
             res.push(dataset);
         }
         return res;
@@ -8918,22 +9176,22 @@ export class YSystemEnv
         throw this.unknownSystemEnvError();
     }
 
-    getWebSocketHub(obj_yapi: YAPIContext, urlInfo: _YY_UrlInfo): YGenericHub | null
+    getWebSocketEngine(hub: YGenericHub, runtime_urlInfo: _YY_UrlInfo): YHubEngine | null
     {
         throw this.unknownSystemEnvError();
     }
 
-    getHttpHub(obj_yapi: YAPIContext, urlInfo: _YY_UrlInfo): YGenericHub | null
+    getHttpEngine(hub: YGenericHub, runtime_urlInfo: _YY_UrlInfo, infojson: any): YHubEngine | null
     {
         throw this.unknownSystemEnvError();
     }
 
-    getWebSocketCallbackHub(obj_yapi: YAPIContext, urlInfo: _YY_UrlInfo, ws: _YY_WebSocket): YGenericHub | null
+    getWebSocketCallbackEngine(hub: YGenericHub, runtime_urlInfo: _YY_UrlInfo, ws: _YY_WebSocket): YHubEngine | null
     {
         throw this.unknownSystemEnvError();
     }
 
-    getHttpCallbackHub(yapi: YAPIContext, urlInfo: _YY_UrlInfo, incomingMessage: any, serverResponse: any): YGenericHub | null
+    getHttpCallbackEngine(hub: YGenericHub, runtime_urlInfo: _YY_UrlInfo, incomingMessage: any, serverResponse: any): YHubEngine | null
     {
         throw this.unknownSystemEnvError();
     }
@@ -8948,7 +9206,12 @@ export class YSystemEnv
         throw this.unknownSystemEnvError();
     }
 
-    async downloadfile(url: string): Promise<Uint8Array>
+    async downloadfile(url: string, yapi: YAPIContext): Promise<Uint8Array>
+    {
+        throw this.unknownSystemEnvError();
+    }
+
+    async downloadRemoteCertificate(urlinfo: _YY_UrlInfo): Promise<string>
     {
         throw this.unknownSystemEnvError();
     }
@@ -8970,51 +9233,137 @@ export const enum Y_YHubConnType
     HUB_CALLBACK = 3        // http or websocket callback hub, triggers exceptions on failed updates
 }
 
+export abstract class YHubEngine
+{
+    protected readonly _hub: YGenericHub;
+    protected readonly _runtime_urlInfo: _YY_UrlInfo;            // same structure but updated after info.json. This is the one to use from HubEngine
+    protected lastPingStamp: number = 0;              // timestamp of last notification received
+
+    constructor(hub: YGenericHub, runtime_urlInfo: _YY_UrlInfo)
+    {
+        this._hub = hub;
+        this._runtime_urlInfo = runtime_urlInfo
+    }
+
+    /** Attempt to establish a connection to the hub asynchronously.
+     *
+     * On success, this method should call this.signalHubConnected()
+     * On temporary failure, this method should call this.imm_signalHubDisconnected()
+     * On fatal failure, this method should call this.imm_commonDisconnect()
+     *
+     * This method is supposed to be redefined by subclasses
+     */
+    async reconnectEngine(tryOpenID: string): Promise<void>
+    {
+        // This method must be redefined by subclasses
+    }
+
+    imm_disconnectEngineNow(connID: string = ''): void
+    {
+    }
+
+    /** Perform an HTTP query on the hub
+     *
+     * @param method {string}
+     * @param devUrl {string}
+     * @param obj_body {YHTTPBody|null}
+     * @param tcpchan {number}
+     * @returns {YHTTPRequest}
+     */
+    async request(method: string, devUrl: string, obj_body: YHTTPBody | null, tcpchan: number): Promise<YHTTPRequest>
+    {
+        // must be overridden by subclasses
+        let res = new YHTTPRequest(null);
+        res.errorType = YAPI_NOT_SUPPORTED;
+        res.errorMsg = 'GenericHub subclass expected';
+        return res;
+    }
+
+    // default implementation of function that reports a fatal error to the HTTP callback party
+    async reportFailure(message: string): Promise<void>
+    {
+        // nothing to do
+    }
+
+    imm_updateLastPinfStamp(): void
+    {
+        this.lastPingStamp = Date.now();
+    }
+
+    imm_isConnected(): boolean
+    {
+        return (Date.now() - this.lastPingStamp) < this._hub.imm_getNetworkTimeout();
+    }
+
+    imm_isForwarded(): boolean
+    {
+        return false;
+    }
+
+    async waitForPendingQueries(ms_duration: number): Promise<void>
+    {
+        // nothing to do
+    }
+}
+
+enum HubMode
+{
+    LEGACY,
+    MIXED,
+    SECURE,
+    PROTO_UNKNOWN
+}
+
 //
 // YGenericHub
 //
-export abstract class YGenericHub
+export class YGenericHub
 {
+
     private static globalHubRefCounter: number = 0;
-    _hubRef: number;
+    private _hubRef: number;
+    private _hubEngine: YHubEngine | null;
     _yapi: YAPIContext;
-    _lastErrorType: number = YAPI_IO_ERROR;
-    _lastErrorMsg: string = 'Hub attachment has not been triggered';
+    private _lastErrorType: number = YAPI_IO_ERROR;
+    private _lastErrorMsg: string = 'Hub attachment has not been triggered';
     // key hub state variables
-    urlInfo: _YY_UrlInfo;                   // structure that describe the root URL of the hub
-    hubSerial: string = '';                 // the hub true serial number, as obtained from the hub itself
-    serialByYdx: string[] = [];             // serials by hub-specific devYdx
+    readonly urlInfo: _YY_UrlInfo;    // structure that describe the root URL of the hub
+    private hubSerial: string = '';           // the hub true serial number, as obtained from the hub itself
+    serialByYdx: string[] = [];               // serials by hub-specific devYdx // fixme move to private
     // state variables to establish connection
-    _currentState: Y_YHubConnType = Y_YHubConnType.HUB_UNKNOWN;
-    _targetState: Y_YHubConnType = Y_YHubConnType.HUB_DETACHED;
-    currentConnID: string = '';             // ConnID of the current/next connection attempt
-    connResolvers: YConditionalResultResolver[] = [];    // callbacks to notify permanent state changes
-    disconnResolvers: YConditionalResultResolver[] = []; // callbacks to notify disconnects
+    private _currentState: Y_YHubConnType = Y_YHubConnType.HUB_UNKNOWN;
+    private _targetState: Y_YHubConnType = Y_YHubConnType.HUB_DETACHED;
+    private currentConnID: string = '';             // ConnID of the current/next connection attempt
+    private connResolvers: YConditionalResultResolver[] = [];    // callbacks to notify permanent state changes
+    private disconnResolvers: YConditionalResultResolver[] = []; // callbacks to notify disconnects
     retryDelay: number = 15;                // delay before reconnecting in case of error: initially 15ms
-    _reconnectionTimer: any = null;         // actually a number | NodeJS.Timeout
-    _rwAccess: boolean | null = null;       // null until hub has been tested for rw-access
+    private _reconnectionTimer: any = null;         // actually a number | NodeJS.Timeout
+    private _rwAccess: boolean | null = null;       // null until hub has been tested for rw-access
     // variables for special "TestHub trying" state
-    keepTryingExpiration: number = 0;       // timestamp of end of all TestHub requests and return to detached
-    keepTryingTimeoutId: any = null;        // actually a number | NodeJs.Timeout: timeout for detaching after test
+    private keepTryingExpiration: number = 0;       // timestamp of end of all TestHub requests and return to detached
+    private keepTryingTimeoutId: any = null;        // actually a number | NodeJs.Timeout: timeout for detaching after test
     // state variables to handle connected state
-    stalledTimeoutMs: number;               // hub-specific timeout for detecting stalled connections
+    private stalledTimeoutMs: number;               // hub-specific timeout for detecting stalled connections
     timeoutId: any = null;                  // actually a number | NodeJs.Timeout: timeout for declaring stalled hub
-    lastPingStamp: number = 0;              // timestamp of last notification received
     isNotifWorking: boolean = false;        // true if we are receiving valid notification
     devListExpires: number = 0;            // timestamp of next useful updateDeviceList
     notifPos: number = -1;                  // current absolute position in hub notification stream
     notifCarryOver: string = '';            // last incomplete notification message
-    missing: object = {};                   // used during UpdateDeviceList
-    _firstArrivalCallback: boolean = true;  // indicates that this is the first time we see this device
+    private _firstArrivalCallback: boolean = true;  // indicates that this is the first time we see this device
     _missing: YBoolDict = {};               // hash table by serial number, used during UpdateDeviceList
-    _knownUrls: string[] = [];               // the list of url that can be use for this hub
+    private _knownUrls: string[] = [];               // the list of url that can be use for this hub
+    private _hubMode: HubMode;
+    private _portInfo: PortInfo[] = [];
+    private _usePureHTTP: boolean = false;
+
     constructor(yapi: YAPIContext, urlInfo: _YY_UrlInfo)
     {
         this._yapi = yapi;
         this.urlInfo = urlInfo;
         this.stalledTimeoutMs = yapi._networkTimeoutMs;
         this._hubRef = YGenericHub.globalHubRefCounter++;
-        this._knownUrls.push(urlInfo.orgUrl);
+        this._hubEngine = null;
+        this._hubMode = HubMode.SECURE;
     }
 
     _throw(int_errType: number, str_errMsg: string, obj_retVal?: any): any
@@ -9022,6 +9371,35 @@ export abstract class YGenericHub
         this._lastErrorType = int_errType;
         this._lastErrorMsg = str_errMsg;
         return this._yapi._throw(int_errType, str_errMsg, obj_retVal);
+    }
+
+    imm_isFirstArrivalCallback(): boolean
+    {
+        return this._firstArrivalCallback;
+    }
+
+    imm_setFirstArrivalCallback(isfirst: boolean): void
+    {
+        this._firstArrivalCallback = isfirst;
+    }
+
+    imm_getNotifyPos(): number
+    {
+        return this.notifPos;
+    }
+
+    imm_getcurrentState(): Y_YHubConnType
+    {
+        return this._currentState;
+    }
+
+    imm_getCurrentConnID(): string
+    {
+        return this.currentConnID;
+    }
+    imm_setCurrentConnID(id: string): void
+    {
+        this.currentConnID = id;
     }
 
     /**
@@ -9092,29 +9470,79 @@ export abstract class YGenericHub
     // default implementation of isOnline
     imm_isOnline(): boolean
     {
-        return (Date.now() - this.lastPingStamp) < this.stalledTimeoutMs;
+        if (this._hubEngine) {
+            return this._hubEngine.imm_isConnected();
+        }
+        return false;
     }
 
     // default implementation of function that says if a hub is currently forwarded and handled remotely
     imm_isForwarded(): boolean
     {
+        if (this._hubEngine) {
+            return this._hubEngine.imm_isForwarded();
+        }
         return false;
+    }
+
+    imm_addKnownUrl(urlInfo: _YY_UrlInfo): void
+    {
+        if (!this._knownUrls.includes(urlInfo.imm_getOriginalURL())) {
+            this._knownUrls.push(urlInfo.imm_getOriginalURL());
+        }
     }
 
     imm_updateUrl(urlInfo: _YY_UrlInfo): void
     {
-        if (!this._knownUrls.includes(urlInfo.orgUrl)) {
-            this._knownUrls.push(urlInfo.orgUrl);
+        if (!this._knownUrls.includes(urlInfo.imm_getOriginalURL())) {
+            this._knownUrls.push(urlInfo.imm_getOriginalURL());
         }
-        if (this.urlInfo.authUrl == urlInfo.authUrl) {
-            this.urlInfo = urlInfo;
+        if (this.urlInfo.imm_getUrl(false, true, true) == urlInfo.imm_getUrl(false, true, true)) {
+            this.urlInfo.imm_updateFrom(urlInfo);
             return;
         }
-        this.urlInfo = urlInfo;
+        this.urlInfo.imm_updateFrom(urlInfo);
         if (this._currentState < Y_YHubConnType.HUB_CONNECTING) {
             if (this._yapi._logLevel >= 4) {
-                this._yapi.imm_log("Updating auth credentials for " + this.urlInfo.rootUrl);
+                this._yapi.imm_log("Updating auth credentials for " + this.urlInfo.imm_getRootUrl());
             }
+        }
+    }
+
+    imm_updateForRedirect(url: string): void
+    {
+
+        let ofs = url.indexOf('://');
+        if (ofs > 0) {
+            ofs = url.indexOf('/', ofs + 3);
+            if (ofs > 0) {
+                url = url.substring(0, ofs);
+            }
+        }
+        let new_url: _YY_UrlInfo = new _YY_UrlInfo(url);
+        this.urlInfo.imm_updateForRedirect(new_url.imm_getHost(), new_url.imm_getPort(), new_url.imm_useSecureSocket());
+        //this._yapi._knownHubsByUrl[new_url.rootUrl] = this;
+        if (this._yapi._logLevel >= 4) {
+            this._yapi.imm_log("Updating URL after HTTP redirection : " + this.urlInfo.imm_getRootUrl());
+        }
+        let primaryHub = this._yapi._knownHubsByUrl[new_url.imm_getRootUrl()];
+        if (primaryHub && primaryHub !== this) {
+            if (primaryHub.urlInfo.imm_useSecureSocket()) {
+                // allow merge only of secure hub
+                if (primaryHub._currentState >= this._currentState) {
+                    // Existing hub is already "better" connected, keep it as primary hub
+                    // Remember alias URL and update target state if needed
+                    primaryHub.imm_inheritFrom(this);
+                    return;
+                }
+            }
+            // Existing hub is not actively connected, set the new hub as primary
+
+            this._yapi._knownHubsByUrl[this.urlInfo.imm_getRootUrl()] = this;
+            this.imm_inheritFrom(primaryHub);
+        } else {
+
+            this._yapi._knownHubsByUrl[new_url.imm_getRootUrl()] = this;
         }
     }
 
@@ -9148,9 +9576,9 @@ export abstract class YGenericHub
         otherHub.connResolvers = [];
         // shut down otherHub connection
         if (this._yapi._logLevel >= 3) {
-            this._yapi.imm_log('Hub ' + this.hubSerial + ' is connected as ' + this.urlInfo.rootUrl + ', dropping connection to ' + otherHub.urlInfo.rootUrl);
+            this._yapi.imm_log('Hub ' + this.hubSerial + ' is connected as ' + this.urlInfo.imm_getRootUrl() + ', dropping connection to ' + otherHub.urlInfo.imm_getRootUrl());
         }
-        otherHub.imm_commonDisconnect('inherit', YAPI_SUCCESS, 'Hub ' + this.hubSerial + ' is already connected via ' + this.urlInfo.rootUrl);
+        otherHub.imm_commonDisconnect('inherit', YAPI_SUCCESS, 'Hub ' + this.hubSerial + ' is already connected via ' + this.urlInfo.imm_getRootUrl());
         otherHub.imm_disconnectNow();
         for (const url of otherHub.get_knownUrls()) {
             if (!this._knownUrls.includes(url)) {
@@ -9219,7 +9647,13 @@ export abstract class YGenericHub
         }
         if (this._currentState <= Y_YHubConnType.HUB_DETACHED) {
             // Hub is not yet connecting, trigger connection
+            if (this._yapi._logLevel >= 4) {
+                this._yapi.imm_log('New hub is detached connecting...');
+            }
+            this._hubEngine = null;// clean old hub engine to force reload of info.json
+            this.stalledTimeoutMs = this._yapi._networkTimeoutMs;
             this.imm_setState(Y_YHubConnType.HUB_CONNECTING);
+            // noinspection ES6MissingAwait
             this.reconnect(this.imm_getNewConnID());
         } else if (this._currentState == Y_YHubConnType.HUB_DISCONNECTED) {
             // Currently waiting to reconnect, trigger immediate retry
@@ -9235,9 +9669,9 @@ export abstract class YGenericHub
                     this._yapi.imm_log('New hub connection requested, retry now (no pending reconnection ?!?)');
                 }
             }
+            // noinspection ES6MissingAwait
             this.reconnect(this.imm_getNewConnID());
-        } else if (this._currentState == Y_YHubConnType.HUB_DETACHING ||
-            this._currentState == Y_YHubConnType.HUB_DISCONNECTING) {
+        } else if (this._currentState == Y_YHubConnType.HUB_DETACHING || this._currentState == Y_YHubConnType.HUB_DISCONNECTING) {
             if (this._yapi._logLevel >= 4) {
                 this._yapi.imm_log('Hub is currently disconnecting, reconnection will be triggered soon [' + this.currentConnID + ']');
                 this._yapi.imm_log('Current state: ' + this._currentState);
@@ -9337,7 +9771,89 @@ export abstract class YGenericHub
      */
     async reconnect(tryOpenID: string): Promise<void>
     {
-        // This method must be redefined by subclasses
+        if (!this._hubEngine) {
+            if (this._yapi._logLevel >= 4) {
+                this._yapi.imm_log('look for suitable Hub engine [' + tryOpenID + ']');
+            }
+            this._usePureHTTP = false;
+            this._portInfo = [];
+            let infoJson: any = null;
+            if (this.urlInfo.imm_testInfoJson()) {
+                let https_req: boolean = this.urlInfo.imm_useSecureSocket();
+                if (this.urlInfo.imm_getPort() == YAPI.YOCTO_DEFAULT_HTTPS_PORT) {
+                    https_req = true;
+                }
+                let url: string = (https_req ? "https://" : "http://") + this.urlInfo.imm_getUrl(false, false, true) + "info.json";
+                if (this._yapi._logLevel >= 4) {
+                    this._yapi.imm_log('look for info.json at ' + url + ' [' + tryOpenID + ']');
+                }
+                try {
+                    let data: Uint8Array = await this._yapi.system_env.downloadfile(url, this._yapi);
+                    infoJson = JSON.parse(YAPI.imm_bin2str(data));
+                    if (infoJson) {
+                        if (infoJson.serialNumber) {
+                            this.imm_setSerialNumber(infoJson.serialNumber);
+                        }
+
+                        if (infoJson.protocol && infoJson.protocol == "HTTP/1.1") {
+                            this._usePureHTTP = true;
+                        }
+                        if (infoJson.port) {
+                            let i: number = 0;
+                            while (i < infoJson.port.length) {
+                                let proto_port: string = infoJson.port[i++];
+                                let split: string[] = proto_port.split(":");
+                                let proto: string = split[0];
+                                let port: number = YAPIContext.imm_atoi(split[1]);
+                                if (port == 0) {
+                                    break;
+                                }
+                                this._portInfo.push({proto, port});
+                            }
+                        }
+                    }
+                    if (this._yapi._logLevel >= 4) {
+                        this._yapi.imm_log('info.json successfully parsed ' + url + ' [' + tryOpenID + ']');
+                    }
+                } catch (e) {
+                    if ((e as YoctoError).errorType == YAPI.SSL_UNK_CERT) {
+                        this.imm_commonDisconnect(tryOpenID, YAPI.SSL_UNK_CERT, (e as YoctoError).message);
+                        this.imm_disconnectNow();
+                        return;
+                    } else {
+                        if (this._yapi._logLevel >= 4) {
+                            this._yapi.imm_log('Unable to get info.json from ' + url + ' [' + tryOpenID + ']');
+                        }
+                        // Old firmware without support for info.json, get at least the serial number
+                        let serialurl: string = (https_req ? "https://" : "http://") + this.urlInfo.imm_getUrl(false, false, false) + "/api/module/serialNumber";
+                        try {
+                            let data: Uint8Array = await this._yapi.system_env.downloadfile(serialurl, this._yapi);
+                            this.imm_setSerialNumber(YAPI.imm_bin2str(data));
+                        } catch (e) {
+                            this.imm_commonDisconnect(tryOpenID, YAPI.IO_ERROR, (e as Error).message);
+                            return;
+                        }
+                    }
+                }
+            }
+            const runtimeUrl = this.imm_UseBestProto();
+            if (runtimeUrl.imm_useWebSocket()) {
+                if (this._yapi._logLevel >= 4) {
+                    this._yapi.imm_log('Use WebSocket hub engine [' + tryOpenID + ']');
+                }
+                this._hubEngine = this._yapi.system_env.getWebSocketEngine(this, runtimeUrl);
+            } else {
+                if (this._yapi._logLevel >= 4) {
+                    this._yapi.imm_log('Use HTTP hub engine [' + tryOpenID + ']');
+                }
+                this._hubEngine = this._yapi.system_env.getHttpEngine(this, runtimeUrl, infoJson);
+            }
+            if (!this._hubEngine) {
+                this.imm_commonDisconnect(tryOpenID, YAPI_NOT_SUPPORTED, 'Unsupported hub protocol: ' + runtimeUrl.imm_getProto());
+                return;
+            }
+        }
+        await this._hubEngine.reconnectEngine(tryOpenID);
     }
 
     /** Invoked by this.reconnect() to handle successful hub connection
@@ -9351,7 +9867,7 @@ export abstract class YGenericHub
         }
 
         let primaryHub: YGenericHub | null = this._yapi.imm_getPrimaryHub(this);
-        // If annother hub connection was active for the same hub, they may have been merged.
+        // If another hub connection was active for the same hub, they may have been merged.
         // So from that point, we continue the work on "primaryHub" rather than "this"
         if (primaryHub._targetState >= Y_YHubConnType.HUB_PREREGISTERED) {
             if (primaryHub._currentState < Y_YHubConnType.HUB_PREREGISTERED) {
@@ -9395,9 +9911,15 @@ export abstract class YGenericHub
      */
     imm_signalHubDisconnected(tryOpenID: string): boolean
     {
+
+        if (this._yapi._logLevel >= 4) {
+            this._yapi.imm_log('imm_signalHubDisconnected  ' + this.urlInfo.imm_getRootUrl());
+        }
+
         if (this._currentState > Y_YHubConnType.HUB_DISCONNECTED) {
             this.imm_setState(Y_YHubConnType.HUB_DISCONNECTED);
         }
+
         this.isNotifWorking = false;
         this.devListExpires = 0;
         this._yapi.imm_dropConnectedHub(this);
@@ -9414,7 +9936,7 @@ export abstract class YGenericHub
             // no reconnection is desired
             this.imm_setState(Y_YHubConnType.HUB_DETACHED);
             if (this._yapi._logLevel >= 4) {
-                this._yapi.imm_log('Hub ' + this.urlInfo.rootUrl + ' detached');
+                this._yapi.imm_log('Hub ' + this.urlInfo.imm_getRootUrl() + ' detached');
             }
             return false;
         }
@@ -9484,7 +10006,7 @@ export abstract class YGenericHub
         }
     }
 
-    // Default implementation of function to abort communication channel immediately
+    // Implementation of function to abort communication channel immediately
     //
     // If a connectionID is passed as argument, only abort the
     // communication channel if the ID matched current connection
@@ -9505,6 +10027,11 @@ export abstract class YGenericHub
             clearTimeout(this.timeoutId)
             this.timeoutId = null;
         }
+        if (this._hubEngine) {
+            this._hubEngine.imm_disconnectEngineNow(connID);
+        } else {
+            this.imm_signalHubDisconnected(connID);
+        }
         return true;
     }
 
@@ -9516,13 +10043,13 @@ export abstract class YGenericHub
      * This method may be redefined by subclasses to do additional
      * cleanup before invoking this.imm_commonDisconnect() to bring
      * communication down, to prevent automatic reconnect.
-     *
-     * note: super.xxx() cannot be used in an async function !
      */
     async detach(errType: number = YAPI.IO_ERROR, errMsg: string = 'Hub has been forcibly detached'): Promise<void>
     {
         this.imm_commonDisconnect('detach', errType, errMsg);
         this.imm_disconnectNow();
+        this.stalledTimeoutMs = this._yapi._networkTimeoutMs;
+        this._hubEngine = null;
     }
 
     /** Wait until the hub is fully disconnected
@@ -9555,7 +10082,7 @@ export abstract class YGenericHub
     async hubUpdateDeviceList(): Promise<number>
     {
         // load hub API, process white pages and yellow pages
-        let hubDev: YDevice = <YDevice>this._yapi.imm_getDevice(this.urlInfo.rootUrl);
+        let hubDev: YDevice = <YDevice>this._yapi.imm_getDevice(this.urlInfo.imm_getRootUrl());
         try {
             hubDev.imm_dropCache();
             let retcode = await hubDev.refresh();
@@ -9597,7 +10124,9 @@ export abstract class YGenericHub
             }
             return retcode;
         } catch (e) {
-            this._yapi.imm_log('Exception during device enumeration: ', e);
+            if (this._yapi._logLevel >= 3) {
+                this._yapi.imm_log('Exception during device enumeration: ', e);
+            }
             if (this._currentState >= Y_YHubConnType.HUB_PREREGISTERED) {
                 try {
                     await this._yapi.updateDeviceList_process(this, hubDev, [], {});
@@ -9618,11 +10147,14 @@ export abstract class YGenericHub
      */
     async request(method: string, devUrl: string, obj_body: YHTTPBody | null, tcpchan: number): Promise<YHTTPRequest>
     {
-        // must be overridden by subclasses
-        let res = new YHTTPRequest(null);
-        res.errorType = YAPI_NOT_SUPPORTED;
-        res.errorMsg = 'GenericHub subclass expected';
-        return res;
+        if (!this._hubEngine) {
+            // must be overridden by subclasses
+            let res = new YHTTPRequest(null);
+            res.errorType = YAPI_IO_ERROR;
+            res.errorMsg = 'HubEngine is not initialised';
+            return res;
+        }
+        return await this._hubEngine.request(method, devUrl, obj_body, tcpchan);
     }
 
     /** Create a new random boundary for form-encoding
@@ -9849,10 +10381,11 @@ export abstract class YGenericHub
         return null;
     }
 
-    // default implementation of function that reports a fatal error to the HTTP callback party
     async reportFailure(message: string): Promise<void>
     {
-        // nothing to do
+        if (this._hubEngine) {
+            await this._hubEngine.reportFailure(message);
+        }
     }
 
     // check if a hub connection provides read-write access to the devices
@@ -9864,6 +10397,19 @@ export abstract class YGenericHub
         }
         return this._rwAccess;
     }
+    imm_isRwAccess(): boolean
+    {
+        if (this._rwAccess == null) {
+            return false;
+        }
+        return this._rwAccess;
+    }
+
+    imm_setRwAccess(rwAccess: boolean): void
+    {
+        this._rwAccess = rwAccess;
+    }
+
     getHubRef(): number
     {
         return this._hubRef;
@@ -9877,6 +10423,129 @@ export abstract class YGenericHub
     imm_forgetUrls(): void
     {
         this._knownUrls = [];
+
+    }
+    imm_getOriginalURL(): string
+    {
+        return this.urlInfo.imm_getOriginalURL();
+    }
+
+    imm_getRootUrl(): string
+    {
+        return this.urlInfo.imm_getRootUrl();
+    }
+    imm_getSerialNumber(): string
+    {
+        return this.hubSerial;
+    }
+    imm_setSerialNumber(serial: string): void
+    {
+        this.hubSerial = serial;
+    }
+    imm_getNetworkTimeout(): number
+    {
+        return this.stalledTimeoutMs;
+    }
+    imm_setNetworkTimeout(mstimeout: number): void
+    {
+        this.stalledTimeoutMs = mstimeout;
+    }
+    imm_setHubEngine(engine: YHubEngine): void
+    {
+        this._hubEngine = engine;
+    }
+    imm_setRetryDelay(value: number): void
+    {
+        this.retryDelay = value
+    }
+    imm_SetErr(errorType: number, errorMsg: string): void
+    {
+        this._lastErrorType = errorType;
+        this._lastErrorMsg = errorMsg
+    }
+
+    async WebSocketJoin(ws: _YY_WebSocket, arr_credentials: WebSocketCredential[], closeCallback: Function): Promise<boolean>
+    {
+        return (<YWebSocketEngine>this._hubEngine).websocketJoin(ws, arr_credentials, closeCallback);
+    }
+    imm_UseBestProto(): _YY_UrlInfo
+    {
+        let cur_proto: string = this.urlInfo.imm_getProto();
+        let runtime_urlInfo: _YY_UrlInfo = this.urlInfo;
+        this._hubMode = HubMode.SECURE;
+        if (this._portInfo.length > 0) {
+            if (this._usePureHTTP) {
+                // For VirtualHub-4web we use the first entry available regardless of the protocol and the port set
+                // by the user. In this scenario info.json has the most accurate value. Note: redirection from http to
+                // https has already done by the http redirect mechanism during the download of info.json
+                // Note 2 : Websocket are not supported by VirtualHub-4web
+                if (cur_proto == "ws" || cur_proto == "wss") {
+                    this._yapi._throw(YAPI.NOT_SUPPORTED, "Websocket protocol is not supported by VirtualHub-4web.");
+                }
+                for (let i: number = 0; i < this._portInfo.length; i++) {
+                    let portInfo: PortInfo = this._portInfo[i];
+                    if (portInfo.proto.startsWith("http")) {
+                        // handle http and https
+                        if (this._yapi._logLevel >= 3) {
+                            this._yapi.imm_log("Hub " + this.urlInfo.imm_getHost() + " will use " + portInfo.proto + " proto on port " + portInfo.port);
+                        }
+                        runtime_urlInfo = this.urlInfo;
+                        runtime_urlInfo.imm_updateBestProto(portInfo.proto, portInfo.port);
+                        break;
+                    }
+                }
+            } else {
+                let best_port: number = 0;
+                let best_proto: string = "ws";
+                if (this._portInfo[0].proto == "http" || this._portInfo[0].proto == "ws") {
+                    this._hubMode = HubMode.LEGACY;
+                }
+
+                for (let i: number = 0; i < this._portInfo.length; i++) {
+                    let portInfo: PortInfo = this._portInfo[i];
+                    if (this._hubMode == HubMode.SECURE && (portInfo.proto == "http" || portInfo.proto == "ws")) {
+                        if (this._yapi._logLevel >= 3) {
+                            this._yapi.imm_log("Hub " + this.urlInfo.imm_getHost() + " use mixed or legacy mode");
+                        }
+                        this._hubMode = HubMode.MIXED;
+                    }
+                    if (cur_proto == "auto" && best_port == 0) {
+                        if (portInfo.proto.startsWith("http") || portInfo.proto.startsWith("ws")) {
+                            // handle http, https, ws and wss proto
+                            best_proto = portInfo.proto;
+                            best_port = portInfo.port;
+                        }
+                    }
+                    if (cur_proto == "secure" && best_port == 0) {
+                        if (portInfo.proto == "https" || portInfo.proto == "wss") {
+                            // handle http, https, ws and wss proto
+                            best_proto = portInfo.proto;
+                            best_port = portInfo.port;
+                        }
+                    }
+                }
+                if (best_port != 0) {
+                    if (this._yapi._logLevel >= 3) {
+                        this._yapi.imm_log("Hub " + this.urlInfo.imm_getHost() + " will use " + best_proto + " proto on port " + best_port);
+                    }
+                    runtime_urlInfo = this.urlInfo;
+                    runtime_urlInfo.imm_updateBestProto(best_proto, best_port);
+                }
+            }
+        }
+        return runtime_urlInfo;
+    }
+
+    imm_useMixedMode(): boolean
+    {
+        return this._hubMode == HubMode.MIXED || this._hubMode == HubMode.LEGACY;
+    }
+
+    async waitForPendingQueries(ms_timeout: number): Promise<void>
+    {
+        if (this._hubEngine) {
+            await this._hubEngine.waitForPendingQueries(ms_timeout);
+        }
     }
 }
 
@@ -9884,26 +10553,29 @@ export abstract class YGenericHub
  * HTTP interface, compatible with browser XMLHTTPRequest and Node.js ClientRequest
  */
 
-export class YHttpHub extends YGenericHub
+export class YHttpEngine extends YHubEngine
 {
     // Hub identification and authentication support
     infoJson: any = null;
+    ha1: string = '';
     realm: string = '';
     nonce: string = '';
+    opaque: string = '';
     nonceCount: number = 0;
     // Notification stream handling
     notbynRequest: any = null;
 
-    constructor(yapi: YAPIContext, urlInfo: _YY_UrlInfo)
+    constructor(hub: YGenericHub, runtime_urlInfo: _YY_UrlInfo, firstInfoJson:any)
     {
-        super(yapi, urlInfo);
+        super(hub, runtime_urlInfo);
+        this.infoJson = firstInfoJson;
     }
 
     // Low-level function to create an HTTP client request (abstraction layer)
     imm_makeRequest(method: string, relUrl: string, contentType: string, body: string | Uint8Array | null,
                     onProgress: null | ((moreText: string) => void),
                     onSuccess: null | ((responseText: string) => void),
-                    onError: (errorType: number, errorMsg: string) => any): any
+                    onError: (errorType: number, errorMsg: string, can_be_retry: boolean) => any): any
     {
         // to be overriden by subclasses
     }
@@ -9919,7 +10591,7 @@ export class YHttpHub extends YGenericHub
     imm_sendRequest(method: string, relUrl: string, obj_body: YHTTPBody | null,
                     onProgress: null | ((moreText: string) => void),
                     onSuccess: null | ((responseText: string) => void),
-                    onError: (errorType: number, errorMsg: string) => void): any
+                    onError: (errorType: number, errorMsg: string, can_be_retry: boolean) => void): any
     {
         let body: string | Uint8Array | null = null;
         // default content-type choosen to bypass CORS checks
@@ -9932,23 +10604,23 @@ export class YHttpHub extends YGenericHub
                 this.nonce = this.infoJson.nonce;
                 this.nonceCount = 0;
             }
-            let shorturi: string = '/' + this.urlInfo.domain + relUrl;
+            let shorturi: string = this._runtime_urlInfo.imm_getSubDomain() + relUrl;
             let jsonBody: any = {
                 'x-yauth': {
                     method: method,
                     uri: shorturi
                 }
             };
-            if (this.urlInfo.user || this.urlInfo.pass) {
+            if (this._runtime_urlInfo.imm_hasAuthParam()) {
                 let cnonce: string = Math.floor(Math.random() * 2147483647).toString(16).toLowerCase();
                 let nc: string = (++this.nonceCount).toString(16).toLowerCase();
-                let ha1_str: string = this.urlInfo.user + ':' + this.realm + ':' + this.urlInfo.pass;
+                let ha1_str: string = this._runtime_urlInfo.imm_getUser() + ':' + this.realm + ':' + this._runtime_urlInfo.imm_getPass();
                 let ha2_str: string = method + ':' + shorturi;
-                let A1: string = this._yapi.imm_bin2hexstr(this._yapi.imm_yMD5(ha1_str)).toLowerCase();
-                let A2: string = this._yapi.imm_bin2hexstr(this._yapi.imm_ySHA1(ha2_str)).toLowerCase();
+                let A1: string = this._hub._yapi.imm_bin2hexstr(this._hub._yapi.imm_yMD5(ha1_str)).toLowerCase();
+                let A2: string = this._hub._yapi.imm_bin2hexstr(this._hub._yapi.imm_ySHA1(ha2_str)).toLowerCase();
                 let signature: string = A1 + ':' + this.nonce + ':' + nc + ':' + cnonce + ':auth:' + A2;
-                let response: string = this._yapi.imm_bin2hexstr(this._yapi.imm_ySHA1(signature)).toLowerCase();
-                jsonBody['x-yauth']['username'] = this.urlInfo.user;
+                let response: string = this._hub._yapi.imm_bin2hexstr(this._hub._yapi.imm_ySHA1(signature)).toLowerCase();
+                jsonBody['x-yauth']['username'] = this._runtime_urlInfo.imm_getUser();
                 jsonBody['x-yauth']['cnonce'] = cnonce;
                 jsonBody['x-yauth']['nonce'] = this.nonce;
                 jsonBody['x-yauth']['nc'] = nc;
@@ -9956,7 +10628,7 @@ export class YHttpHub extends YGenericHub
                 jsonBody['x-yauth']['response'] = response;
             }
             if (obj_body) {
-                let binstr: string = this._yapi.imm_bin2str(obj_body.data);
+                let binstr: string = this._hub._yapi.imm_bin2str(obj_body.data);
                 jsonBody['body'] = {
                     filename: obj_body.fname,
                     b64content: btoa(binstr)
@@ -9970,7 +10642,7 @@ export class YHttpHub extends YGenericHub
                 relUrl = relUrl.slice(0, qpos);
             }
         } else if (obj_body != null) {
-            let boundary = this.imm_getBoundary();
+            let boundary = this._hub.imm_getBoundary();
             if (this.infoJson && this.infoJson.nonce) {
                 // VirtualHub-4web: do not use multipart/form-data in order
                 //                  to avoid PHP processing of uploads
@@ -9979,7 +10651,7 @@ export class YHttpHub extends YGenericHub
                 // YoctoHubs: use multipart/form-data to avoid CORS preflight requests
                 contentType = 'multipart/form-data; boundary=' + boundary;
             }
-            body = this.imm_formEncodeBody(obj_body, boundary);
+            body = this._hub.imm_formEncodeBody(obj_body, boundary);
         }
         return this.imm_makeRequest(method, relUrl, contentType, body, onProgress, onSuccess, onError);
     }
@@ -9987,83 +10659,68 @@ export class YHttpHub extends YGenericHub
     // Internal method to perform a simple HTTP GET using a hub-relative URL
     async tryFetch(relUrl: string): Promise<YConditionalResult>
     {
-        return new Promise<YConditionalResult>((resolve, reject):void => {
+        return new Promise<YConditionalResult>((resolve, reject): void => {
             this.imm_sendRequest('GET', relUrl, null, null,
                 (responseText: string): void => {
                     resolve({errorType: YAPI_SUCCESS, errorMsg: '', result: responseText});
                 },
-                (errorType: number, errorMsg: string): void => {
-                    resolve({errorType: errorType, errorMsg: errorMsg});
+                (errorType: number, errorMsg: string, can_be_retry: boolean): void => {
+                    if (can_be_retry) {
+                        this.imm_sendRequest('GET', relUrl, null, null,
+                            (responseText2: string): void => {
+                                resolve({errorType: YAPI_SUCCESS, errorMsg: '', result: responseText2});
+                            },
+                            (errorType2: number, errorMsg2: string, can_be_retry2: boolean): void => {
+                                resolve({errorType: errorType2, errorMsg: errorMsg2});
+                            });
+                    } else {
+                        resolve({errorType: errorType, errorMsg: errorMsg});
+                    }
                 });
         });
     }
 
     /** Handle HTTP-based event-monitoring work on a registered hub
      */
-    async reconnect(tryOpenID: string): Promise<void>
+    async reconnectEngine(tryOpenID: string): Promise<void>
     {
-        // Try to fetch info.json if not yet done or if possibly expired
-        this.currentConnID = tryOpenID;
-        if (!this.hubSerial || (this.infoJson && this.infoJson.nonce && YAPI.GetTickCount() - this.infoJson.stamp > 12000)) {
-            if (this._yapi._logLevel >= 4) {
-                this._yapi.imm_log('Trying info.json [' + tryOpenID + ']');
+        this._hub.imm_setCurrentConnID(tryOpenID);
+        // Try to fetch info.json if  expired
+        if (this.infoJson && this.infoJson.nonce && YAPI.GetTickCount() - this.infoJson.stamp > 12000) {
+            if (this._hub._yapi._logLevel >= 4) {
+                this._hub._yapi.imm_log('Trying info.json [' + tryOpenID + ']');
             }
             let res_struct: YConditionalResult = await this.tryFetch('info.json');
             if (res_struct.errorType == YAPI_SUCCESS && res_struct.result) {
                 this.infoJson = JSON.parse(res_struct.result);
                 this.infoJson.stamp = YAPI.GetTickCount();
-                if (this.infoJson && this.infoJson.serialNumber) {
-                    this.hubSerial = this.infoJson.serialNumber;
-                }
-            } else if (res_struct.errorType == YAPI_FILE_NOT_FOUND) {
-                // Old firmware without support for info.json, get at least the serial number
-                res_struct = await this.tryFetch('api/module/serialNumber');
-                if (res_struct.errorType == YAPI_SUCCESS && res_struct.result) {
-                    this.hubSerial = res_struct.result;
-                }
-            }
-            if (!this.hubSerial) {
-                if (!super.imm_disconnectNow(tryOpenID)) {
-                    return;
-                }
-                if (!this.imm_isDisconnecting()) {
-                    if (this._yapi._logLevel >= 3) {
-                        this._yapi.imm_log('Failed to load info.json: ' + res_struct.errorMsg + ' [' + tryOpenID + ']');
-                    }
-                }
-                this._lastErrorType = res_struct.errorType;
-                this._lastErrorMsg = res_struct.errorMsg;
-                this.currentConnID = '';
-                this.imm_signalHubDisconnected(tryOpenID);
-                return;
             }
         }
-
         // Check if this hub is a duplicate connection
-        let primaryHub: YGenericHub | null = this._yapi.imm_getPrimaryHub(this);
-        if (primaryHub !== this) {
-            this.imm_commonDisconnect(tryOpenID, YAPI_SUCCESS, 'Hub ' + this.hubSerial + ' is already connected');
-            this.currentConnID = '';
-            this.imm_signalHubDisconnected(tryOpenID);
+        let primaryHub: YGenericHub | null = this._hub._yapi.imm_getPrimaryHub(this._hub);
+        if (primaryHub !== this._hub) {
+            this._hub.imm_commonDisconnect(tryOpenID, YAPI_SUCCESS, 'Hub ' + this._hub.imm_getSerialNumber() + ' is already connected');
+            this._hub.imm_setCurrentConnID('');
+            this._hub.imm_signalHubDisconnected(tryOpenID);
             return;
         }
 
         // Then issue an HTTP request to open the notification channel
         let args = '';
-        if (this.notifPos >= 0) {
-            args = '?abs=' + this.notifPos.toString();
+        if (this._hub.imm_getNotifyPos() >= 0) {
+            args = '?abs=' + this._hub.imm_getNotifyPos().toString();
         } else {
-            this._firstArrivalCallback = true;
+            this._hub.imm_setFirstArrivalCallback(true);
         }
-        if (this._yapi._logLevel >= 4) {
-            this._yapi.imm_log('Opening http connection to hub (' + args + ') [' + tryOpenID + ']');
+        if (this._hub._yapi._logLevel >= 4) {
+            this._hub._yapi.imm_log('Opening http connection to hub (' + args + ') [' + tryOpenID + ']');
         }
-        this.notbynRequest = this.imm_sendRequest('GET', 'not.byn' + args, null,
+        this.notbynRequest = this.imm_sendRequest('GET', '/not.byn' + args, null,
             (moreText: string): void => {
                 // make sure data comes for current connection
-                if (tryOpenID != this.currentConnID) {
-                    if (this._yapi._logLevel >= 3) {
-                        this._yapi.imm_log('Previous request still sending data [' + tryOpenID + ']');
+                if (tryOpenID != this._hub.imm_getCurrentConnID()) {
+                    if (this._hub._yapi._logLevel >= 3) {
+                        this._hub._yapi.imm_log('Previous request still sending data [' + tryOpenID + ']');
                     }
                     return;
                 }
@@ -10071,39 +10728,39 @@ export class YHttpHub extends YGenericHub
                 if (this.infoJson) {
                     this.infoJson.stamp = YAPI.GetTickCount();
                 }
-                if (this._currentState < Y_YHubConnType.HUB_CONNECTED) {
-                    this.signalHubConnected(tryOpenID, this.hubSerial);
+                if (this._hub.imm_getcurrentState() < Y_YHubConnType.HUB_CONNECTED) {
+                    this._hub.signalHubConnected(tryOpenID, this._hub.imm_getSerialNumber());
                 }
-                this._yapi.parseEvents(this, moreText);
+                this.imm_updateLastPinfStamp();
+                this._hub._yapi.parseEvents(this._hub, moreText);
             },
             (resultText: string): void => {
-                if (tryOpenID != this.currentConnID) {
-                    if (this._yapi._logLevel >= 3) {
-                        this._yapi.imm_log('Previous request completed [' + tryOpenID + ']');
+                if (tryOpenID != this._hub.imm_getCurrentConnID()) {
+                    if (this._hub._yapi._logLevel >= 3) {
+                        this._hub._yapi.imm_log('Previous request completed [' + tryOpenID + ']');
                     }
                     return;
                 }
-                this.reconnect(tryOpenID);
+                this.reconnectEngine(tryOpenID);
             },
-            (errorType: number, errorMsg: string): void => {
-                if (tryOpenID != this.currentConnID) {
-                    if (this._yapi._logLevel >= 3) {
-                        this._yapi.imm_log('Previous not.byn request says: ' + errorMsg + ' [' + tryOpenID + ']');
+            (errorType: number, errorMsg: string, can_be_retry: boolean): void => {
+                if (tryOpenID != this._hub.imm_getCurrentConnID()) {
+                    if (this._hub._yapi._logLevel >= 3) {
+                        this._hub._yapi.imm_log('Previous not.byn request says: ' + errorMsg + ' [' + tryOpenID + ']');
                     }
                     return;
                 }
-                if (!this.imm_isDisconnecting()) {
-                    if (this._yapi._logLevel >= 3) {
-                        this._yapi.imm_log('Failed to load not.byn (' + args + '): ' + errorMsg + ' [' + tryOpenID + ']');
+                if (!this._hub.imm_isDisconnecting()) {
+                    if (this._hub._yapi._logLevel >= 3) {
+                        this._hub._yapi.imm_log('Failed to load not.byn (' + args + '): ' + errorMsg + ' [' + tryOpenID + ']');
                     }
                 }
-                this._lastErrorType = errorType;
-                this._lastErrorMsg = errorMsg;
-                if (errorType == YAPI_UNAUTHORIZED) {
+                this._hub.imm_SetErr(errorType, errorMsg);
+                if ((errorType == YAPI_UNAUTHORIZED || errorType == YAPI_SSL_UNK_CERT) && !can_be_retry) {
                     // this is a fatal failure, no need to retry
-                    this.imm_commonDisconnect(tryOpenID, errorType, errorMsg);
+                    this._hub.imm_commonDisconnect(tryOpenID, errorType, errorMsg);
                 }
-                this.imm_disconnectNow();
+                this._hub.imm_disconnectNow();
             }
         );
     }
@@ -10113,23 +10770,20 @@ export class YHttpHub extends YGenericHub
     // If a connectionID is passed as argument, only abort the
     // communication channel if the ID matched current connection
     //
-    // Return true if the connection os getting aborted
-    //
-    imm_disconnectNow(connID: string = ''): boolean
+    imm_disconnectEngineNow(connID: string = ''): void
     {
-        if (!super.imm_disconnectNow(connID)) {
-            return false;
+        if (this._hub._yapi._logLevel >= 4) {
+            this._hub._yapi.imm_log("YHTTPEngine.imm_disconnectEngineNow " + connID);
         }
         if (!this.notbynRequest) {
-            return false;
+            return;
         }
-        let closeConnID = (connID ? connID : this.currentConnID);
+        let closeConnID = (connID ? connID : this._hub.imm_getCurrentConnID());
         this.imm_abortRequest(this.notbynRequest);
         this.notbynRequest = null;
-        this.currentConnID = '';
-        this.imm_signalHubDisconnected(closeConnID);
+        this._hub.imm_setCurrentConnID('');
+        this._hub.imm_signalHubDisconnected(closeConnID);
 
-        return true;
     }
 
     /** Perform an HTTP query on the hub
@@ -10142,31 +10796,31 @@ export class YHttpHub extends YGenericHub
      */
     async request(method: string, devUrl: string, obj_body: YHTTPBody | null, tcpchan: number): Promise<YHTTPRequest>
     {
-        if (this._yapi._logLevel >= 3) {
-            this.imm_logrequest(method, devUrl, obj_body);
+        if (this._hub._yapi._logLevel >= 3) {
+            this._hub.imm_logrequest(method, devUrl, obj_body);
         }
-        if (this._currentState < Y_YHubConnType.HUB_CONNECTED) {
+        if (this._hub.imm_getcurrentState() < Y_YHubConnType.HUB_CONNECTED) {
             return new YHTTPRequest(null, YAPI.IO_ERROR, 'Hub is currently unavailable');
         }
         return new Promise<YHTTPRequest>(
             (resolve, reject): void => {
                 this.imm_sendRequest(
-                    method, devUrl.slice(1),
+                    method, devUrl,
                     obj_body, null,
                     (responseText: string): void => {
-                        if (this._currentState < Y_YHubConnType.HUB_CONNECTED) {
+                        if (this._hub.imm_getcurrentState() < Y_YHubConnType.HUB_CONNECTED) {
                             // avoid race condition between hub inventory and not.byn disconnect
                             resolve(new YHTTPRequest(null, YAPI.IO_ERROR, 'Hub is currently unavailable'));
                         } else {
-                            if (this._yapi._logLevel >= 4) {
-                                this._yapi.imm_log(method + ' ' + devUrl + ' succeeded');
+                            if (this._hub._yapi._logLevel >= 4) {
+                                this._hub._yapi.imm_log(method + ' ' + devUrl + ' succeeded');
                             }
-                            resolve(new YHTTPRequest(this._yapi.imm_str2bin(responseText)));
+                            resolve(new YHTTPRequest(this._hub._yapi.imm_str2bin(responseText)));
                         }
                     },
-                    (errorType: number, errorMsg: string): void => {
-                        if (this._yapi._logLevel >= 4) {
-                            this._yapi.imm_log(method + ' ' + devUrl + ' failed (' + errorMsg + ')');
+                    (errorType: number, errorMsg: string, can_be_retry: boolean): void => {
+                        if (this._hub._yapi._logLevel >= 4) {
+                            this._hub._yapi.imm_log(method + ' ' + devUrl + ' failed (' + errorMsg + ')');
                         }
                         resolve(new YHTTPRequest(null, errorType, errorMsg));
                     });
@@ -10262,7 +10916,7 @@ const enum WSConnState
     CONNECTED = 5
 }
 
-export abstract class YWebSocketHub extends YGenericHub
+export abstract class YWebSocketEngine extends YHubEngine
 {
     // default transport layer parameters
     _DEFAULT_TCP_ROUND_TRIP_TIME = 30;
@@ -10311,9 +10965,9 @@ export abstract class YWebSocketHub extends YGenericHub
     fwd_connectionState: number;
     fwd_closeCallback: Function | null = null;
 
-    constructor(yapi: YAPIContext, urlInfo: _YY_UrlInfo)
+    constructor(hub: YGenericHub, runtime_urlInfo: _YY_UrlInfo)
     {
-        super(yapi, urlInfo);
+        super(hub, runtime_urlInfo);
         // setup defaults states
         this._connectionState = WSConnState.CONNECTING;
         this._tcpRoundTripTime = this._DEFAULT_TCP_ROUND_TRIP_TIME;
@@ -10337,30 +10991,33 @@ export abstract class YWebSocketHub extends YGenericHub
      **/
     imm_asyncWebSocketError(errorType: number, message: string): void
     {
-        // Note: throwing an exception here would typically kill the node.js process
-        this._yapi.imm_log('WS: ' + message + ' on ' + this.urlInfo.rootUrl);
+        if (this._hub._yapi._logLevel >= 3) {
+            // Note: throwing an exception here would typically kill the node.js process
+            this._hub._yapi.imm_log('WS: ' + message + ' on ' + this._runtime_urlInfo.imm_getRootUrl());
+        }
     }
 
     /** Handle websocket-based event-monitoring work on a registered hub
      */
-    async reconnect(tryOpenID: string): Promise<void>
+    async reconnectEngine(tryOpenID: string): Promise<void>
     {
         this._connectionState = WSConnState.CONNECTING;
-        if (this._yapi._logLevel >= 4) {
-            this._yapi.imm_log('Opening websocket connection [' + tryOpenID + ']');
+        if (this._hub._yapi._logLevel >= 4) {
+            this._hub._yapi.imm_log('Opening websocket connection [' + tryOpenID + ']');
         }
-        this.currentConnID = tryOpenID;
-        this.imm_webSocketOpen(this.urlInfo.authUrl + 'not.byn');
-        this._firstArrivalCallback = true;
+        this._hub.imm_setCurrentConnID(tryOpenID);
+        let url = (this._runtime_urlInfo.imm_useSecureSocket() ? "wss://" : "ws://") + this._runtime_urlInfo.imm_getUrl(false, true, true);
+        this.imm_webSocketOpen(url + 'not.byn');
+        this._hub.imm_setFirstArrivalCallback(true)
         if (!this.websocket) {
             // failure to create the websocket only occurs in case of unsupported protocol
-            this.imm_commonDisconnect(tryOpenID, YAPI_IO_ERROR, 'Failed to create WebSocket');
+            this._hub.imm_commonDisconnect(tryOpenID, YAPI_IO_ERROR, 'Failed to create WebSocket');
             return;
         }
         this.websocket.onmessage = ((evt: _YY_WebSocketMessageEvent): void => {
-            if (this.currentConnID != tryOpenID) {
-                if (this._yapi._logLevel >= 4) {
-                    this._yapi.imm_log('Incoming WebSocket data for previous connection [' + tryOpenID + ']');
+            if (this._hub.imm_getCurrentConnID() != tryOpenID) {
+                if (this._hub._yapi._logLevel >= 4) {
+                    this._hub._yapi.imm_log('Incoming WebSocket data for previous connection [' + tryOpenID + ']');
                 }
                 return;
             }
@@ -10368,68 +11025,75 @@ export abstract class YWebSocketHub extends YGenericHub
             if (this._connectionState == WSConnState.READY) {
                 // registration is now complete
                 this._connectionState = WSConnState.CONNECTED;
-                this.signalHubConnected(tryOpenID, this._remoteSerial);
+                this._hub.signalHubConnected(tryOpenID, this._remoteSerial);
             } else if (this._connectionState == WSConnState.DEAD) {
                 let errMsg = (this._session_error ? 'WebSocket error: ' + this._session_error : 'Websocket I/O error');
                 if (this._session_errno == 401) {
-                    this.imm_commonDisconnect(tryOpenID, YAPI_UNAUTHORIZED, errMsg);
+                    this._hub.imm_commonDisconnect(tryOpenID, YAPI_UNAUTHORIZED, errMsg);
                 } else {
-                    this._lastErrorType = YAPI_IO_ERROR;
-                    this._lastErrorMsg = errMsg;
+                    this._hub.imm_SetErr(YAPI_IO_ERROR, errMsg);
                 }
-                this.imm_disconnectNow();
+                this._hub.imm_disconnectNow();
             }
         });
         this.websocket.onclose = ((evt: _YY_WebSocketCloseEvent): void => {
-            if (this.currentConnID != tryOpenID) {
-                if (this._yapi._logLevel >= 4) {
-                    this._yapi.imm_log('WebSocket close received for previous connection [' + tryOpenID + '], now using [' + this.currentConnID + ']');
+            if (this._hub.imm_getCurrentConnID() != tryOpenID) {
+                if (this._hub._yapi._logLevel >= 4) {
+                    this._hub._yapi.imm_log('WebSocket close received for previous connection [' + tryOpenID + '], now using [' + this._hub.imm_getCurrentConnID() + ']');
                 }
                 return;
             }
-            if (this._yapi._logLevel >= 4) {
-                this._yapi.imm_log('WebSocket connection closed [' + tryOpenID + ']');
+            if (this._hub._yapi._logLevel >= 4) {
+                this._hub._yapi.imm_log('WebSocket connection closed [' + tryOpenID + ']');
             }
             this._connectionState = WSConnState.DISCONNECTED;
             this.websocket = null;
-            if (this.retryDelay < 0) {
+            if (this._hub.retryDelay < 0) {
                 // this happens typically for websocket callback
-                this.imm_commonDisconnect(tryOpenID, YAPI_IO_ERROR, 'Websocket callback connection closed');
+                this._hub.imm_commonDisconnect(tryOpenID, YAPI_IO_ERROR, 'Websocket callback connection closed');
             }
             this.imm_dropAllPendingConnection();
             // connection error, will retry automatically if needed
-            this.imm_signalHubDisconnected(tryOpenID);
+            this._hub.imm_signalHubDisconnected(tryOpenID);
         });
         this.websocket.onerror = ((evt: _YY_WebSocketErrorEvent): void => {
-            if (this.currentConnID != tryOpenID) {
-                if (this._yapi._logLevel >= 4) {
-                    this._yapi.imm_log('WebSocket error received for previous connection [' + tryOpenID + ']');
+            if (this._hub.imm_getCurrentConnID() != tryOpenID) {
+                if (this._hub._yapi._logLevel >= 4) {
+                    this._hub._yapi.imm_log('WebSocket error received for previous connection [' + tryOpenID + ']');
                 }
                 return;
             }
-            if (evt.message && (!/ ETIMEDOUT /.test(evt.message) || this._yapi._logLevel >= 4)) {
-                this._yapi.imm_log('WebSocket error [' + tryOpenID + ']: ', evt);
-                this._lastErrorType = YAPI_IO_ERROR;
-                this._lastErrorMsg = evt.message;
+            if (evt.message && (!/ ETIMEDOUT /.test(evt.message) || this._hub._yapi._logLevel >= 4)) {
+                if (this._hub._yapi._logLevel >= 3) {
+                    this._hub._yapi.imm_log('WebSocket error [' + tryOpenID + ']: ', evt);
+                }
+                if ((evt.error as any).code == "DEPTH_ZERO_SELF_SIGNED_CERT") {
+                    // this is a fatal failure, no need to retry
+                    this._hub.imm_commonDisconnect(tryOpenID, YAPI_SSL_UNK_CERT, evt.message);
+                } else {
+                    this._hub.imm_SetErr(YAPI_IO_ERROR, evt.message);
+                }
             }
-            if (this.retryDelay < 0) {
+            if (this._hub.retryDelay < 0) {
                 // this happens typically for websocket callback
-                this.imm_commonDisconnect(tryOpenID, YAPI_IO_ERROR, 'Websocket callback connection closed');
+                this._hub.imm_commonDisconnect(tryOpenID, YAPI_IO_ERROR, 'Websocket callback connection closed');
             }
-            this.imm_disconnectNow();
+            this._hub.imm_disconnectNow();
             // connection error, will retry automatically
-            this.imm_signalHubDisconnected(tryOpenID);
+            this._hub.imm_signalHubDisconnected(tryOpenID);
         });
-        if (this.timeoutId) {
-            clearTimeout(this.timeoutId);
+        if (this._hub.timeoutId) {
+            clearTimeout(this._hub.timeoutId);
         }
-        this.timeoutId = setTimeout((): void => {
+        this._hub.timeoutId = setTimeout((): void => {
             if (!this.imm_isForwarded()) {
                 // abort communication channel, this will trigger a reconnect
-                this._yapi.imm_log('WS: connection stalled during open [' + tryOpenID + ']');
-                this.imm_disconnectNow();
+                if (this._hub._yapi._logLevel >= 3) {
+                    this._hub._yapi.imm_log('WS: connection stalled during open [' + tryOpenID + ']');
+                }
+                this._hub.imm_disconnectNow();
             }
-        }, this.stalledTimeoutMs);  // initial timeout to start receiving notifications
+        }, this._hub.imm_getNetworkTimeout());  // initial timeout to start receiving notifications
     }
 
     /** Compute websocket authentication sha1 key
@@ -10443,10 +11107,10 @@ export abstract class YWebSocketHub extends YGenericHub
     imm_computeAuth(user: string, pass: string, serial: string, nonce: number): Uint8Array
     {
         let ha1_str = user + ':' + serial + ':' + pass;
-        let ha1 = this._yapi.imm_bin2hexstr(this._yapi.imm_yMD5(ha1_str)).toLowerCase();
+        let ha1 = this._hub._yapi.imm_bin2hexstr(this._hub._yapi.imm_yMD5(ha1_str)).toLowerCase();
         let nonce8 = new Uint8Array([(nonce & 0xff) >>> 0, (nonce & 0xff00) >>> 8, (nonce & 0xff0000) >>> 16, nonce >>> 24]);
-        let sha1_raw = ha1 + this._yapi.imm_bin2hexstr(nonce8).toLowerCase();
-        return this._yapi.imm_ySHA1(sha1_raw.toLowerCase());
+        let sha1_raw = ha1 + this._hub._yapi.imm_bin2hexstr(nonce8).toLowerCase();
+        return this._hub._yapi.imm_ySHA1(sha1_raw.toLowerCase());
     }
 
     /** Tell if a websocket hub is currently forwarded and handled remotely
@@ -10466,12 +11130,12 @@ export abstract class YWebSocketHub extends YGenericHub
     {
         try {
             if (this.imm_isForwarded()) {
-                this.lastPingStamp = Date.now();
+                this.imm_updateLastPinfStamp();
                 (<_YY_WebSocket>this.fwd_websocket).send(arr_bytes);
                 return;
             }
 
-            let reltime = (this._yapi.GetTickCount() - this._connectionTime) / 1000.0;
+            let reltime = (this._hub._yapi.GetTickCount() - this._connectionTime) / 1000.0;
             let ystream = arr_bytes[0] >>> 3;
             let text = '';
             if (ystream == YSTREAM.TCP_NOTIF) {
@@ -10479,7 +11143,8 @@ export abstract class YWebSocketHub extends YGenericHub
                 for (let i = 1; i < arr_bytes.length; i++) {
                     text += String.fromCharCode(arr_bytes[i]);
                 }
-                await this._yapi.parseEvents(this, text);
+                this.imm_updateLastPinfStamp();
+                await this._hub._yapi.parseEvents(this._hub, text);
                 return;
             }
             // Other types of messages
@@ -10501,18 +11166,18 @@ export abstract class YWebSocketHub extends YGenericHub
                     // async close packet, check async signature byte
                     tcp_end--;
                     let rcvId = arr_bytes[tcp_end];
-                    if (this._yapi._logLevel >= 5) {
-                        this._yapi.imm_log('async-' + rcvId + ' close received');
+                    if (this._hub._yapi._logLevel >= 5) {
+                        this._hub._yapi.imm_log('async-' + rcvId + ' close received');
                     }
                     if (yreq.asyncId == 0) {
-                        if (this._yapi._logLevel >= 4) {
-                            this._yapi.imm_log('async-' + rcvId + ' close received while req @' + yreq._creat + ' was pending');
+                        if (this._hub._yapi._logLevel >= 4) {
+                            this._hub._yapi.imm_log('async-' + rcvId + ' close received while req @' + yreq._creat + ' was pending');
                         }
                         this.imm_asyncWebSocketError(YAPI_IO_ERROR, 'Asynchronous close received, sync reply request');
                         return;
                     } else if (yreq.asyncId != rcvId) {
-                        if (this._yapi._logLevel >= 4) {
-                            this._yapi.imm_log('async-' + rcvId + ' close received instead of async-' + yreq.asyncId + ' close');
+                        if (this._hub._yapi._logLevel >= 4) {
+                            this._hub._yapi.imm_log('async-' + rcvId + ' close received instead of async-' + yreq.asyncId + ' close');
                         }
                         this.imm_asyncWebSocketError(YAPI_IO_ERROR, 'Incorrect async-close signature on tcpChan ' + tcpchan);
                         return;
@@ -10533,8 +11198,8 @@ export abstract class YWebSocketHub extends YGenericHub
                     if (ystream == YSTREAM.TCP_CLOSE) {
                         // synchronous close
                         if (yreq.asyncId != 0) {
-                            if (this._yapi._logLevel >= 4) {
-                                this._yapi.imm_log('Synchronous close received instead of async-' + yreq.asyncId + ' close');
+                            if (this._hub._yapi._logLevel >= 4) {
+                                this._hub._yapi.imm_log('Synchronous close received instead of async-' + yreq.asyncId + ' close');
                             }
                             // no need to ack that close packet, we have sent the ack when aborting
                             // the request if the request was indeed coming from us
@@ -10544,8 +11209,10 @@ export abstract class YWebSocketHub extends YGenericHub
                             if (yreq.toBeSent && <number>yreq.sendPos < yreq.toBeSent.length) {
                                 // close before completely sent
                                 // force a websocket disconnection to resynchronize
-                                this._yapi.imm_log('WS: tcpclose at ' + yreq.sendPos + ' < ' + yreq.toBeSent.length);
-                                this.imm_disconnectNow();
+                                if (this._hub._yapi._logLevel >= 3) {
+                                    this._hub._yapi.imm_log('WS: tcpclose at ' + yreq.sendPos + ' < ' + yreq.toBeSent.length);
+                                }
+                                this._hub.imm_disconnectNow();
                                 if (yreq.timeoutId) {
                                     clearTimeout(yreq.timeoutId);
                                 }
@@ -10579,7 +11246,7 @@ export abstract class YWebSocketHub extends YGenericHub
                         yreq.errorType = YAPI_IO_ERROR;
                         yreq.errorMsg = 'Bad response header';
                     } else {
-                        let header = this._yapi.imm_bin2str(yreq.bin_result.subarray(0, pos));
+                        let header = this._hub._yapi.imm_bin2str(yreq.bin_result.subarray(0, pos));
                         let words = header.split(' ');
                         if (words[0] == 'OK') {
                             yreq.errorType = YAPI_SUCCESS;
@@ -10603,8 +11270,8 @@ export abstract class YWebSocketHub extends YGenericHub
                         }
                     }
                     if (yreq.asyncId == 0) {
-                        if (this._yapi._logLevel >= 5) {
-                            this._yapi.imm_log('request @' + yreq._creat + ' done, status=' + yreq.errorType);
+                        if (this._hub._yapi._logLevel >= 5) {
+                            this._hub._yapi.imm_log('request @' + yreq._creat + ' done, status=' + yreq.errorType);
                         }
                         this.imm_sendPendingRequest(tcpchan);
                         if (yreq.acceptor) {
@@ -10641,14 +11308,14 @@ export abstract class YWebSocketHub extends YGenericHub
                     this._remoteNonce = arr_bytes[5] + (arr_bytes[6] << 8) + (arr_bytes[7] << 16) + (arr_bytes[8] << 24);
                     for (let i = 9; i < 9 + 20; i++) {
                         if (arr_bytes[i] == 0) {
-                            this._remoteSerial = this._yapi.imm_bin2str(arr_bytes.subarray(9, i));
+                            this._remoteSerial = this._hub._yapi.imm_bin2str(arr_bytes.subarray(9, i));
                             break;
                         }
                     }
                     let nonce = new Uint8Array(4);
                     this.imm_getRandomValues(nonce);
                     this._nonce = nonce[0] + (nonce[1] << 8) + (nonce[2] << 16) + (nonce[3] << 24);
-                    this._connectionTime = this._yapi.GetTickCount();
+                    this._connectionTime = this._hub._yapi.GetTickCount();
                     this._connectionState = WSConnState.AUTHENTICATING;
                     // send our authentication packet
                     let frame = new Uint8Array(1 + this._USB_META_WS_AUTHENTICATION_SIZE);
@@ -10657,9 +11324,9 @@ export abstract class YWebSocketHub extends YGenericHub
                     frame[0] = (YSTREAM.META << 3);
                     frame[1] = USB_META.WS_AUTHENTICATION;
                     frame[2] = version;
-                    if (this.urlInfo.pass != '') {
+                    if (this._runtime_urlInfo.imm_getPass() != '') {
                         flags = this._USB_META_WS_VALID_SHA1;
-                        let sha1 = this.imm_computeAuth(this.urlInfo.user, this.urlInfo.pass, this._remoteSerial, this._remoteNonce);
+                        let sha1 = this.imm_computeAuth(this._runtime_urlInfo.imm_getUser(), this._runtime_urlInfo.imm_getPass(), this._remoteSerial, this._remoteNonce);
                         for (let i = 0; i < sha1.length; i++) {
                             frame[9 + i] = sha1[i];
                         }
@@ -10679,14 +11346,14 @@ export abstract class YWebSocketHub extends YGenericHub
                     if (arr_bytes.length < 1 + this._USB_META_WS_AUTHENTICATION_SIZE) {
                         return;
                     }
-                    this._tcpRoundTripTime = this._yapi.GetTickCount() - this._connectionTime + 1;
+                    this._tcpRoundTripTime = this._hub._yapi.GetTickCount() - this._connectionTime + 1;
                     if (this._tcpMaxWindowSize < 2048 && this._tcpRoundTripTime < 7) {
                         // Fix overly optimistic round-trip on YoctoHubs
                         this._tcpRoundTripTime = 7;
                     }
                     let uploadRate = (this._tcpMaxWindowSize * 1000 / this._tcpRoundTripTime) >> 0;
-                    if (this._yapi._logLevel >= 4) {
-                        this._yapi.imm_log('RTT=' + this._tcpRoundTripTime + 'ms, WS=' + this._tcpMaxWindowSize + ', uploadRate=' + (uploadRate / 1000) + ' KB/s');
+                    if (this._hub._yapi._logLevel >= 4) {
+                        this._hub._yapi.imm_log('RTT=' + this._tcpRoundTripTime + 'ms, WS=' + this._tcpMaxWindowSize + ', uploadRate=' + (uploadRate / 1000) + ' KB/s');
                     }
                     this._remoteVersion = arr_bytes[2];
                     if (this._remoteVersion < 1) {
@@ -10694,13 +11361,13 @@ export abstract class YWebSocketHub extends YGenericHub
                     }
                     let inflags = arr_bytes[3] + (arr_bytes[4] << 8);
                     if ((inflags & this._USB_META_WS_RW) != 0) {
-                        this._rwAccess = true;
+                        this._hub.imm_setRwAccess(true);
                     } else {
-                        this._rwAccess = false;
+                        this._hub.imm_setRwAccess(false)
                     }
                     if ((inflags & this._USB_META_WS_VALID_SHA1) != 0) {
                         let remote_sha1 = arr_bytes.subarray(9, 29);
-                        let sha1 = this.imm_computeAuth(this.urlInfo.user, this.urlInfo.pass, this._remoteSerial, this._nonce);
+                        let sha1 = this.imm_computeAuth(this._runtime_urlInfo.imm_getUser(), this._runtime_urlInfo.imm_getPass(), this._remoteSerial, this._nonce);
                         for (let i = 0; i < sha1.length; i++) {
                             if (sha1[i] != remote_sha1[i]) {
                                 // bad signature
@@ -10713,13 +11380,13 @@ export abstract class YWebSocketHub extends YGenericHub
                         // Password verified OK
                         this._connectionState = WSConnState.READY;
                     } else {
-                        if (this.urlInfo.pass == '') {
+                        if (this._runtime_urlInfo.imm_getPass() == '') {
                             // No password required, connection OK
                             this._connectionState = WSConnState.READY;
                         } else {
                             // Hub did not sign password, unauthorized
                             this._session_errno = 401;
-                            if (this.urlInfo.user == 'admin' && !this._rwAccess) {
+                            if (this._runtime_urlInfo.imm_getUser() == 'admin' && !this._hub.imm_isRwAccess()) {
                                 this._session_error = 'Authentication as admin failed';
                             } else {
                                 this._session_error = 'Password not set on remote hub';
@@ -10743,7 +11410,7 @@ export abstract class YWebSocketHub extends YGenericHub
                     if (this.tcpChan[tcpchan]) {
                         let yreq = <YHTTPRequest>this.tcpChan[tcpchan];
                         let ackBytes = arr_bytes[3] + (arr_bytes[4] << 8) + (arr_bytes[5] << 16) + (arr_bytes[6] << 24);
-                        let ackTime = this._yapi.GetTickCount();
+                        let ackTime = this._hub._yapi.GetTickCount();
                         if (this._lastUploadAckTime[tcpchan] != 0 && ackBytes > this._lastUploadAckBytes[tcpchan]) {
                             this._lastUploadAckBytes[tcpchan] = ackBytes;
                             this._lastUploadAckTime[tcpchan] = ackTime;
@@ -10758,8 +11425,8 @@ export abstract class YWebSocketHub extends YGenericHub
                             }
                             let newRate = deltaBytes * 1000 / deltaTime;
                             this._uploadRate[tcpchan] = (0.8 * this._uploadRate[tcpchan] + 0.3 * newRate) >> 0;// +10% intentionally
-                            if (this._yapi._logLevel >= 5) {
-                                this._yapi.imm_log("New rate: " + (this._uploadRate[tcpchan] / 1000) + " KB/s (last " + ((deltaBytes / 1000) >> 0) + "KB sent at " + ((newRate >> 0) / 1000) + " KB/s)");
+                            if (this._hub._yapi._logLevel >= 5) {
+                                this._hub._yapi.imm_log("New rate: " + (this._uploadRate[tcpchan] / 1000) + " KB/s (last " + ((deltaBytes / 1000) >> 0) + "KB sent at " + ((newRate >> 0) / 1000) + " KB/s)");
                             }
                         } else {
                             //this._yapi.imm_log("First Ack received");
@@ -10778,9 +11445,9 @@ export abstract class YWebSocketHub extends YGenericHub
                 }
                 return;
             }
-            this.imm_asyncWebSocketError(YAPI_IO_ERROR, 'Unsupported message: ' + this._yapi.imm_bin2hexstr(arr_bytes));
+            this.imm_asyncWebSocketError(YAPI_IO_ERROR, 'Unsupported message: ' + this._hub._yapi.imm_bin2hexstr(arr_bytes));
         } catch (e) {
-            this._yapi.imm_log('Unhandled exception in _webSocketMsg:', e);
+            this._hub._yapi.imm_log('Unhandled exception in _webSocketMsg:', e);
         }
     }
 
@@ -10795,6 +11462,28 @@ export abstract class YWebSocketHub extends YGenericHub
         }
     }
 
+    imm_hasPendingRequest(): boolean
+    {
+        for (let tcpchan = 0; tcpchan < 4; tcpchan++) {
+            let queue = this.tcpChan[tcpchan];
+            if (queue) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    async waitForPendingQueries(ms_duration: number): Promise<void>
+    {
+        let end: number = this._hub._yapi.GetTickCount() + ms_duration;
+        let remaining: number = ms_duration;
+        while (this.imm_hasPendingRequest() && remaining > 0) {
+            let waitTime: number = Math.min(remaining, 25);
+            await new Promise<void>((resolve, reject): void => { setTimeout(resolve, waitTime); });
+            remaining = end - this._hub._yapi.GetTickCount();
+        }
+    }
+
     /** Perform an HTTP query on the hub
      *
      * @param method {string}
@@ -10805,8 +11494,8 @@ export abstract class YWebSocketHub extends YGenericHub
      */
     async request(method: string, devUrl: string, obj_body: YHTTPBody | null, tcpchan: number): Promise<YHTTPRequest>
     {
-        if (this._yapi._logLevel >= 3) {
-            this.imm_logrequest(method, devUrl, obj_body);
+        if (this._hub._yapi._logLevel >= 3) {
+            this._hub.imm_logrequest(method, devUrl, obj_body);
         }
         //noinspection UnnecessaryLocalVariableJS
         let httpPromise = new Promise<YHTTPRequest>(
@@ -10816,16 +11505,16 @@ export abstract class YWebSocketHub extends YGenericHub
                 let isAsync = (this._remoteVersion > 0 && devUrl.slice(-2) == '&.');
                 let yreq = new YHTTPRequest(new Uint8Array(0));
 
-                if (this._yapi._logLevel >= 5) {
+                if (this._hub._yapi._logLevel >= 5) {
                     yreq._creat = (Date.now() % 600000).toString();
-                    this._yapi.imm_log('request @' + yreq._creat + ': ' + method + ' ' + devUrl);
+                    this._hub._yapi.imm_log('request @' + yreq._creat + ': ' + method + ' ' + devUrl);
                 }
                 yreq.acceptor = resolve;
                 yreq.devUrl = devUrl;
                 yreq.sendPos = 0;
                 if (obj_body) {
-                    let boundary = this.imm_getBoundary();
-                    let body = this.imm_formEncodeBody(obj_body, boundary);
+                    let boundary = this._hub.imm_getBoundary();
+                    let body = this._hub.imm_formEncodeBody(obj_body, boundary);
                     subReq = subReq.slice(0, -2) +
                         'Content-Type: x-upload, boundary=' + boundary + '\r\n\r\n';
                     yreq.toBeSent = new Uint8Array(subReq.length + body.length);
@@ -10843,12 +11532,12 @@ export abstract class YWebSocketHub extends YGenericHub
                     try { yreq.acceptor(yreq); } catch (e) {}
                     return;
                 }
-                if (!ws || this.imm_isDisconnecting() || this._connectionState != WSConnState.CONNECTED) {
-                    if (this._yapi._logLevel >= 4) {
+                if (!ws || this._hub.imm_isDisconnecting() || this._connectionState != WSConnState.CONNECTED) {
+                    if (this._hub._yapi._logLevel >= 4) {
                         let wsState: string = (ws ? ' websocket=NULL' : '');
-                        let dsState: string = (this.imm_isDisconnecting() ? ' disconnecting' : '');
+                        let dsState: string = (this._hub.imm_isDisconnecting() ? ' disconnecting' : '');
                         let cnState: string = (this._connectionState != WSConnState.CONNECTED ? ' connState=' + this._connectionState : '');
-                        this._yapi.imm_log('request @' + yreq._creat + ' failed, websocket is down:' + wsState + dsState + cnState);
+                        this._hub._yapi.imm_log('request @' + yreq._creat + ' failed, websocket is down:' + wsState + dsState + cnState);
                     }
                     yreq.errorType = YAPI_IO_ERROR;
                     yreq.errorMsg = 'WebSocket not connected';
@@ -10891,9 +11580,9 @@ export abstract class YWebSocketHub extends YGenericHub
         let yreq = this.tcpChan[tcpchan];
 
         while (yreq) {
-            if (!this.websocket || this.imm_isDisconnecting() || this._connectionState != WSConnState.CONNECTED) {
-                if (this._yapi._logLevel >= 4) {
-                    this._yapi.imm_log('request @' + yreq._creat + ' failed, websocket is down');
+            if (!this.websocket || this._hub.imm_isDisconnecting() || this._connectionState != WSConnState.CONNECTED) {
+                if (this._hub._yapi._logLevel >= 4) {
+                    this._hub._yapi.imm_log('request @' + yreq._creat + ' failed, websocket is down');
                 }
                 yreq.errorType = YAPI_IO_ERROR;
                 yreq.errorMsg = 'WebSocket not connected';
@@ -10913,8 +11602,8 @@ export abstract class YWebSocketHub extends YGenericHub
             if (!yreq.toBeSent) {
                 // request already sent
                 if (yreq.asyncId == 0) {
-                    if (this._yapi._logLevel >= 5) {
-                        this._yapi.imm_log(pendingCount.toString() + ' req pending, @' + yreq._creat + ' not completed');
+                    if (this._hub._yapi._logLevel >= 5) {
+                        this._hub._yapi.imm_log(pendingCount.toString() + ' req pending, @' + yreq._creat + ' not completed');
                     }
                     return;
                 }
@@ -10947,7 +11636,7 @@ export abstract class YWebSocketHub extends YGenericHub
                     // adapt window frame to available bandwidth
                     let bytesOnTheAir = pos - this._lastUploadAckBytes[tcpchan];
                     let uploadRate = this._uploadRate[tcpchan];
-                    let timeOnTheAir = this._yapi.GetTickCount() - this._lastUploadAckTime[tcpchan];
+                    let timeOnTheAir = this._hub._yapi.GetTickCount() - this._lastUploadAckTime[tcpchan];
                     let toBeSent = (2 * uploadRate + 1024 - bytesOnTheAir + (uploadRate * timeOnTheAir / 1000)) >> 0;
                     if (toBeSent + bytesOnTheAir > this._DEFAULT_TCP_MAX_WINDOW_SIZE) {
                         toBeSent = this._DEFAULT_TCP_MAX_WINDOW_SIZE - bytesOnTheAir;
@@ -10974,6 +11663,13 @@ export abstract class YWebSocketHub extends YGenericHub
                 let framelen = 1 + end - pos;
                 if (framelen > 125) framelen = 125;
                 let datalen = framelen - 1;
+                if (pos < 180 && pos + datalen >= 192) {
+                    // on a YoctoHub, the input FIFO is limited to 192, and we can only
+                    // accept a frame if it fits entirely in the input FIFO. So make sure
+                    // the beginning of the request gets delivered entirely
+                    datalen = 191 - pos;
+                    framelen = datalen + 1;
+                }
 
                 if (isAsync && pos + datalen == yreq.toBeSent.length && framelen < 125) {
                     frame = new Uint8Array(framelen + 1);
@@ -11016,12 +11712,12 @@ export abstract class YWebSocketHub extends YGenericHub
                     yreq.acceptor(yreq);
                 } catch (e) {
                     // discard exception
-                    this._yapi.imm_log('WS: async acceptor exception: ', e);
+                    this._hub._yapi.imm_log('WS: async acceptor exception: ', e);
                 }
             }
 
             // Setup timeout counter
-            let mstimeout = this._yapi._networkTimeoutMs;
+            let mstimeout = this._hub._yapi._networkTimeoutMs;
             if (yreq.devUrl) {
                 if (yreq.devUrl.indexOf('/testcb.txt') >= 0) {
                     mstimeout = this._YIO_1_MINUTE_TCP_TIMEOUT;
@@ -11047,8 +11743,8 @@ export abstract class YWebSocketHub extends YGenericHub
             yreq._sent = (Date.now() % 600000).toString();
 
             // Wait for request completion in case this is a sync request
-            if (this._yapi._logLevel >= 5) {
-                this._yapi.imm_log('req @' + yreq._creat + ' sent (1/' + pendingCount.toString() + ')' +
+            if (this._hub._yapi._logLevel >= 5) {
+                this._hub._yapi.imm_log('req @' + yreq._creat + ' sent (1/' + pendingCount.toString() + ')' +
                     (isAsync ? ' async-' + yreq.asyncId + ', continue' : ', waiting for reply'));
             }
 
@@ -11075,18 +11771,18 @@ export abstract class YWebSocketHub extends YGenericHub
             frame[0] = 8 * YSTREAM.TCP_CLOSE + tcpchan;
             this.imm_webSocketSend(frame);
 
-            if (this._yapi._logLevel >= 4) {
+            if (this._hub._yapi._logLevel >= 4) {
                 let pendingCount = 1;
                 for (let yr = yreq; yr.next; yr = yr.next) {
                     pendingCount++;
                 }
-                this._yapi.imm_log(pendingCount.toString() + ' req pending, @' + yreq._creat + ' is in timeout');
+                this._hub._yapi.imm_log(pendingCount.toString() + ' req pending, @' + yreq._creat + ' is in timeout');
             }
 
             // device is still expected to send a close to remove request from queue
             // but if that does not happen, remove the request from queue after 5 seconds
             setTimeout((chan: number, yr: YHTTPRequest): void => {
-                this._yapi.imm_log('Dropping synchronous request after timeout: ' + yr.devUrl);
+                this._hub._yapi.imm_log('Dropping synchronous request after timeout: ' + yr.devUrl);
                 this.imm_forgetRequest(chan, yr);
             }, 5000, tcpchan, yreq);
         }
@@ -11139,8 +11835,8 @@ export abstract class YWebSocketHub extends YGenericHub
 
                 // mark request as failed
                 if (yreq.asyncId == 0) {
-                    if (this._yapi._logLevel >= 4) {
-                        this._yapi.imm_log('drop @' + yreq._creat + ' (websocket down)');
+                    if (this._hub._yapi._logLevel >= 4) {
+                        this._hub._yapi.imm_log('drop @' + yreq._creat + ' (websocket down)');
                     }
                     yreq.errorType = YAPI_IO_ERROR;
                     yreq.errorMsg = 'Request ' + yreq.devUrl + ' dropped (websocket down)';
@@ -11171,14 +11867,14 @@ export abstract class YWebSocketHub extends YGenericHub
                     this.imm_webSocketSend(evt.data);
                 } else {
                     // drop unexpected frame in disconnected state
-                    this._yapi.imm_log('WS: drop packet from fwd API (state=' + this._connectionState + ')');
+                    this._hub._yapi.imm_log('WS: drop packet from fwd API (state=' + this._connectionState + ')');
                 }
             } else if (this.fwd_connectionState == WSConnState.AUTHENTICATING) {
                 // handle authentication packet
                 this.imm_handleAPIAuthPkt(evt.data);
             } else {
                 // drop unexpected frame in disconnected state
-                this._yapi.imm_log('WS: drop packet from fwd API (fwd_state=' + this.fwd_connectionState + ')');
+                this._hub._yapi.imm_log('WS: drop packet from fwd API (fwd_state=' + this.fwd_connectionState + ')');
             }
         });
         ws.onclose = ((evt: _YY_WebSocketCloseEvent): void => {
@@ -11221,12 +11917,16 @@ export abstract class YWebSocketHub extends YGenericHub
     imm_handleAPIAuthPkt(msg: Uint8Array): void
     {
         if (msg.length < 1 + this._USB_META_WS_AUTHENTICATION_SIZE || msg[0] != (YSTREAM.META << 3)) {
-            this._yapi.imm_log("bad-apiauth1\n");
+            if (this._hub._yapi._logLevel >= 3) {
+                this._hub._yapi.imm_log("bad-apiauth1\n");
+            }
             this.fwd_connectionState = WSConnState.DEAD;
             return;
         }
         if (msg[1] != USB_META.WS_AUTHENTICATION || msg[2] > 2) {
-            this._yapi.imm_log("bad-apiauth2\n");
+            if (this._hub._yapi._logLevel >= 3) {
+                this._hub._yapi.imm_log("bad-apiauth2\n");
+            }
             this.fwd_connectionState = WSConnState.DEAD;
             return;
         }
@@ -11235,12 +11935,16 @@ export abstract class YWebSocketHub extends YGenericHub
         // Only accepts authenticated requests
         let flags = msg[3] + (msg[4] << 8);
         if ((flags & this._USB_META_WS_VALID_SHA1) == 0) {
-            this._yapi.imm_log("bad-apiauth3\n");
+            if (this._hub._yapi._logLevel >= 3) {
+                this._hub._yapi.imm_log("bad-apiauth3\n");
+            }
             this.fwd_connectionState = WSConnState.DEAD;
             return;
         }
         if (!this.fwd_websocket) {
-            this._yapi.imm_log("no-fwd-ws\n");
+            if (this._hub._yapi._logLevel >= 3) {
+                this._hub._yapi.imm_log("no-fwd-ws\n");
+            }
             this.fwd_connectionState = WSConnState.DEAD;
             return;
         }
@@ -11256,7 +11960,9 @@ export abstract class YWebSocketHub extends YGenericHub
         }
         if (credIdx >= credentials.length) {
             // bad signature, return unsigned frame to signal invalid password
-            this._yapi.imm_log("bad-apiauth4\n");
+            if (this._hub._yapi._logLevel >= 3) {
+                this._hub._yapi.imm_log("bad-apiauth4\n");
+            }
             msg.fill(0, 3);
             this.fwd_websocket.send(msg);
             this.fwd_connectionState = WSConnState.DEAD;
@@ -11277,7 +11983,7 @@ export abstract class YWebSocketHub extends YGenericHub
     async detach(errType: number = YAPI.IO_ERROR, errMsg: string = 'Hub has been forcibly detached'): Promise<void>
     {
         let tcpchan_busy;
-        let timeout = this._yapi.GetTickCount() + 3000;
+        let timeout = this._hub._yapi.GetTickCount() + 3000;
         do {
             tcpchan_busy = false;
             for (let tcpchan = 0; tcpchan < 4; tcpchan++) {
@@ -11287,12 +11993,12 @@ export abstract class YWebSocketHub extends YGenericHub
                 }
             }
             if (tcpchan_busy) {
-                await this._yapi._microSleep_internal();
+                await this._hub._yapi._microSleep_internal();
             }
-        } while (tcpchan_busy && timeout > this._yapi.GetTickCount());
+        } while (tcpchan_busy && timeout > this._hub._yapi.GetTickCount());
 
-        this.imm_commonDisconnect('detach', errType, errMsg);
-        this.imm_disconnectNow();
+        this._hub.imm_commonDisconnect('detach', errType, errMsg);
+        this._hub.imm_disconnectNow();
     }
 
     // abort communication channel immediately
@@ -11300,20 +12006,15 @@ export abstract class YWebSocketHub extends YGenericHub
     // If a connectionID is passed as argument, only abort the
     // communication channel if the ID matched current connection
     //
-    // Return true if the connection os getting aborted
-    //
-    imm_disconnectNow(connID: string = ''): boolean
+    imm_disconnectEngineNow(connID: string = ''): void
     {
-        if (!super.imm_disconnectNow(connID)) {
-            return false;
-        }
         if (!this.websocket) {
-            return false;
+            return;
         }
         this._connectionState = WSConnState.DISCONNECTED;
-        let prevOpenID = (connID ? connID : this.currentConnID);
+        let prevOpenID = (connID ? connID : this._hub.imm_getCurrentConnID());
         let websocket = this.websocket;
-        this.currentConnID = '';
+        this._hub.imm_setCurrentConnID('');
         this.websocket = null;
         websocket.onclose = null;
         websocket.onerror = null;
@@ -11332,16 +12033,15 @@ export abstract class YWebSocketHub extends YGenericHub
             }, 900);
         }
         this.imm_dropAllPendingConnection();
-        this.imm_signalHubDisconnected(prevOpenID);
-        return true;
+        this._hub.imm_signalHubDisconnected(prevOpenID);
     }
 
-    imm_isOnline(): boolean
+    imm_isConnected(): boolean
     {
         if (this._connectionState != WSConnState.CONNECTED) {
             return false;
         }
-        return super.imm_isOnline();
+        return super.imm_isConnected();
     }
 }
 
@@ -11509,7 +12209,7 @@ export abstract class YGenericSSDPManager
                 await this._invokeCallback(p.serial, null, p.url);
             }
         }
-        this._thread = setTimeout(():void => { this.ySSDPCheckExpiration(); }, 3000);
+        this._thread = setTimeout((): void => { this.ySSDPCheckExpiration(); }, 3000);
     }
 
     async ySSDPStart(func_callback: Function): Promise<number>
@@ -11596,11 +12296,11 @@ export class YHub
         }
         switch (attrName) {
         case "registeredUrl":
-            return hub.urlInfo.orgUrl;
+            return hub.imm_getOriginalURL();
         case "connectionUrl":
-            return hub.urlInfo.rootUrl;
+            return hub.imm_getRootUrl();
         case "serialNumber":
-            return hub.hubSerial;
+            return hub.imm_getSerialNumber();
         case "errorMessage":
             return hub.get_errorMessage()
         default:
@@ -11622,7 +12322,7 @@ export class YHub
         case "isReadOnly":
             return await hub.hasRwAccess() ? 0 : 1;
         case "networkTimeout":
-            return hub.stalledTimeoutMs;
+            return hub.imm_getNetworkTimeout();
         case "errorType":
             return hub.get_errorType();
         default:
@@ -11633,7 +12333,7 @@ export class YHub
     {
         let hub: YGenericHub | null = this._ctx.getGenHub(this._hubref);
         if (hub != null && attrName == "networkTimeout") {
-            hub.stalledTimeoutMs = value;
+            hub.imm_setNetworkTimeout(value);
         }
     }
 
@@ -11732,7 +12432,7 @@ export class YHub
      * Modifies tthe network connection delay for this hub.
      * The default value is inherited from ySetNetworkTimeout
      * at the time when the hub is registered, but it can be updated
-     * afterwards for each specific hub if necessary.
+     * afterward for each specific hub if necessary.
      *
      * @param networkMsTimeout : the network connection delay in milliseconds.
      * @noreturn
@@ -11746,7 +12446,7 @@ export class YHub
      * Returns the network connection delay for this hub.
      * The default value is inherited from ySetNetworkTimeout
      * at the time when the hub is registered, but it can be updated
-     * afterwards for each specific hub if necessary.
+     * afterward for each specific hub if necessary.
      *
      * @return the network connection delay in milliseconds.
      */
@@ -11883,6 +12583,8 @@ export class YAPIContext
     _knownHubsBySerial: YGenericHubDict = {};       // hash table by serial number
     _knownHubsByUrl: YGenericHubDict = {};          // hash table by connection URL
     _connectedHubs: YGenericHub[] = [];
+    _trustedCertificate: string[] = [];
+    _networkSecurityOptions: number = 0;
     _yhub_cache: YHubDict = {};
     _ssdpManager: YGenericSSDPManager | null = null;
     _devs: YDeviceDict = {};                        // hash table of known devices, by serial number
@@ -11893,7 +12595,7 @@ export class YAPIContext
     _lastErrorMsg: string = 'no error';
     _updateDevListStarted: number = 0;
     _pendingCallbacks: DeviceUpdateEvent[] = [];
-    _logLevel: number = 2;                          // default to logging warnings and errors only
+    _logLevel: number = 4;                          // default to logging warnings and errors only
     _logCallback: YLogCallback | null = null;
     _arrivalCallback: YDeviceUpdateCallback | null = null;
     _namechgCallback: YDeviceUpdateCallback | null = null;
@@ -11930,6 +12632,12 @@ export class YAPIContext
     public readonly RFID_SOFT_ERROR: number = -16;
     public readonly RFID_HARD_ERROR: number = -17;
     public readonly BUFFER_TOO_SMALL: number = -18;
+    public readonly DNS_ERROR: number = -19;
+    public readonly SSL_UNK_CERT: number = -20;
+    public readonly NO_TRUSTED_CA_CHECK: number = 1;
+    public readonly NO_EXPIRATION_CHECK: number = 2;
+    public readonly NO_HOSTNAME_CHECK: number = 4;
+    public readonly LEGACY: number = 8;
     defaultCacheValidity: number = 5;
 
     // API symbols as static members
@@ -11952,6 +12660,12 @@ export class YAPIContext
     public static readonly RFID_SOFT_ERROR: number = -16;
     public static readonly RFID_HARD_ERROR: number = -17;
     public static readonly BUFFER_TOO_SMALL: number = -18;
+    public static readonly DNS_ERROR: number = -19;
+    public static readonly SSL_UNK_CERT: number = -20;
+    public static readonly NO_TRUSTED_CA_CHECK: number = 1;
+    public static readonly NO_EXPIRATION_CHECK: number = 2;
+    public static readonly NO_HOSTNAME_CHECK: number = 4;
+    public static readonly LEGACY: number = 8;
     //--- (end of generated code: YAPIContext attributes declaration)
 
     // API symbols
@@ -11969,6 +12683,9 @@ export class YAPIContext
     public readonly DETECT_NET: number = Y_DETECT_NET;
     public readonly DETECT_ALL: number = Y_DETECT_ALL;
 
+    public readonly YOCTO_DEFAULT_HTTP_PORT: number = 4444;
+    public readonly YOCTO_DEFAULT_HTTPS_PORT: number = 4443;
+
     constructor(system_env?: YSystemEnv)
     {
         //--- (generated code: YAPIContext constructor)
@@ -11985,6 +12702,8 @@ export class YAPIContext
         this._knownHubsBySerial = {};
         this._knownHubsByUrl = {};
         this._connectedHubs = [];
+        this._trustedCertificate = [];
+        this._networkSecurityOptions = 0;
         this._devs = {}; // hash table of known devices, by serial number
         this._snByUrl = {}; // serial number for each known device, by URL
         this._snByName = {}; // serial number for each known device, by name
@@ -12098,7 +12817,16 @@ export class YAPIContext
     // Search for an existing a hub object for a given URL
     imm_getHub(obj_urlInfo: _YY_UrlInfo): YGenericHub | null
     {
-        return this._knownHubsByUrl[obj_urlInfo.rootUrl];
+        let hub = this._knownHubsByUrl[obj_urlInfo.imm_getRootUrl()];
+        if (!hub) {
+            // iterate on all hubs to look if we have an hub that match the original url
+            for (const url in this._knownHubsByUrl) {
+                if (this._knownHubsByUrl[url].imm_getOriginalURL() == obj_urlInfo.imm_getOriginalURL()) {
+                    return this._knownHubsByUrl[url];
+                }
+            }
+        }
+        return hub;
     }
 
     // Check if a given connected YGenericHub should be used as the primary hub object
@@ -12109,21 +12837,24 @@ export class YAPIContext
     //
     imm_getPrimaryHub(hub: YGenericHub): YGenericHub
     {
-        let primaryHub = this._knownHubsBySerial[hub.hubSerial];
+        let primaryHub = this._knownHubsBySerial[hub.imm_getSerialNumber()];
         if (!primaryHub || primaryHub === hub) {
             // First known hub with this serial number, or no change
-            this._knownHubsBySerial[hub.hubSerial] = hub;
-            this._knownHubsByUrl[hub.urlInfo.rootUrl] = hub;
+            this._knownHubsBySerial[hub.imm_getSerialNumber()] = hub;
+            this._knownHubsByUrl[hub.imm_getRootUrl()] = hub;
             return hub;
         }
-        if (primaryHub._currentState >= hub._currentState) {
-            // Existing hub is already "better" connected, keep it as primary hub
-            // Remember alias URL and update target state if needed
-            primaryHub.imm_inheritFrom(hub);
-            return primaryHub;
+        if (!hub.urlInfo.imm_useSecureSocket() || (hub.urlInfo.imm_useSecureSocket() && primaryHub.urlInfo.imm_useSecureSocket())) {
+            //can be merged to primary
+            if (primaryHub.imm_getcurrentState() >= hub.imm_getcurrentState()) {
+                // Existing hub is already "better" connected, keep it as primary hub
+                // Remember alias URL and update target state if needed
+                primaryHub.imm_inheritFrom(hub);
+                return primaryHub;
+            }
         }
         // Existing hub is not actively connected, set the new hub as primary
-        this._knownHubsBySerial[hub.hubSerial] = hub;
+        this._knownHubsBySerial[hub.imm_getSerialNumber()] = hub;
         hub.imm_inheritFrom(primaryHub);
         return hub;
     }
@@ -12132,9 +12863,9 @@ export class YAPIContext
     async _addConnectedHub(newhub: YGenericHub): Promise<void>
     {
         // If hub is not yet known, create a device object
-        let serial: string = this._snByUrl[newhub.urlInfo.rootUrl];
+        let serial: string = this._snByUrl[newhub.imm_getRootUrl()];
         if (!serial) {
-            let newdev: YDevice = new YDevice(this, newhub.urlInfo.rootUrl, null, null);
+            let newdev: YDevice = new YDevice(this, newhub.imm_getRootUrl(), null, null);
             // make sure to index device before adding it officially in the _hubs list,
             // to avoid crazy course conditions within updateDeviceList
             await newdev.refresh();
@@ -12143,8 +12874,8 @@ export class YAPIContext
         // Add hub to active list if needed
         let hubFound = false;
         for (let i = 0; i < this._connectedHubs.length; i++) {
-            let url = this._connectedHubs[i].urlInfo.rootUrl;
-            if (newhub.urlInfo.rootUrl == url) {
+            let url = this._connectedHubs[i].imm_getRootUrl();
+            if (newhub.imm_getRootUrl() == url) {
                 hubFound = true;
                 break;
             }
@@ -12176,6 +12907,7 @@ export class YAPIContext
         for (let j = 0; j < hub.serialByYdx.length; j++) {
             let serial = hub.serialByYdx[j];
             if (serial && this._devs[serial]) {
+
                 if (this._removalCallback) {
                     let module = YModule.FindModuleInContext(this, serial + '.module');
                     this._pendingCallbacks.push({event: '-', serial: serial, module: module});
@@ -12210,7 +12942,7 @@ export class YAPIContext
             };
         }
         for (let i: number = 0; i < this._connectedHubs.length; i++) {
-            if (this._connectedHubs[i]._firstArrivalCallback && bool_invokecallbacks && this._arrivalCallback) {
+            if (this._connectedHubs[i].imm_isFirstArrivalCallback() && bool_invokecallbacks && this._arrivalCallback) {
                 bool_forceupdate = true;
                 break;
             }
@@ -12229,17 +12961,17 @@ export class YAPIContext
             let hubs: YGenericHub[] = [];
             for (let i: number = 0; i < this._connectedHubs.length; i++) {
                 let hub: YGenericHub = this._connectedHubs[i];
-                let rootUrl: string = hub.urlInfo.rootUrl;
+                let rootUrl: string = hub.imm_getRootUrl();
                 let hubDev = this.imm_getDevice(rootUrl);
                 if (!hubDev) {
                     // this is a newly added hub, for which we did not yet load all attributes
                     // skip it for now
                     continue;
                 }
-                if (hub._currentState < Y_YHubConnType.HUB_PREREGISTERED) {
+                if (hub.imm_getcurrentState() < Y_YHubConnType.HUB_PREREGISTERED) {
                     // this hub is not ready to be scanned, skip it for now
                     if (this._logLevel >= 4) {
-                        this.imm_log('Skip updateDeviceList for hub ' + hub.urlInfo.host + ', currently offline');
+                        this.imm_log('Skip updateDeviceList for hub ' + hub.urlInfo.imm_getHost() + ', currently offline');
                     }
                     continue;
                 }
@@ -12253,7 +12985,7 @@ export class YAPIContext
             for (let serial in this._devs) {
                 let rooturl: string = this._devs[serial].imm_getRootUrl();
                 for (let i: number = 0; i < hubs.length; i++) {
-                    let huburl = hubs[i].urlInfo.rootUrl;
+                    let huburl = hubs[i].imm_getRootUrl();
                     if (rooturl.substr(0, huburl.length) == huburl) {
                         hubs[i]._missing[serial] = true;
                     }
@@ -12377,9 +13109,9 @@ export class YAPIContext
             if (rooturl.charAt(0) == '/') rooturl = hubDev.imm_getRootUrl() + rooturl.substr(1);
             let currdev = this._devs[serial];
             if (this._logLevel >= 5) {
-                this.imm_log('Device ' + serial + ' present, currdev ' + (currdev ? '' : 'NOT ') + 'set' + (hub._firstArrivalCallback ? ', firstArrival' : ''));
+                this.imm_log('Device ' + serial + ' present, currdev ' + (currdev ? '' : 'NOT ') + 'set' + (hub.imm_isFirstArrivalCallback() ? ', firstArrival' : ''));
             }
-            if (currdev && hub._firstArrivalCallback) {
+            if (currdev && hub.imm_isFirstArrivalCallback()) {
                 newDevices++;
                 if (this._arrivalCallback) {
                     let module = YModule.FindModuleInContext(this, serial + '.module');
@@ -12411,8 +13143,8 @@ export class YAPIContext
             hub._missing[serial] = false;
         }
 
-        if (this._arrivalCallback && hub._firstArrivalCallback) {
-            hub._firstArrivalCallback = false;
+        if (this._arrivalCallback && hub.imm_isFirstArrivalCallback()) {
+            hub.imm_setFirstArrivalCallback(false);
         }
 
         // Keep track of all unplugged devices on this hub
@@ -12442,17 +13174,16 @@ export class YAPIContext
         }
         // Use events to detect stalled connections
         hub.isNotifWorking = true;
-        hub.lastPingStamp = Date.now();
         if (hub.timeoutId) {
             clearTimeout(hub.timeoutId);
         }
         hub.timeoutId = setTimeout((): void => {
             if (!hub.imm_isForwarded()) {
-                this.imm_log('Closing stalled connection after ' + (hub.stalledTimeoutMs / 1000) + 's');
+                this.imm_log('Closing stalled connection after ' + (hub.imm_getNetworkTimeout() / 1000) + 's');
                 // abort communication channel immediately, this will trigger a reconnect
                 hub.imm_disconnectNow();
             }
-        }, hub.stalledTimeoutMs);
+        }, hub.imm_getNetworkTimeout());
 
         let rows = (hub.notifCarryOver + str_lines).split('\n');
         let nrows = rows.length;
@@ -12897,6 +13628,20 @@ export class YAPIContext
         return Math.floor(num);
     }
 
+    /** Convert a numeric string to an float
+     *
+     * @param str_data {string}
+     * @return {number}
+     */
+    static imm_atof(str_data: string): number
+    {
+        let num = parseFloat(str_data);
+        if (isNaN(num)) {
+            return 0.0;
+        }
+        return num;
+    }
+
     /** Convert a binary object to string
      *
      * @param bin_data {Uint8Array}
@@ -13302,7 +14047,9 @@ export class YAPIContext
         if (str_device.substr(0, 7) == 'http://' ||
             str_device.substr(0, 5) == 'ws://' ||
             str_device.substr(0, 8) == 'https://' ||
-            str_device.substr(0, 6) == 'wss://') {
+            str_device.substr(0, 6) == 'wss://' ||
+            str_device.substr(0, 9) == 'secure://' ||
+            str_device.substr(0, 7) == 'auto://') {
             baseUrl = str_device;
             if (baseUrl.slice(-1) != '/') baseUrl = baseUrl + '/';
             if (lines[0].substr(0, 12) != 'GET /not.byn') {
@@ -13338,7 +14085,7 @@ export class YAPIContext
         }
         let hub: YGenericHub | null = null;
         for (let i = 0; i < this._connectedHubs.length; i++) {
-            let hubUrl = this._connectedHubs[i].urlInfo.rootUrl;
+            let hubUrl = this._connectedHubs[i].imm_getRootUrl();
             if (baseUrl.slice(0, hubUrl.length) == hubUrl) {
                 hub = this._connectedHubs[i];
                 break;
@@ -13358,8 +14105,8 @@ export class YAPIContext
         let devUrl: string = words[1];
         if (devUrl.substr(0, 1) == '/') devUrl = devUrl.substr(1);
         // create an absolute hub-relative URL in devUrl
-        if (baseUrl.substr(0, hub.urlInfo.rootUrl.length) == hub.urlInfo.rootUrl) {
-            devUrl = baseUrl.substr(hub.urlInfo.rootUrl.length - 1) + devUrl;
+        if (baseUrl.substr(0, hub.imm_getRootUrl().length) == hub.imm_getRootUrl()) {
+            devUrl = baseUrl.substr(hub.imm_getRootUrl().length - 1) + devUrl;
         } else {
             let pos = baseUrl.indexOf('//');
             pos = baseUrl.indexOf('/', pos + 3);
@@ -13402,7 +14149,7 @@ export class YAPIContext
         let baseUrl = lockdev.imm_getRootUrl();
         let hub = null;
         for (let i = 0; i < this._connectedHubs.length; i++) {
-            let hubUrl = this._connectedHubs[i].urlInfo.rootUrl;
+            let hubUrl = this._connectedHubs[i].imm_getRootUrl();
             if (baseUrl.slice(0, hubUrl.length) == hubUrl) {
                 hub = this._connectedHubs[i];
                 break;
@@ -13557,7 +14304,7 @@ export class YAPIContext
         let rootUrl = dev.imm_getRootUrl();
         for (let i = 0; i < this._connectedHubs.length; i++) {
             let hub = this._connectedHubs[i];
-            let hubUrl = hub.urlInfo.rootUrl;
+            let hubUrl = hub.urlInfo.imm_getRootUrl();
             if (rootUrl.substr(0, hubUrl.length) === hubUrl) {
                 /** @type {YDevice} **/
                 let hubDev = <YDevice>this.imm_getDevice(hubUrl);
@@ -13603,6 +14350,28 @@ export class YAPIContext
     async AddUdevRule_internal(force: boolean): Promise<string>
     {
         return "error: Not supported in TypeScript";
+    }
+
+    async DownloadHostCertificate_internal(url: string, mstimeout: number): Promise<string>
+    {
+        return await this.system_env.downloadRemoteCertificate(new _YY_UrlInfo(url));
+    }
+
+    async SetTrustedCertificatesList_internal(certificatePath: string): Promise<string>
+    {
+        return "error: Not supported in TypeScript";
+    }
+
+    async SetNetworkSecurityOptions_internal(opts: number): Promise<string>
+    {
+        this._networkSecurityOptions = opts
+        return "";
+    }
+
+    async AddTrustedCertificates_internal(certificate: string): Promise<string>
+    {
+        this._trustedCertificate.push(certificate);
+        return "";
     }
 
     //--- (generated code: YAPIContext implementation)
@@ -13652,10 +14421,72 @@ export class YAPIContext
     }
 
     /**
+     * Download the TLS/SSL certificate from the hub. This function allows to download a TLS/SSL certificate to add it
+     * to the list of trusted certificates using the AddTrustedCertificates method.
+     *
+     * @param url : the root URL of the VirtualHub V2 or HTTP server.
+     * @param mstimeout : the number of milliseconds available to download the certificate.
+     *
+     * @return a string containing the certificate. In case of error, returns a string starting with "error:".
+     */
+    async DownloadHostCertificate(url: string, mstimeout: number): Promise<string>
+    {
+        return await this.DownloadHostCertificate_internal(url, mstimeout);
+    }
+
+    /**
+     * Adds a TLS/SSL certificate to the list of trusted certificates. By default, the library
+     * library will reject TLS/SSL connections to servers whose certificate is not known. This function
+     * function allows to add a list of known certificates. It is also possible to disable the verification
+     * using the SetNetworkSecurityOptions method.
+     *
+     * @param certificate : a string containing one or more certificates.
+     *
+     * @return an empty string if the certificate has been added correctly.
+     *         In case of error, returns a string starting with "error:".
+     */
+    async AddTrustedCertificates(certificate: string): Promise<string>
+    {
+        return await this.AddTrustedCertificates_internal(certificate);
+    }
+
+    /**
+     * Set the path of Certificate Authority file on local filesystem. This method takes as a parameter
+     * the path of a file containing all certificates in PEM format.
+     * For technical reasons, only one file can be specified. So if you need to connect to several Hubs
+     * instances with self-signed certificates, you'll need to use
+     * a single file containing all the certificates end-to-end. Passing a empty string will restore the
+     * default settings. This option is only supported by PHP library.
+     *
+     * @param certificatePath : the path of the file containing all certificates in PEM format.
+     *
+     * @return an empty string if the certificate has been added correctly.
+     *         In case of error, returns a string starting with "error:".
+     */
+    async SetTrustedCertificatesList(certificatePath: string): Promise<string>
+    {
+        return await this.SetTrustedCertificatesList_internal(certificatePath);
+    }
+
+    /**
+     * Enables or disables certain TLS/SSL certificate checks.
+     *
+     * @param opts : The options are YAPI.NO_TRUSTED_CA_CHECK,
+     *         YAPI.NO_EXPIRATION_CHECK, YAPI.NO_HOSTNAME_CHECK.
+     *
+     * @return an empty string if the options are taken into account.
+     *         On error, returns a string beginning with "error:".
+     */
+    async SetNetworkSecurityOptions(opts: number): Promise<string>
+    {
+        return await this.SetNetworkSecurityOptions_internal(opts);
+    }
+
+    /**
      * Modifies the network connection delay for yRegisterHub() and yUpdateDeviceList().
      * This delay impacts only the YoctoHubs and VirtualHub
      * which are accessible through the network. By default, this delay is of 20000 milliseconds,
-     * but depending or you network you may want to change this delay,
+     * but depending on your network you may want to change this delay,
      * gor example if your network infrastructure is based on a GSM connection.
      *
      * @param networkMsTimeout : the network connection delay in milliseconds.
@@ -13670,7 +14501,7 @@ export class YAPIContext
      * Returns the network connection delay for yRegisterHub() and yUpdateDeviceList().
      * This delay impacts only the YoctoHubs and VirtualHub
      * which are accessible through the network. By default, this delay is of 20000 milliseconds,
-     * but depending or you network you may want to change this delay,
+     * but depending on your network you may want to change this delay,
      * for example if your network infrastructure is based on a GSM connection.
      *
      * @return the network connection delay in milliseconds.
@@ -13753,7 +14584,7 @@ export class YAPIContext
 
     imm_GetAPIVersion(): string
     {
-        return /* version number patched automatically */'1.10.58391';
+        return /* version number patched automatically */'2.0.63744';
     }
 
     /**
@@ -13797,7 +14628,7 @@ export class YAPIContext
      *
      * From an operating system standpoint, it is generally not required to call
      * this function since the OS will automatically free allocated resources
-     * once your program is completed. However there are two situations when
+     * once your program is completed. However, there are two situations when
      * you may really want to use that function:
      *
      * - Free all dynamically allocated memory blocks in order to
@@ -13814,13 +14645,7 @@ export class YAPIContext
     {
         // Wait for all requests to complete
         for (let serial in this._devs) {
-            let lockdev = this._devs[serial];
-            let newPromise = lockdev._pendingQueries;
-            if (newPromise != null) {
-                try {
-                    await newPromise;
-                } catch (e) {}
-            }
+            await this._devs[serial].waitPendingQueries();
         }
         // Close all hubs, restart the API
         await this.KillAPI();
@@ -13846,7 +14671,7 @@ export class YAPIContext
         // disconnect all hubs (including callback)
         for (let serial in this._knownHubsBySerial) {
             let hub = this._knownHubsBySerial[serial];
-            if (hub._currentState > Y_YHubConnType.HUB_DETACHED) {
+            if (hub.imm_getcurrentState() > Y_YHubConnType.HUB_DETACHED) {
                 await hub.detach(YAPI.IO_ERROR, 'Connection closed by FreeAPI');
             }
         }
@@ -13890,106 +14715,8 @@ export class YAPIContext
         })
     }
 
-    // Parse a hub URL
-    imm_parseRegisteredUrl(str_url: string): _YY_UrlInfo
-    {
-        let org_url = str_url;
-        let proto = 'ws://';
-        let user = '';
-        let pass = '';
-        let port = '4444';
-        let host;
-        let dom = '';
-        let url = '';
-        let rooturl = '';
-
-        if (!this._isNodeJS && window && window.navigator && window.navigator.userAgent && /(iPad|iPhone|iPod)/g.test(window.navigator.userAgent)) {
-            // iOS now blocks ws:// unless embedded from a https:// page, so we have to default to http://
-            proto = 'http://';
-        }
-        if (str_url.slice(0, 7) == 'http://') {
-            proto = 'http://';
-            str_url = str_url.slice(7);
-        } else if (str_url.slice(0, 5) == 'ws://') {
-            str_url = str_url.slice(5);
-        } else if (str_url.slice(0, 8) == 'https://') {
-            proto = 'https://';
-            str_url = str_url.slice(8);
-        } else if (str_url.slice(0, 6) == 'wss://') {
-            proto = 'wss://';
-            str_url = str_url.slice(6);
-        }
-        str_url = str_url.replace('/not.byn', '');
-        let pos = str_url.indexOf('/');
-        if (pos > 0) {
-            dom = str_url.slice(pos + 1);
-            if (dom.length > 0 && dom.slice(-1) != '/') {
-                dom += '/';
-            }
-            str_url = str_url.slice(0, pos);
-        }
-        url = proto;
-        let authpos = str_url.indexOf('@');
-        if (authpos >= 0) {
-            let auth = str_url.slice(0, authpos);
-            let passpos = auth.indexOf(':');
-            if (passpos >= 0) {
-                user = auth.slice(0, passpos);
-                pass = auth.slice(passpos + 1);
-                url += user + ':' + pass + '@';
-            } else {
-                user = auth;
-                url += user + '@';
-            }
-            str_url = str_url.slice(authpos + 1);
-        }
-        pos = str_url.indexOf(':');
-        if (pos < 0) {
-            host = str_url;
-            if (dom != '') {
-                if ( proto == 'http://'){
-                    port = '80';
-                } else if ( proto == 'https://'){
-                    port = '443';
-                }
-            }
-        } else {
-            host = str_url.slice(0, pos);
-            port = str_url.slice(pos + 1);
-        }
-        if (host == 'callback') {
-            if (proto == 'ws:') {
-                url = 'ws://callback:4444/';
-            } else {
-                url = 'http://callback:4444/';
-            }
-            rooturl = url;
-        } else {
-            url += host + ':' + port + '/' + dom;
-            rooturl = proto + host + ':' + port + '/' + dom;
-        }
-        return {
-            'proto': proto, 'user': user, 'pass': pass, 'host': host, 'port': port, 'domain': dom,
-            'authUrl': url, 'rootUrl': rooturl, 'orgUrl': org_url
-        };
-    }
-
-    imm_registerHub_internal(urlInfo: _YY_UrlInfo): YGenericHub | null
-    {
-        let newhub;
-        if (urlInfo.proto.slice(0, 3) == 'ws:' || urlInfo.proto.slice(0, 4) == 'wss:') {
-            newhub = this.system_env.getWebSocketHub(this, urlInfo);
-        } else {
-            newhub = this.system_env.getHttpHub(this, urlInfo);
-        }
-        if (newhub) {
-            this._knownHubsByUrl[urlInfo.rootUrl] = newhub;
-        }
-        return newhub;
-    }
-
     /**
-     * Setup the Yoctopuce library to use modules connected on a given machine. Idealy this
+     * Set up the Yoctopuce library to use modules connected on a given machine. Idealy this
      * call will be made once at the begining of your application.  The
      * parameter will determine how the API will work. Use the following values:
      *
@@ -14006,7 +14733,7 @@ export class YAPIContext
      * computer, use the IP address 127.0.0.1. If the given IP is unresponsive, yRegisterHub
      * will not return until a time-out defined by ySetNetworkTimeout has elapsed.
      * However, it is possible to preventively test a connection  with yTestHub.
-     * If you cannot afford a network time-out, you can use the non blocking yPregisterHub
+     * If you cannot afford a network time-out, you can use the non-blocking yPregisterHub
      * function that will establish the connection as soon as it is available.
      *
      *
@@ -14021,7 +14748,7 @@ export class YAPIContext
      * while trying to access the USB modules. In particular, this means
      * that you must stop the VirtualHub software before starting
      * an application that uses direct USB access. The workaround
-     * for this limitation is to setup the library to use the VirtualHub
+     * for this limitation is to set up the library to use the VirtualHub
      * rather than direct USB access.
      *
      * If access control has been activated on the hub, virtual or not, you want to
@@ -14043,6 +14770,10 @@ export class YAPIContext
      */
     async RegisterHub(url: string, errmsg: YErrorMsg): Promise<number>
     {
+        if (this._logLevel >= 4) {
+            this.imm_log('Registering  hub: ' + url);
+        }
+
         if (url === "net") {
             if (this.system_env.hasSSDP) {
                 this._detectType |= this.DETECT_NET;
@@ -14054,19 +14785,19 @@ export class YAPIContext
         if (url === "usb") {
             return this.imm_setErr(errmsg, YAPI_NOT_SUPPORTED, 'Use the VirtualHub on 127.0.0.1 to access USB devices', YAPI_NOT_SUPPORTED);
         }
-        let urlInfo: _YY_UrlInfo = this.imm_parseRegisteredUrl(url);
+        let urlInfo: _YY_UrlInfo = new _YY_UrlInfo(url);
         let hub: YGenericHub | null = this.imm_getHub(urlInfo);
         if (!hub) {
             if (this._logLevel >= 3) {
-                this.imm_log('Registering new hub: ' + urlInfo.rootUrl);
+                this.imm_log('Registering new hub: ' + urlInfo.imm_getRootUrl());
             }
-            hub = this.imm_registerHub_internal(urlInfo);
-            if (!hub) {
-                return this.imm_setErr(errmsg, YAPI_NOT_SUPPORTED, 'Unsupported hub protocol: ' + urlInfo.proto, YAPI_NOT_SUPPORTED);
-            }
+            hub = new YGenericHub(this, urlInfo);
+            hub.imm_addKnownUrl(urlInfo);
+            // add original url to the _knownHubsByUrl array
+            this._knownHubsByUrl[urlInfo.imm_getRootUrl()] = hub;
         } else {
             if (this._logLevel >= 3) {
-                this.imm_log('Registering existing hub: ' + urlInfo.rootUrl);
+                this.imm_log('Registering existing hub: ' + urlInfo.imm_getRootUrl() + " old=" + hub.imm_getRootUrl());
             }
             hub.imm_updateUrl(urlInfo);
         }
@@ -14076,14 +14807,19 @@ export class YAPIContext
         if (retcode != YAPI_SUCCESS) {
             this.imm_dropConnectedHub(hub);
             await hub.detach(retcode, sub_errmsg.msg);
+            hub.imm_forgetUrls();
             return this.imm_setErr(errmsg, retcode, sub_errmsg.msg, retcode);
         }
 
         // Update known device list immediately after connection
         let yreq = await this._updateDeviceList_internal(true, false);
         if (yreq.errorType != YAPI_SUCCESS) {
+            if (this._logLevel >= 3) {
+                this.imm_log('Registering failed with' + yreq.errorType + " (" + yreq.errorMsg + ")");
+            }
             this.imm_dropConnectedHub(hub);
             await hub.detach(yreq.errorType, yreq.errorMsg);
+            hub.imm_forgetUrls();
             return this.imm_setErr(errmsg, yreq.errorType, yreq.errorMsg, yreq.errorType);
         }
         return YAPI_SUCCESS;
@@ -14107,19 +14843,22 @@ export class YAPIContext
      */
     async PreregisterHub(url: string, errmsg: YErrorMsg): Promise<number>
     {
-        let urlInfo: _YY_UrlInfo = this.imm_parseRegisteredUrl(url);
+        let urlInfo: _YY_UrlInfo = new _YY_UrlInfo(url);
         let hub: YGenericHub | null = this.imm_getHub(urlInfo);
         if (!hub) {
             if (this._logLevel >= 3) {
-                this.imm_log('Preregistering new hub: ' + urlInfo.rootUrl);
+                this.imm_log('Preregistering new hub: ' + urlInfo.imm_getRootUrl());
             }
-            hub = this.imm_registerHub_internal(urlInfo);
+            hub = new YGenericHub(this, urlInfo);
             if (!hub) {
-                return this.imm_setErr(errmsg, YAPI_NOT_SUPPORTED, 'Unsupported hub protocol: ' + urlInfo.proto, YAPI_NOT_SUPPORTED);
+                return this.imm_setErr(errmsg, YAPI_NOT_SUPPORTED, 'Unsupported hub protocol: ' + urlInfo.imm_getProto(), YAPI_NOT_SUPPORTED);
             }
+            hub.imm_addKnownUrl(urlInfo);
+            // add original url to the _knownHubsByUrl array
+            this._knownHubsByUrl[urlInfo.imm_getRootUrl()] = hub;
         } else {
             if (this._logLevel >= 3) {
-                this.imm_log('Preregistering existing hub: ' + urlInfo.rootUrl);
+                this.imm_log('Preregistering existing hub: ' + urlInfo.imm_getRootUrl());
             }
             hub.imm_updateUrl(urlInfo);
         }
@@ -14143,13 +14882,15 @@ export class YAPIContext
     async RegisterHubHttpCallback(incomingMessage: any, serverResponse: any, errmsg: YErrorMsg): Promise<number>
     {
         let url: string = 'http://callback:4444';
-        let urlInfo: _YY_UrlInfo = this.imm_parseRegisteredUrl(url);
+        let urlInfo: _YY_UrlInfo = new _YY_UrlInfo(url);
         let hub: YGenericHub | null = this.imm_getHub(urlInfo);
         if (!hub) {
-            hub = this.system_env.getHttpCallbackHub(this, urlInfo, incomingMessage, serverResponse);
-            if (!hub) {
+            hub = new YGenericHub(this, urlInfo);
+            let engine = this.system_env.getHttpCallbackEngine(hub, urlInfo, incomingMessage, serverResponse);
+            if (!engine) {
                 return this.imm_setErr(errmsg, YAPI_NOT_SUPPORTED, 'HTTP Callback mode is not available in this environment', YAPI_NOT_SUPPORTED);
             }
+            hub.imm_setHubEngine(engine);
         }
         await hub.attach(Y_YHubConnType.HUB_CALLBACK);
         let sub_errmsg = new YErrorMsg();
@@ -14185,13 +14926,15 @@ export class YAPIContext
     {
         let authstr = (authpwd ? 'ws:' + authpwd + '@' : '');
         let url: string = 'http://' + authstr + 'callback:4444';
-        let urlInfo: _YY_UrlInfo = this.imm_parseRegisteredUrl(url);
+        let urlInfo: _YY_UrlInfo = new _YY_UrlInfo(url);
         let hub: YGenericHub | null = this.imm_getHub(urlInfo);
         if (!hub) {
-            hub = this.system_env.getWebSocketCallbackHub(this, urlInfo, ws);
-            if (!hub) {
+            hub = new YGenericHub(this, urlInfo);
+            let engine: YHubEngine | null = this.system_env.getWebSocketCallbackEngine(hub, urlInfo, ws);
+            if (!engine) {
                 return this.imm_setErr(errmsg, YAPI_NOT_SUPPORTED, 'WebSocket Callback mode is not available in this environment', YAPI_NOT_SUPPORTED);
             }
+            hub.imm_setHubEngine(engine);
         }
         await hub.attach(Y_YHubConnType.HUB_CALLBACK);
         let sub_errmsg = new YErrorMsg();
@@ -14217,11 +14960,12 @@ export class YAPIContext
         if (this._connectedHubs.length == 0) {
             return false;
         }
-        return (<YWebSocketHub>this._connectedHubs[0]).websocketJoin(ws, arr_credentials, closeCallback);
+        let hub: YGenericHub = this._connectedHubs[0];
+        return await hub.WebSocketJoin(ws, arr_credentials, closeCallback);
     }
 
     /**
-     * Setup the Yoctopuce library to no more use modules connected on a previously
+     * Set up the Yoctopuce library to no more use modules connected on a previously
      * registered machine with RegisterHub.
      *
      * @param url : a string containing either "usb" or the
@@ -14229,12 +14973,19 @@ export class YAPIContext
      */
     async UnregisterHub(url: string): Promise<void>
     {
-        let urlInfo: _YY_UrlInfo = this.imm_parseRegisteredUrl(url);
+        let urlInfo: _YY_UrlInfo = new _YY_UrlInfo(url);
         let hub: YGenericHub | null = this.imm_getHub(urlInfo);
         if (hub) {
-            if (hub.hubSerial) {
+            // first ensure all set request are done
+            for (let serial in this._devs) {
+                await this._devs[serial].waitPendingQueries();
+            }
+            await hub.waitForPendingQueries(200)
+
+            let serialNumber: string = hub.imm_getSerialNumber();
+            if (serialNumber) {
                 // Make sure to work on the latest active "alias" hub
-                let activeHub: YGenericHub | null = this._knownHubsBySerial[hub.hubSerial]
+                let activeHub: YGenericHub | null = this._knownHubsBySerial[serialNumber]
                 if (activeHub) {
                     hub.imm_forgetUrls();
                     hub = activeHub;
@@ -14242,12 +14993,12 @@ export class YAPIContext
                 }
             }
             if (this._logLevel >= 3) {
-                this.imm_log('Unregistering hub ' + url + ' (' + urlInfo.rootUrl + ')');
+                this.imm_log('Unregistering hub ' + url + ' (' + urlInfo.imm_getRootUrl() + ')');
             }
             this.imm_dropConnectedHub(hub);
             if (hub.imm_isDisconnected()) {
                 if (this._logLevel >= 3) {
-                    this.imm_log('Hub ' + urlInfo.rootUrl + ' is already disconnected');
+                    this.imm_log('Hub ' + urlInfo.imm_getRootUrl() + ' is already disconnected');
                 }
                 return;
             }
@@ -14255,7 +15006,7 @@ export class YAPIContext
             let disconnected: Promise<void> = hub.waitForDisconnection(500);
             if (hub.imm_isDisconnecting()) {
                 if (this._logLevel >= 3) {
-                    this.imm_log('Hub ' + urlInfo.rootUrl + ' is already disconnecting');
+                    this.imm_log('Hub ' + urlInfo.imm_getRootUrl() + ' is already disconnecting');
                 }
             } else {
                 await hub.detach(YAPI.IO_ERROR, 'Hub has been unregistered');
@@ -14264,6 +15015,10 @@ export class YAPIContext
             hub.imm_forgetUrls();
             if (this._logLevel >= 4) {
                 this.imm_log("Disconnected after " + (this.GetTickCount() - before) + " ms");
+            }
+        } else {
+            if (this._logLevel >= 4) {
+                this.imm_log('No hub to Unregister with ' + url + ' (' + urlInfo.imm_getRootUrl() + ')');
             }
         }
     }
@@ -14285,19 +15040,22 @@ export class YAPIContext
      */
     async TestHub(url: string, mstimeout: number, errmsg: YErrorMsg): Promise<number>
     {
-        let urlInfo: _YY_UrlInfo = this.imm_parseRegisteredUrl(url);
+        if (url == "net") {
+            return this.imm_setErr(errmsg, YAPI_INVALID_ARGUMENT, "Not supported", YAPI_INVALID_ARGUMENT);
+        }
+        let urlInfo: _YY_UrlInfo = new _YY_UrlInfo(url);
         let hub: YGenericHub | null = this.imm_getHub(urlInfo);
         if (!hub) {
             if (this._logLevel >= 4) {
-                this.imm_log('Testing new hub: ' + urlInfo.rootUrl);
+                this.imm_log('Testing new hub: ' + urlInfo.imm_getRootUrl());
             }
-            hub = this.imm_registerHub_internal(urlInfo);
+            hub = new YGenericHub(this, urlInfo);
             if (!hub) {
-                return this.imm_setErr(errmsg, YAPI_NOT_SUPPORTED, 'Unsupported hub protocol: ' + urlInfo.proto, YAPI_NOT_SUPPORTED);
+                return this.imm_setErr(errmsg, YAPI_NOT_SUPPORTED, 'Unsupported hub protocol: ' + urlInfo.imm_getProto(), YAPI_NOT_SUPPORTED);
             }
         } else {
             if (this._logLevel >= 4) {
-                this.imm_log('Testing existing hub: ' + urlInfo.rootUrl);
+                this.imm_log('Testing existing hub: ' + hub.imm_getRootUrl());
             }
         }
         await hub.attach(Y_YHubConnType.HUB_CONNECTED);
@@ -14339,7 +15097,7 @@ export class YAPIContext
     {
         if (this._hubDiscoveryCallback && urlToRegister) {
             try {
-                await this._hubDiscoveryCallback(serial, urlToRegister, urlToUnregister);
+                await this._hubDiscoveryCallback(serial, urlToRegister);
             } catch (e) {
                 this.imm_log('Exception in hub discovery callback:', e);
             }
@@ -14517,7 +15275,7 @@ export class YAPIContext
     /**
      * Checks if a given string is valid as logical name for a module or a function.
      * A valid logical name has a maximum of 19 characters, all among
-     * A..Z, a..z, 0..9, _, and -.
+     * A...Z, a...z, 0...9, _, and -.
      * If you try to configure a logical name with an incorrect string,
      * the invalid characters are ignored.
      *
@@ -14837,16 +15595,30 @@ export class YAPIContext
     private nextHubInUseInternal_internal(hubref: number): YHub | null
     {
         let nextref: number = hubref < 0 ? 0 : hubref + 1;
-        for (let url in this._knownHubsByUrl) {
-            let hub = this._knownHubsByUrl[url];
-            if (hub.getHubRef() == nextref) {
-                if (hub.imm_isPreOrRegistered()) {
-                    return this.getYHubObj(nextref);
-                } else {
-                    nextref++;
+        let restart: boolean;
+        let has_higher_hubref: boolean;
+        do {
+            has_higher_hubref = false;
+            restart = false;
+            for (let url in this._knownHubsByUrl) {
+                let hub = this._knownHubsByUrl[url];
+                let hubRef = hub.getHubRef();
+                if (hubRef == nextref) {
+                    if (hub.imm_isPreOrRegistered()) {
+                        return this.getYHubObj(nextref);
+                    } else {
+                        has_higher_hubref = true;
+                        break;
+                    }
+                } else if (hubRef > nextref) {
+                    has_higher_hubref = true;
                 }
             }
-        }
+            if (has_higher_hubref) {
+                nextref++;
+                restart = true;
+            }
+        } while (restart);
         return null;
     }
     getGenHub(hubref: number): YGenericHub | null

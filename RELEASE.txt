@@ -1,4 +1,4 @@
-Yocto-Visualization-4web v1.10.58391
+Yocto-Visualization-4web v1.10.63744
 
-- Add missing log notifications for log on virtualhub itself
-- Remove broken link to apple icon
+- Fix Authentication on web server that was using HTTP header without spaces
+- Fix authentication on VirtualHub-4Web

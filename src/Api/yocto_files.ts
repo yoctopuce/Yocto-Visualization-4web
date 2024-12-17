@@ -1,6 +1,6 @@
 /*********************************************************************
  *
- *  $Id: yocto_files.ts 56027 2023-08-14 09:32:59Z mvuilleu $
+ *  $Id: yocto_files.ts 63482 2024-11-26 09:29:16Z seb $
  *
  *  Implements the high-level API for FileRecord functions
  *
@@ -201,13 +201,13 @@ export class YFiles extends YFunction
     /**
      * Retrieves a filesystem for a given identifier.
      * The identifier can be specified using several formats:
-     * <ul>
-     * <li>FunctionLogicalName</li>
-     * <li>ModuleSerialNumber.FunctionIdentifier</li>
-     * <li>ModuleSerialNumber.FunctionLogicalName</li>
-     * <li>ModuleLogicalName.FunctionIdentifier</li>
-     * <li>ModuleLogicalName.FunctionLogicalName</li>
-     * </ul>
+     *
+     * - FunctionLogicalName
+     * - ModuleSerialNumber.FunctionIdentifier
+     * - ModuleSerialNumber.FunctionLogicalName
+     * - ModuleLogicalName.FunctionIdentifier
+     * - ModuleLogicalName.FunctionLogicalName
+     *
      *
      * This function does not require that the filesystem is online at the time
      * it is invoked. The returned object is nevertheless valid.
@@ -232,7 +232,7 @@ export class YFiles extends YFunction
         obj = <YFiles> YFunction._FindFromCache('Files', func);
         if (obj == null) {
             obj = new YFiles(YAPI, func);
-            YFunction._AddToCache('Files',  func, obj);
+            YFunction._AddToCache('Files', func, obj);
         }
         return obj;
     }
@@ -240,13 +240,13 @@ export class YFiles extends YFunction
     /**
      * Retrieves a filesystem for a given identifier in a YAPI context.
      * The identifier can be specified using several formats:
-     * <ul>
-     * <li>FunctionLogicalName</li>
-     * <li>ModuleSerialNumber.FunctionIdentifier</li>
-     * <li>ModuleSerialNumber.FunctionLogicalName</li>
-     * <li>ModuleLogicalName.FunctionIdentifier</li>
-     * <li>ModuleLogicalName.FunctionLogicalName</li>
-     * </ul>
+     *
+     * - FunctionLogicalName
+     * - ModuleSerialNumber.FunctionIdentifier
+     * - ModuleSerialNumber.FunctionLogicalName
+     * - ModuleLogicalName.FunctionIdentifier
+     * - ModuleLogicalName.FunctionLogicalName
+     *
      *
      * This function does not require that the filesystem is online at the time
      * it is invoked. The returned object is nevertheless valid.
@@ -265,10 +265,10 @@ export class YFiles extends YFunction
     static FindFilesInContext(yctx: YAPIContext, func: string): YFiles
     {
         let obj: YFiles | null;
-        obj = <YFiles> YFunction._FindFromCacheInContext(yctx,  'Files', func);
+        obj = <YFiles> YFunction._FindFromCacheInContext(yctx, 'Files', func);
         if (obj == null) {
             obj = new YFiles(yctx, func);
-            YFunction._AddToCache('Files',  func, obj);
+            YFunction._AddToCache('Files', func, obj);
         }
         return obj;
     }
@@ -361,13 +361,13 @@ export class YFiles extends YFunction
     async get_list(pattern: string): Promise<YFileRecord[]>
     {
         let json: Uint8Array;
-        let filelist: string[] = [];
+        let filelist: Uint8Array[] = [];
         let res: YFileRecord[] = [];
         json = await this.sendCommand('dir&f=' + pattern);
         filelist = this.imm_json_get_array(json);
         res.length = 0;
         for (let ii in filelist) {
-            res.push(new YFileRecord(filelist[ii]));
+            res.push(new YFileRecord(this._yapi.imm_bin2str(filelist[ii])));
         }
         return res;
     }
@@ -384,7 +384,7 @@ export class YFiles extends YFunction
     async fileExist(filename: string): Promise<boolean>
     {
         let json: Uint8Array;
-        let filelist: string[] = [];
+        let filelist: Uint8Array[] = [];
         if ((filename).length == 0) {
             return false;
         }
