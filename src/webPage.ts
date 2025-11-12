@@ -741,7 +741,7 @@ export class YWebPage
 
         let checkurl = location.protocol+"//www.yoctopuce.com/FR/common/getLastFirmwareLink.php?app=yoctovisualization4web.installer&version="+YoctoVisualization.constants.buildVersion+"&platform=_";
         let response :Response;
-        try { response = await fetch(checkurl);} catch(e:any) {return;}
+        try { response = await fetch(checkurl);} catch(e) {return;}
         if (!response.ok)  return;
         let json : any;
         try  { json  = await response.json();} catch (e) {return}
@@ -1173,7 +1173,7 @@ export class HubInfo
       url += "/info.json";
       let response :Response;
       try { response  = await fetch(url,{mode: 'cors'});}
-      catch (e: any) {return -3;}
+      catch (e) {return -3;}
       if (response.ok)
        {  let HubData: any;
           try {HubData = await response.json();} catch (e) {return -1;}
@@ -1422,23 +1422,28 @@ export class YoctoHubFileHandler
         this.info.findOutCredentialsFromConfigFile(xmldata);
 
         let url: string = this.info.get_hubUrl(this.info.srvUsername, this.info.srvPassword);
-
+        let errorNo :number =YoctoAPI.YAPI.SUCCESS;
+        let errorMsg : string ="";
         //console.log("registering " + url);
         try
         {
-            await YoctoAPI.YAPI.RegisterHub(url, errmsg)
+            errorNo= await YoctoAPI.YAPI.RegisterHub(url, errmsg);
+            errorMsg = errmsg.msg;
         }
         catch (e)
-        {
-            this.fileSystemReady = false;
-            if ((e as YoctoAPI.YoctoError).errorType == YoctoAPI.YAPI.UNAUTHORIZED)
+        { errorNo= (e as YoctoAPI.YoctoError).errorType as number;
+            errorMsg =    (e as Error).message;
+         }
+
+         if (errorNo!= YoctoAPI.YAPI.SUCCESS)
+         {this.fileSystemReady = false;
+            if (errorNo == YoctoAPI.YAPI.UNAUTHORIZED)
             {
                 console.log("Access to hub " + url + " is denied, waiting for YV callback to save the situation.");
                 this.FileSystemAccessDenied = true;
                 return;
             }
-            throw "YV4F ERROR: Unable to register Hub " + this.info.get_hubUrl() + "(" + (e as Error).message + "), save will not work.";
-
+            throw "YV4F ERROR: Unable to register Hub " + this.info.get_hubUrl() + "(" +errorMsg+ "), save will not work.";
         }
         let fs: YoctoAPI.YFiles | null = YoctoAPI.YFiles.FirstFiles();
         if (fs == null)

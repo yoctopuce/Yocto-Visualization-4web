@@ -230,6 +230,7 @@ export class YV4W_installer
     private readonly _MODIFYUSEMINIFIED: number = 5;
     private readonly _MODIFYUSEPLAIN: number = 6;
     private readonly _MODIFYDELETE: number = 7;
+    private readonly _MODIFYUPDATE: number = 8;
     private readonly TARGETEXTENSION: string = ".html"
 
     private readonly icon = '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGh'
@@ -686,10 +687,15 @@ export class YV4W_installer
 
         } }
 
+        await YoctoAPI.YAPI.FreeAPI();   // workaround  for a session  management bug
+        await YoctoAPI.YAPI.DisableExceptions();
+
         let addr: string = info.get_hubUrl(RW_username, RW_password);
 
 
         this._applicationURL = IP + ":" + port.toString() + ((path != "") ? "/" + path : "");
+
+
 
         let res: number = await YoctoAPI.YAPI.TestHub(addr, 5000, errmsg);
 
@@ -707,6 +713,10 @@ export class YV4W_installer
                 return;
             }
         }
+
+       await YoctoAPI.YAPI.FreeAPI();  // workaround  for a session  management bug
+       await YoctoAPI.YAPI.DisableExceptions();
+
 
         if (await YoctoAPI.YAPI.RegisterHub(addr, errmsg) != YoctoAPI.YAPI.SUCCESS)
         {
@@ -884,8 +894,8 @@ export class YV4W_installer
             TD4.style.fontSize = "smaller";
             Row.appendChild(TD4);
 
-            this._adminNameInput.value = this.DEFAULTUSER;
-            this._adminPasswordInput.value = this.DEFAULTPWD;
+            this._adminNameInput.value = this.DEFAULTSRVUSERNAME;
+            this._adminPasswordInput.value = this.DEFAULTSRVPASSORD;
             Table.appendChild(Row)
 
 
@@ -1030,7 +1040,7 @@ export class YV4W_installer
             Table.style.marginTop = "20px";
             Table.style.marginBottom = "20px";
             let serial: string = await m.get_serialNumber();
-            let firmware: string = await m.get_firmwareRelease();
+            let firmware: string = ""+(await m.get_firmwareRelease());
             Table.appendChild(this.createTextRow("Model:", await m.get_productName()));
             Table.appendChild(this.createTextRow("Serial:", serial));
             Table.appendChild(this.createTextRow("Firmware:", firmware));
@@ -1377,9 +1387,14 @@ export class YV4W_installer
                 chooser.add(opt4);
 
                 let opt5: HTMLOptionElement = document.createElement("OPTION") as HTMLOptionElement;
-                opt5.text = "Delete (cannot be reverted)";
-                opt5.value = this._MODIFYDELETE.toString();
+                opt5.text = "Update credentials";
+                opt5.value = this._MODIFYUPDATE.toString();
                 chooser.add(opt5);
+
+                let opt6: HTMLOptionElement = document.createElement("OPTION") as HTMLOptionElement;
+                opt6.text = "Delete (cannot be reverted)";
+                opt6.value = this._MODIFYDELETE.toString();
+                chooser.add(opt6);
 
                 let index: number = i;
                 chooser.addEventListener("change", () =>
@@ -2031,6 +2046,111 @@ export class YV4W_installer
 
     }
 
+    private  async  setInstanceCredentials(log: installLogFct, page: pageInstance, hubaddr : string, hubpath:string, newusername :string, newpwd :string)
+     {
+       let contents   : string = YoctoAPI.YAPI.imm_bin2str(page.contents);
+       let start      : number = contents.indexOf("<Hub ");
+       let mustupload : boolean =false;
+       let end        : number;
+       while (start>0)
+
+       { let end:number = contents.indexOf("/>",start);
+         if (end>start)
+         {  let hubline : string = contents.substring(start,end+2);
+            while (hubline.indexOf('\\"')>0) hubline=hubline.replace('\\"','"');  // higly inefficiant.
+            let state : number  = 0;
+            let key :  string="";
+            let value : string="";
+            let data  : [string,string][] = [] ;
+            let parseError : boolean =false;
+            for (let i:number = 4 ;(i< hubline.length-1) && (!parseError) ;i++)
+            { let c: string = hubline.charAt(i);
+              switch (state)
+              {  case  0 :  // waiting for key first char
+                  if (((c>="A")&&(c<="Z"))||((c>="a")&&(c<="z")))
+                    {  key=c;
+                       state=1;
+                    }
+                  else if (c!=" ") parseError=true;
+                  break;
+                case 1 :  // read key letter
+                  if (((c>="A")&&(c<="Z"))||((c>="a")&&(c<="z"))||((c>="0")&&(c<="9"))||(c=="_")) key=key+c;
+                  else if (c==" ") state=2
+                  else if (c=="=") state=3
+                  else parseError=true;
+                  break;
+                case 2 : // wait for "="
+                   if (c=="=")  state =3;
+                   else if (c!=" ") parseError=true;
+                   break
+                case 3 : // wait for "  or '
+                    if (c=="\"") state =4
+                    else if (c=="'") state =5
+                    else if (c!=" ") parseError=true;
+                    break;
+                case 4 : // read value letters, wait for terminal "
+                    if (c=="\"") state=6
+                    else value=value+c
+                    break;
+                case 5 : // read value letters, wait for terminal '
+                  if (c=="'") state=6
+                  else value=value+c
+                  break;
+                case 6 :
+                    data.push([key,value]);
+                    key="";
+                    value="";
+                    state=0;
+                    break;
+              }
+
+         }
+
+           if ((state!=0) || parseError) log("hub definition parse error")
+           else
+           {
+
+          let addrok:boolean=false;
+          let pathok:boolean=false;
+          for (let i:number =0;i< data.length;i++)
+          { if ((data[i][0]=="addr") && (data[i][1].toUpperCase())==hubaddr.toUpperCase())  addrok=true;
+            if ((data[i][0]=="path") && (data[i][1]==hubpath))  pathok=true;
+
+          }
+          if  ((addrok) &&  (pathok))
+          {
+            { for (let i:number =data.length-1;i>=0;i--)
+                if ((data[i][0]=="user") || (data[i][0]=="password")) data.splice(i,1);
+            }
+
+            if ((newusername!="") &&  (newpwd!=""))
+            { let p:string= YoctoVisualization.Hub.Encrypt(newpwd, YoctoVisualization.Hub.loginCypherPassword);
+              data.splice(1,0,["user","user"]);
+              data.splice(2,0,["password",p]);
+            }
+
+            let newhubline : string="<Hub ";
+            for (let i:number =0;i< data.length;i++)
+            { newhubline+=   data[i][0]+"=\\\""+data[i][1]+"\\\""+ (i< data.length-1?" ":"") ;
+            }
+
+            contents = contents.substring(0,start)+newhubline+contents.substring(end);
+            mustupload =true;
+            }
+          }
+
+          start = contents.indexOf("<Hub ",start+4);
+       }
+
+
+       }
+       if (mustupload) this.uploadpage(log, page, contents);
+
+
+     }
+
+
+
     private async patchPageInstance(log: installLogFct, page: pageInstance,
                                     signature1: string, replace1: string,
                                     altsignature1: string, altreplace1: string,
@@ -2053,23 +2173,28 @@ export class YV4W_installer
             if (p < 0) throw "Operation failed: cannot find the [" + signature2 + "] signature parameter in " + page.fs_filename;
             contents = contents.substr(0, p) + replace2 + contents.substr(p + signature2.length);
         }
-        let bincontents: Uint8Array = YoctoAPI.YAPI.imm_str2bin(contents);
-        let filename: string = page.fs_filename;
-        if (page.compressed)
-        {
-            let status: HTMLSpanElement = log("Compressing  " + filename)
-            bincontents = <Uint8Array>Pako.Pako_Deflate.gzip(bincontents, {level: 9})
-            status.innerText = 'done';
-        }
-        let status: HTMLSpanElement = log('Uploading  ' + filename + " to hub");
-        status.innerText = '0%';
-        let success: number = await this.uploadWidthProgress(filename, bincontents, (curr: number, total: number) =>
-        {
-            status.innerText = Math.round(100 * curr / total).toString() + "%"
-        })
-        status.innerText = 'done';
+        this.uploadpage(log, page, contents);
 
-        if (success != YoctoAPI.YAPI_SUCCESS) throw "Upload failed (Error" + success.toString() + ").";
+    }
+
+    private async uploadpage(log: installLogFct, page: pageInstance, contents:string)
+    {   let bincontents: Uint8Array = YoctoAPI.YAPI.imm_str2bin(contents);
+      let filename: string = page.fs_filename;
+      if (page.compressed)
+      {
+        let status: HTMLSpanElement = log("Compressing  " + filename)
+        bincontents = <Uint8Array>Pako.Pako_Deflate.gzip(bincontents, {level: 9})
+        status.innerText = 'done';
+      }
+      let status: HTMLSpanElement = log('Uploading  ' + filename + " to hub");
+      status.innerText = '0%';
+      let success: number = await this.uploadWidthProgress(filename, bincontents, (curr: number, total: number) =>
+      {
+        status.innerText = Math.round(100 * curr / total).toString() + "%"
+      })
+      status.innerText = 'done';
+
+      if (success != YoctoAPI.YAPI_SUCCESS) throw "Upload failed (Error" + success.toString() + ").";
 
     }
 
@@ -2146,6 +2271,24 @@ export class YV4W_installer
                     "\"./yv4web-readonly.min.js\"", "\"./yv4web-readonly.js\"",
                     "", "");
                 this._webPageinstances[i].useMinified = false;
+                break;
+
+              case this._MODIFYUPDATE :
+                let RO_username: string = "";
+                let RO_password: string = "";
+                let HUBaddr : string = "";
+                let HUBpath : string = "";
+
+
+                if (this._userNameInput != null) RO_username = this._userNameInput.value;
+                if (this._userPasswordInput != null) RO_password = this._userPasswordInput.value;
+                if (this._ipAddrInput!=null )HUBaddr = this._ipAddrInput.value;
+                if (this._pathInput!=null )HUBpath = this._pathInput.value;
+
+
+
+
+                 await this.setInstanceCredentials(log, this._webPageinstances[i],HUBaddr,HUBpath, RO_username,RO_password);
                 break;
 
             case this._MODIFYUSEMINIFIED :

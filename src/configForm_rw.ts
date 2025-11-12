@@ -40,6 +40,7 @@
 
 import * as YDataRendering from "./Renderer/YDataRendererFull.js";
 import * as YoctoVisualization from "./YoctoVisualizationFull.js";
+import * as YoctoAPI from "./YoctoApiFull";
 
 class configEditorTab
 {
@@ -163,7 +164,7 @@ export class configForm
     public static get activeBackgroundColor(): string { return YoctoVisualization.constants.WindowInnerBackgroundColor;}
     public static get inactiveBackgroundColor(): string { return YoctoVisualization.constants.WindowBackgroundColor;}
 
-    public static hubStateChanged(source: YoctoVisualization.Hub)
+    public static async hubStateChanged(source: YoctoVisualization.Hub)
     {
         if (configForm._Hubtable == null) return;
         let srvNotification: string = source.removable ? "" : " (server)"
@@ -171,8 +172,8 @@ export class configForm
         {
             if ((<any>configForm._Hubtable.childNodes[i])["YHUB"] == source)
             {
-                (configForm._Hubtable.childNodes[i].childNodes[2] as HTMLTableCellElement).innerText = source.ConnectionDescription + srvNotification;
-                switch (source.ConnectionState)
+                (configForm._Hubtable.childNodes[i].childNodes[2] as HTMLTableCellElement).innerText = await source.ConnectionDescription() + srvNotification;
+                switch (await source.ConnectionState())
                 {
                 case YoctoVisualization.HubState.CONNECTED :
                     (configForm._Hubtable.childNodes[i].childNodes[0] as HTMLTableCellElement).innerHTML = YoctoVisualization.ressources.OkIcon((1.2 * configForm.fontSize).toString(), true, false, false, false, " ")
@@ -235,7 +236,7 @@ export class configForm
         YoctoVisualization.HubEdit.newHub(() => {configForm._window.show();})
     }
 
-    private static AddHubToUI(hub: YoctoVisualization.Hub): void
+    private static async AddHubToUI(hub: YoctoVisualization.Hub)
     {
         let HubtableTR: HTMLTableRowElement = document.createElement("TR") as HTMLTableRowElement;
         HubtableTR.style.fontSize = configForm.fontSize.toString() + "px";
@@ -262,7 +263,7 @@ export class configForm
 
         let HubtableTD: HTMLTableCellElement = document.createElement("TD") as HTMLTableCellElement;
 
-        switch (hub.ConnectionState)
+        switch (await hub.ConnectionState())
         {
         case YoctoVisualization.HubState.CONNECTED :
             HubtableTD.innerHTML = YoctoVisualization.ressources.OkIcon((1.2 * configForm.fontSize).toString(), true, false, false, false, " ");
@@ -288,7 +289,8 @@ export class configForm
         HubtableTR.appendChild(HubtableTD)
         HubtableTD = document.createElement("TD") as HTMLTableCellElement;
         HubtableTD.style.verticalAlign = "center"
-        HubtableTD.innerText = hub.ConnectionDescription +  (hub.removable ? "" : " (server)");
+        HubtableTD.style.whiteSpace = "nowrap";
+        HubtableTD.innerText = await hub.ConnectionDescription() +  (hub.removable ? "" : " (server)");
         HubtableTD.style.borderBottom = "1px solid " + configForm.inactiveBorderColor;
 
         HubtableTR.appendChild(HubtableTD)
@@ -939,9 +941,7 @@ export class configForm
 
         configForm.RefreshUI(hub);
         YoctoVisualization.constants.edited = true;
-        hub.Disconnect().then(r => {});
-        hub.Connect().then(r => {});
-
+        hub.Disconnect().then(r => { YoctoAPI.YAPI.Sleep(1) ;    hub.Connect() });
     }
 
     private static dbleClickBringsUpContextMenuChange(source: HTMLInputElement)

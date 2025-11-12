@@ -2328,6 +2328,11 @@ export abstract class YDataRenderer
 
         this.DisableRedraw();
 
+        if (captureType== YDataRenderer.CaptureType.SVG)
+         {  w=Math.round(w/1.371);   // empirical
+            h=Math.round(h/1.371);
+         }
+
         let DrawArea = document.createElement('canvas');
         DrawArea.width = w;
         DrawArea.height = h;

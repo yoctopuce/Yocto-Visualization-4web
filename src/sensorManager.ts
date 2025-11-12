@@ -112,6 +112,7 @@ export class Hub
     private _logicname: string = "";
     private _previousURL: string = "";
     private _previousobfuscatedURL: string = "";
+    private _apiHub : YoctoAPI.YHub |  null = null;
 
     private _hubType: HubType = HubType.REMOTEHUB;
     public get hubType(): HubType {return this._hubType;}
@@ -148,16 +149,31 @@ export class Hub
     public set path(value: string) { this._path = value; }
 
     private _state: HubState = HubState.NOTCONNECTED;
-    public get ConnectionState(): HubState { return this._state }
-    public get ConnectionDescription(): string
+    public async ConnectionState(): Promise<HubState>
+     {  if (this._apiHub!=null)
+            if (await  this._apiHub.get_errorType() != YoctoAPI.YAPI_SUCCESS)
+            {   this._state = HubState.FAILURE;
+            }
+         return this._state
+
+    }
+    public async ConnectionDescription(): Promise<string>
     {
         switch (this._state)
         {
         case HubState.CONNECTING :
+            if (this._apiHub!=null)
+              if (await  this._apiHub.get_errorType() != YoctoAPI.YAPI_SUCCESS)
+                {   this._state = HubState.FAILURE;
+                    return await  this._apiHub.get_errorMessage();
+                }
             return "Connecting..";
+           break;
+
         case HubState.CONNECTED :
             return (this._logicname != "" ? this._logicname : this._netname) + " OK";
         case HubState.FAILURE :
+            if (this._apiHub!=null)   return await  this._apiHub.get_errorMessage();
             return "Connection failed ";
         default :
             return "Not connected.";
@@ -224,7 +240,12 @@ export class Hub
             this._previousobfuscatedURL = "";
         }
         else
-        {
+        {   let h : YoctoAPI.YHub | null = YoctoAPI.YHub.FirstHubInUse();
+            while (h!=null)
+            { if (await this.matches(h)) this._apiHub = h;
+              h =   h.nextHubInUse();
+            }
+
             this._previousURL = url;
             this._previousobfuscatedURL = this.get_obfuscatedURL()
         }
@@ -240,7 +261,8 @@ export class Hub
         await YoctoAPI.YAPI.UnregisterHub(this._previousURL);
         this._previousURL = "";
         this._previousobfuscatedURL = "";
-        this._state = HubState.NOTCONNECTED;
+        this._state  = HubState.NOTCONNECTED;
+        this._apiHub = null;
 //#ifndef READONLY
         if (!YoctoVisualization.YWebPage.readonly) YoctoVisualization.configForm.hubStateChanged(this)
 //#endif
@@ -324,6 +346,17 @@ export class Hub
         if (this._path != "") fullurl = fullurl + "/" + this._path;
         return fullurl;
     }
+
+
+    public async matches(apihub:YoctoAPI.YHub):Promise<boolean>
+    {
+        let URL1 : string =  this.get_connexionUrl()+this._path;
+        let URL2 : string = await apihub.get_connectionUrl();
+        if (URL1.slice(-1) =="/")  URL1=URL1.substr(0,URL1.length-1);
+        if (URL2.slice(-1) =="/")  URL2=URL2.substr(0,URL2.length-1);
+        return (URL1==URL2) ;
+
+     }
 
 //#ifndef READONLY
     public XmlCode(): string
@@ -1975,6 +2008,34 @@ export class sensorsManager
             YoctoVisualization.logForm.log("UpdateDeviceList failed :" + err.msg);
           }
         } catch (e) { YoctoVisualization.logForm.log("UpdateDeviceList failed :" +(e as Error).message);}
+
+        let hub : YoctoAPI.YHub | null = YoctoAPI.YHub.FirstHubInUse();
+        while (hub !=null)
+          {  let lastError :number = await hub.get_errorType();
+              if (lastError != YoctoAPI.YAPI_SUCCESS)
+              {  let logline :string  = "Cannot connect to " + await hub.get_connectionUrl() +" ("+await hub.get_errorMessage()+")";
+                 if (lastError == YoctoAPI.YAPI_UNAUTHORIZED)
+                 {  for (let i:number=0;i<this._hubList.length;i++)
+                      {
+                         if ((  await this._hubList[i].matches(hub)  ) && (!this._hubList[i].removable))
+                         {
+                             //#ifndef READONLY
+                             logline+=". Update hub credentials in 'Global configuration' window.";
+                             //#endif
+                             //#ifdef READONLY
+                             logline+=". Try to run the Yocto-Visualization (for web) installer again to update credentials";
+                             //#endif
+
+
+                      }
+                      }
+                 }
+                 YoctoVisualization.logForm.log(logline);
+              }
+            hub = hub.nextHubInUse();
+        }
+
+
     }
 
     private static async _runAsync(): Promise<void>

@@ -1,4 +1,3 @@
-Yocto-Visualization-4web v1.10.63744
+Yocto-Visualization-4web v1.11.10136
 
-- Fix Authentication on web server that was using HTTP header without spaces
-- Fix authentication on VirtualHub-4Web
+- Improved the hub detection method

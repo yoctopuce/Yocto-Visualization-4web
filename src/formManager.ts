@@ -681,6 +681,7 @@ export class YWidget
     public SensorArrivalcallback(source: YoctoVisualization.CustomYSensor)
     {
 
+
     }
 
     public SensorStateChangedcallback(source: YoctoVisualization.CustomYSensor)
@@ -2184,6 +2185,19 @@ export class graphWidget extends YWidget
     public SensorArrivalcallback(source: YoctoVisualization.CustomYSensor)
     {   this.loadRecordedDataIfNeeded();
 
+        for (let i: number = 0; i < graphWidget.SeriesCount; i++)
+        {
+          let s: YoctoVisualization.ChartSerie = this.seriesProperties[i];
+          if (s.DataSource_source == source)
+            {
+              if (!s.DataSource_source.isOnline())
+                  this.showOffline[i] = true;
+                else
+                   this.showOffline[i] = false;
+          }
+        }
+        this.updateOfflinePanel();
+
     }
 
     private preLoadSensorData(value: YoctoVisualization.CustomYSensor, index: number): void
@@ -2471,7 +2485,7 @@ export class graphWidget extends YWidget
                         break;
                     }
                 }
-
+                this._graph.series[i].unit = source.get_unit(); // dirty fix: series's unit were not set until the first data callback.
             }
         }
     }
