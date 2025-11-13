@@ -42,9 +42,17 @@ import * as YoctoAPI from "./YoctoApiFull.js";
 
 export class constants
 {
+    public static get versionInfo(): string[]
+    {
+        return /* version number patched automatically */['1.11.10214','70214'];
+    }
     public static get buildVersion(): string
     {
-        return /* version number patched automatically */'1.11.10136';
+        return this.versionInfo[0];
+    }
+    public static get trueBuild(): string
+    {
+        return this.versionInfo[1];
     }
     public static get deviceScreenWidth(): number {return screen.width * window.devicePixelRatio;}
     public static get deviceScreenHeight(): number {return screen.height * window.devicePixelRatio;}

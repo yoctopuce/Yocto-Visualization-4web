@@ -15,7 +15,7 @@ import * as process from 'process';
 import * as esbuild from 'esbuild';
 import * as Pako from "../src/Pako/Pakofull.js"
 
-function patchVersionInFile(newver: string, str_filename: string)
+function patchVersionInFile(newver: string, newbuild: string, str_filename: string)
 {
     let pattern: string = '/* version number patched automatically */';
     let jsFile: Buffer = fs.readFileSync(str_filename);
@@ -25,7 +25,7 @@ function patchVersionInFile(newver: string, str_filename: string)
     } else {
         pos += pattern.length;
         let endMark: number = jsFile.indexOf(';', pos);
-        let patch: string = "'" + newver + "'";
+        let patch: string = "['" + newver + "','" + newbuild + "']";
         let res: Buffer = Buffer.alloc(pos + patch.length + jsFile.length-endMark);
         jsFile.copy(res, 0, 0, pos);
         res.write(patch, pos);
@@ -34,7 +34,7 @@ function patchVersionInFile(newver: string, str_filename: string)
     }
 }
 
-function setVersion(str_newver: string)
+function setVersion(str_newver: string, str_newbuild: string)
 {
     // update version number is package.json
     let json: { version: string } = JSON.parse(fs.readFileSync('package.json', 'utf8'));
@@ -56,7 +56,7 @@ function setVersion(str_newver: string)
     fs.writeFileSync("package.json", JSON.stringify(json, null, 2), 'utf-8');
 
     // update version number in yocto_api.ts
-    patchVersionInFile(newver, 'src/constants.ts');
+    patchVersionInFile(newver, str_newbuild, 'src/constants.ts');
 }
 
 function findFilesRecursively(path: string, pattern: RegExp): string[]
@@ -167,7 +167,7 @@ async function bundleRenderer(objdir: string, target: string, banner: string)
         format: fmt,
         globalName: 'Renderer',
         sourcemap: false,
-        banner: banner,
+        banner: { js: banner, css: banner },
         outfile: 'dist/'+target+'/yv4web-renderer.js',
     });
     await esbuild.build({
@@ -178,7 +178,7 @@ async function bundleRenderer(objdir: string, target: string, banner: string)
         globalName: 'Renderer',
         sourcemap: false,
         minify: true,
-        banner: banner,
+        banner: { js: banner, css: banner },
         outfile: 'dist/'+target+'/yv4web-renderer.min.js',
     });
 }
@@ -191,7 +191,7 @@ async function bundle(objdir: string, target: string, bundleName: string, banner
         target: target,
         format: 'esm',
         sourcemap: true,
-        banner: banner,
+        banner: { js: banner, css: banner },
         outfile: 'dist/'+target+'/'+bundleName+'.js',
     });
     await esbuild.build({
@@ -201,7 +201,7 @@ async function bundle(objdir: string, target: string, bundleName: string, banner
         format: 'esm',
         sourcemap: false,
         minify: true,
-        banner: banner,
+        banner: { js: banner, css: banner },
         outfile: 'dist/'+target+'/'+bundleName+'.min.js',
     });
 }
@@ -234,7 +234,7 @@ async function bundleInstaller(objdir: string, target: string, bundleName: strin
         target: target,
         format: 'esm',
         sourcemap: true,
-        banner: banner,
+        banner: { js: banner, css: banner },
         outfile: 'dist/'+target+'/'+bundleName+'.js',
     });
     await esbuild.build({
@@ -244,7 +244,7 @@ async function bundleInstaller(objdir: string, target: string, bundleName: strin
         format: 'esm',
         sourcemap: false,
         minify: true,
-        banner: banner,
+        banner: { js: banner, css: banner },
         outfile: 'dist/'+target+'/'+bundleName+'.min.js',
     });
 }
@@ -276,7 +276,7 @@ if(args.length == 0) {
     switch(args[0])
     {
     case "newbuild":
-        setVersion(args[1]);
+        setVersion(args[1], args[2]);
         break;
     case "build":
         let json: { version: string } = JSON.parse(fs.readFileSync('package.json', 'utf8'));

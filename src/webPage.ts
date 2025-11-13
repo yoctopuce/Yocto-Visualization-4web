@@ -752,7 +752,7 @@ export class YWebPage
 
         let newVersionInstallerURL :string =  json[0]["link"];
         let newVersionNumber  : number = parseInt( json[0]["version"]);
-        let currentVersionStr  : string = YoctoVisualization.constants.buildVersion;
+        let currentVersionStr  : string = YoctoVisualization.constants.trueBuild;
         let currentVersionNumber : number=0;
         if (currentVersionStr.indexOf("-")<0)
         {  let n = currentVersionStr.lastIndexOf(".");
@@ -882,7 +882,7 @@ export class YWebPage
         //#ifndef READONLY
         YoctoVisualization.logForm.log("This application contains code ported from the Pako library (www.github.com/nodeca/pako).");
         //#endif
-        YoctoVisualization.logForm.log("Yocto-Visualization version is " + YoctoVisualization.constants.buildVersion);
+        YoctoVisualization.logForm.log("Yocto-Visualization (for web) version is " + YoctoVisualization.constants.buildVersion);
 
         YoctoVisualization.logForm.log("Yoctopuce API version is " + YoctoAPI.YAPI.imm_GetAPIVersion());
         if (YoctoVisualization.constants.RunningOnAndroid) YoctoVisualization.logForm.log("Browser is running on Android");

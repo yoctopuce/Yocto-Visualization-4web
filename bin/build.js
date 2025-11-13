@@ -39,7 +39,7 @@ const ts = __importStar(require("typescript"));
 const process = __importStar(require("process"));
 const esbuild = __importStar(require("esbuild"));
 const Pako = __importStar(require("../src/Pako/Pakofull.js"));
-function patchVersionInFile(newver, str_filename) {
+function patchVersionInFile(newver, newbuild, str_filename) {
     let pattern = '/* version number patched automatically */';
     let jsFile = fs.readFileSync(str_filename);
     let pos = jsFile.indexOf(pattern);
@@ -49,7 +49,7 @@ function patchVersionInFile(newver, str_filename) {
     else {
         pos += pattern.length;
         let endMark = jsFile.indexOf(';', pos);
-        let patch = "'" + newver + "'";
+        let patch = "['" + newver + "','" + newbuild + "']";
         let res = Buffer.alloc(pos + patch.length + jsFile.length - endMark);
         jsFile.copy(res, 0, 0, pos);
         res.write(patch, pos);
@@ -57,7 +57,7 @@ function patchVersionInFile(newver, str_filename) {
         fs.writeFileSync(str_filename, res);
     }
 }
-function setVersion(str_newver) {
+function setVersion(str_newver, str_newbuild) {
     // update version number is package.json
     let json = JSON.parse(fs.readFileSync('package.json', 'utf8'));
     let newver;
@@ -78,7 +78,7 @@ function setVersion(str_newver) {
     json.version = newver;
     fs.writeFileSync("package.json", JSON.stringify(json, null, 2), 'utf-8');
     // update version number in yocto_api.ts
-    patchVersionInFile(newver, 'src/constants.ts');
+    patchVersionInFile(newver, str_newbuild, 'src/constants.ts');
 }
 function findFilesRecursively(path, pattern) {
     let result = [];
@@ -191,7 +191,7 @@ async function bundleRenderer(objdir, target, banner) {
         format: fmt,
         globalName: 'Renderer',
         sourcemap: false,
-        banner: banner,
+        banner: { js: banner, css: banner },
         outfile: 'dist/' + target + '/yv4web-renderer.js',
     });
     await esbuild.build({
@@ -202,7 +202,7 @@ async function bundleRenderer(objdir, target, banner) {
         globalName: 'Renderer',
         sourcemap: false,
         minify: true,
-        banner: banner,
+        banner: { js: banner, css: banner },
         outfile: 'dist/' + target + '/yv4web-renderer.min.js',
     });
 }
@@ -213,7 +213,7 @@ async function bundle(objdir, target, bundleName, banner) {
         target: target,
         format: 'esm',
         sourcemap: true,
-        banner: banner,
+        banner: { js: banner, css: banner },
         outfile: 'dist/' + target + '/' + bundleName + '.js',
     });
     await esbuild.build({
@@ -223,7 +223,7 @@ async function bundle(objdir, target, bundleName, banner) {
         format: 'esm',
         sourcemap: false,
         minify: true,
-        banner: banner,
+        banner: { js: banner, css: banner },
         outfile: 'dist/' + target + '/' + bundleName + '.min.js',
     });
 }
@@ -249,7 +249,7 @@ async function bundleInstaller(objdir, target, bundleName, banner) {
         target: target,
         format: 'esm',
         sourcemap: true,
-        banner: banner,
+        banner: { js: banner, css: banner },
         outfile: 'dist/' + target + '/' + bundleName + '.js',
     });
     await esbuild.build({
@@ -259,7 +259,7 @@ async function bundleInstaller(objdir, target, bundleName, banner) {
         format: 'esm',
         sourcemap: false,
         minify: true,
-        banner: banner,
+        banner: { js: banner, css: banner },
         outfile: 'dist/' + target + '/' + bundleName + '.min.js',
     });
 }
@@ -286,7 +286,7 @@ if (args.length == 0) {
 else {
     switch (args[0]) {
         case "newbuild":
-            setVersion(args[1]);
+            setVersion(args[1], args[2]);
             break;
         case "build":
             let json = JSON.parse(fs.readFileSync('package.json', 'utf8'));
