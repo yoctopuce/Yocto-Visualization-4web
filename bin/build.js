@@ -222,6 +222,7 @@ async function bundle(objdir, target, bundleName, banner) {
         target: target,
         format: 'esm',
         sourcemap: false,
+        keepNames: true,
         minify: true,
         banner: { js: banner, css: banner },
         outfile: 'dist/' + target + '/' + bundleName + '.min.js',

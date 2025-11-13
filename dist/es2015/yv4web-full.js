@@ -1,4 +1,4 @@
-/* Yocto-Visualization-4web (ES2015 full 1.11.10214) - www.yoctopuce.com */
+/* Yocto-Visualization-4web (ES2015 full 2.1.10284) - www.yoctopuce.com */
 
 // obj/full/Renderer/YDataRendererCommon.js
 var Vector3 = class _Vector3 {
@@ -21027,7 +21027,7 @@ var YAPIContext = class {
   imm_GetAPIVersion() {
     return (
       /* version number patched automatically */
-      "2.1.10214"
+      "2.1.10284"
     );
   }
   /**
@@ -24308,7 +24308,7 @@ var constants = class _constants {
   static get versionInfo() {
     return (
       /* version number patched automatically */
-      ["1.11.10214", "70214"]
+      ["2.1.10284", "70284"]
     );
   }
   static get buildVersion() {

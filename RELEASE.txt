@@ -1,4 +1,4 @@
-Yocto-Visualization-4web v1.11.10214
+Yocto-Visualization-4web v2.1.10284
 
-- Fix version number reported
-- Improve connection to hubs
+- Fix version number to 2.1
+- Improved the hub detection method
