@@ -1,4 +1,4 @@
-Yocto-Visualization-4web v2.1.10284
+Yocto-Visualization-4web v2.1.11843
 
-- Fix version number to 2.1
-- Improved the hub detection method
+- Improve hub status reporting in specific cases
+- Improve reconnection to VirtualHub for Web when browser goes to deep sleep

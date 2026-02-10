@@ -572,7 +572,7 @@ export class YWebPage
         let doc: XMLDocument = parser.parseFromString(xmlData.replace("<" + "!-->", "<" + "!-- "), "application/xml")
         let root: ChildNode | null = null;
         doc.childNodes.forEach(node => {if ((node.nodeName.toUpperCase() == "ROOT") && (root == null)) root = node; })
-        if (root == null) throw "No ROOT top node in XML data";
+        if (root == null) throw new Error("No ROOT top node in XML data");
 
         // sensor configuration must be loaded first
         (<ChildNode>root).childNodes.forEach(node =>
@@ -1346,6 +1346,16 @@ export class YoctoHubFileHandler
         //#endif
     }
 
+    public async disconnect()
+    {   
+        //#ifndef READONLY
+        if (this.fileSystem == null) return
+        let m: YoctoAPI.YModule | null= await this.fileSystem.get_module();
+        let url : string = await m.get_url();
+        await YoctoAPI.YAPI.UnregisterHub(url)
+        //#endif
+    }
+
     public static async start(defaultXmlConfigFileContents?: string)
     {
         let dirpath: string = location.pathname;
@@ -1367,7 +1377,10 @@ export class YoctoHubFileHandler
         await hubinfo.makeRequest();
         let filehandler = new YoctoHubFileHandler(hubinfo);
         await filehandler.init(defaultXmlConfigFileContents);
-        return filehandler;
+        // important: disconnecting will prevent from creating some weird dual connection if the Host page url is silghtly
+        // different from the the one saved in the configuration.
+        await filehandler.disconnect()
+        return filehandler
     }
 
     public get xmlConfigData(): string {return this.xmldata;}
@@ -1443,13 +1456,13 @@ export class YoctoHubFileHandler
                 this.FileSystemAccessDenied = true;
                 return;
             }
-            throw "YV4F ERROR: Unable to register Hub " + this.info.get_hubUrl() + "(" +errorMsg+ "), save will not work.";
+            throw new Error("YV4F ERROR: Unable to register Hub " + this.info.get_hubUrl() + "(" +errorMsg+ "), save will not work.");
         }
         let fs: YoctoAPI.YFiles | null = YoctoAPI.YFiles.FirstFiles();
         if (fs == null)
         {
             this.fileSystemReady = true;
-            throw "YV4F ERROR: No file system found on Hub " + this.info.get_hubUrl() + ", save will not work.";
+            throw new Error("YV4F ERROR: No file system found on Hub " + this.info.get_hubUrl() + ", save will not work.");
         }
         // first search by serial number
         while (fs != null)
@@ -1467,7 +1480,7 @@ export class YoctoHubFileHandler
         {
             let m: YoctoAPI.YModule = await fs.get_module();
             let url = await m.get_url();
-            console.log("URL = (" + url + ")")
+            //console.log("URL = (" + url + ")")
             let p: number = url.indexOf("://");
             if (p >= 0) url = url.slice(p + 3);
             p = url.indexOf(":");
@@ -1482,7 +1495,7 @@ export class YoctoHubFileHandler
             fs = fs.nextFiles();
         }
         this.fileSystemReady = true;
-        throw "YV4F ERROR: No file system matching Hub " + this.info.get_hubUrl() + " found, save will not work.";
+        throw new Error("YV4F ERROR: No file system matching Hub " + this.info.get_hubUrl() + " found, save will not work.");
     }
 
     private async registerSourceFileSystem(fs: YoctoAPI.YFiles)
@@ -1509,9 +1522,10 @@ export class YoctoHubFileHandler
             // since a configchange is triggered on the hub arrival in Yocto-Visualisation
             // and this callback is forwarded to us, we get a second chance to get it right.
             let urlSignature = this.info.addr + ":" + this.info.port.toString() + "/"+this.info.path+(this.info.path!=""?"/":"");
+            if  (urlSignature.startsWith("www.") ) urlSignature =  urlSignature.substring(4);
             let sourceUrl = await m.get_url();
-            console.log('urlSignature=' + urlSignature);
-            console.log('sourceUrl=' + sourceUrl);
+            //console.log('urlSignature=' + urlSignature);
+            //console.log('sourceUrl=' + sourceUrl);
             if ((sourceUrl.length > urlSignature.length) && (sourceUrl.substring(sourceUrl.length - urlSignature.length) == urlSignature))
             {
                 let fs: YoctoAPI.YFiles | null = YoctoAPI.YFiles.FindFiles(await m.get_serialNumber() + ".files");
@@ -1574,6 +1588,8 @@ export class YoctoHubFileHandler
            catch (e) { if (callback!=null) callback(false,"Save failed ("+(e as Error).message)+")"; return }
 
         }
+
+
 
     public async saveFctinternal(xml: string, callback? :XMLConfigSaveFunctionCompleted): Promise<boolean>
     {

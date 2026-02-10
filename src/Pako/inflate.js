@@ -113,11 +113,11 @@ class Pako_inflate_option {
             let custKeys = Object.keys(CustOption);
             for (let i = 0; i < custKeys.length; i++) {
                 if (stdKeys.indexOf(custKeys[i]) < 0)
-                    throw "Invalid Pako option name '" + custKeys[i] + "', check Pako_inflate_option class";
+                    throw new Error("Invalid Pako option name '" + custKeys[i] + "', check Pako_inflate_option class");
                 let srcType = typeof (Reflect.get(CustOption, custKeys[i]));
                 let trgtType = typeof (Reflect.get(StdOption, custKeys[i]));
                 if (srcType != trgtType) {
-                    throw "Invalid Pako type for option '" + custKeys[i] + "' (expected '" + trgtType + "', got '" + srcType + "')";
+                    throw new Error("Invalid Pako type for option '" + custKeys[i] + "' (expected '" + trgtType + "', got '" + srcType + "')");
                 }
                 Reflect.set(StdOption, custKeys[i], Reflect.get(CustOption, custKeys[i]));
             }

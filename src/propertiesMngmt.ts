@@ -300,7 +300,7 @@ export abstract class GenericProperties
                                             break;
                                         default :
                                             debugger
-                                            throw "unhandled target type : " + targetType + "(" + target.constructor.name + ")";
+                                            throw new Error("unhandled target type : " + targetType + "(" + target.constructor.name + ")");
                                         }
                                     }
                                 }
@@ -453,7 +453,7 @@ export abstract class GenericProperties
                                 value = ((s == null) || (s instanceof YoctoVisualization.NullYSensor)) ? "NULL" : s.get_hardwareId();
                                 break;
                             default:
-                                throw "XML generation : unhandled type (" + p.type + ")";
+                                throw new Error("XML generation : unhandled type (" + p.type + ")");
 
                             }
                         }

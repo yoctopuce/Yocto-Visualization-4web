@@ -173,7 +173,7 @@ export class configForm
             if ((<any>configForm._Hubtable.childNodes[i])["YHUB"] == source)
             {
                 (configForm._Hubtable.childNodes[i].childNodes[2] as HTMLTableCellElement).innerText = await source.ConnectionDescription() + srvNotification;
-                switch (await source.ConnectionState())
+                switch ( source.ConnectionState())
                 {
                 case YoctoVisualization.HubState.CONNECTED :
                     (configForm._Hubtable.childNodes[i].childNodes[0] as HTMLTableCellElement).innerHTML = YoctoVisualization.ressources.OkIcon((1.2 * configForm.fontSize).toString(), true, false, false, false, " ")
@@ -263,7 +263,7 @@ export class configForm
 
         let HubtableTD: HTMLTableCellElement = document.createElement("TD") as HTMLTableCellElement;
 
-        switch (await hub.ConnectionState())
+        switch ( hub.ConnectionState())
         {
         case YoctoVisualization.HubState.CONNECTED :
             HubtableTD.innerHTML = YoctoVisualization.ressources.OkIcon((1.2 * configForm.fontSize).toString(), true, false, false, false, " ");

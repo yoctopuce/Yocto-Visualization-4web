@@ -620,8 +620,8 @@ export class YNetwork extends YFunction
     async set_userPassword(newval: string): Promise<number>
     {
         let rest_val: string;
-        if (newval.length > YAPI.HASH_BUF_SIZE) {
-            return this._throw(YAPI.INVALID_ARGUMENT, 'Password too long :' + newval, YAPI.INVALID_ARGUMENT);
+        if (!this._is_valid_pass(newval)) {
+            return YAPI.INVALID_ARGUMENT;
         }
         rest_val = String(newval);
         return await this._setAttr('userPassword', rest_val);
@@ -664,8 +664,8 @@ export class YNetwork extends YFunction
     async set_adminPassword(newval: string): Promise<number>
     {
         let rest_val: string;
-        if (newval.length > YAPI.HASH_BUF_SIZE) {
-            return this._throw(YAPI.INVALID_ARGUMENT, 'Password too long :' + newval, YAPI.INVALID_ARGUMENT);
+        if (!this._is_valid_pass(newval)) {
+            return YAPI.INVALID_ARGUMENT;
         }
         rest_val = String(newval);
         return await this._setAttr('adminPassword', rest_val);
@@ -1411,7 +1411,9 @@ export class YNetwork extends YFunction
 
     /**
      * Registers the callback function that is invoked on every change of advertised value.
-     * The callback is invoked only during the execution of ySleep or yHandleEvents.
+     * The callback is called once when it is registered, passing the current advertised value
+     * of the function, provided that it is not an empty string.
+     * The callback is then invoked only during the execution of ySleep or yHandleEvents.
      * This provides control over the time when the callback is triggered. For good responsiveness, remember to call
      * one of these two functions periodically. To unregister a callback, pass a null pointer as argument.
      *

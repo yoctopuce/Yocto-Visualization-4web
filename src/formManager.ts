@@ -378,7 +378,7 @@ export class YWidget
     private _relativeWidth: number = 100;
     private set relativeWidth(value: number)
     {
-        if (value <= 0) throw "Value must be strictly positive";
+        if (value <= 0) throw new Error("Value must be strictly positive");
         this._relativeWidth = value;
         this._Width = Math.round(value * this.parentWidth / 100);
     }
@@ -386,7 +386,7 @@ export class YWidget
     private _relativeHeight: number = 100;
     private set relativeHeight(value: number)
     {
-        if (value <= 0) throw "Value must be strictly positive";
+        if (value <= 0) throw new Error("Value must be strictly positive");
         this._relativeHeight = value;
         this._Height = Math.round(value * this.parentHeight / 100);
     }
@@ -418,7 +418,7 @@ export class YWidget
 
     public set Width(value: number)
     {
-        if (value <= 0) throw "Value must be strictly positive";
+        if (value <= 0) throw new Error("Value must be strictly positive");
         if (this._SizeIsRelative) this.relativeWidth = value; else this._Width = value;
         this.UIContainer.style.width = (this._Width - 2).toString() + "px";
         this.UIContainer.width = this._Width - 2;
@@ -439,7 +439,7 @@ export class YWidget
 
     public set Height(value: number)
     {
-        if (value <= 0) throw "Value must be strictly positive";
+        if (value <= 0) throw new Error("Value must be strictly positive");
         if (this._SizeIsRelative) this.relativeHeight = value; else this._Height = value;
         this.UIContainer.style.height = (this._Height - 2).toString() + "px";
         this.UIContainer.height = (this._Height - 2);
@@ -479,7 +479,7 @@ export class YWidget
         if (this._containerID == value) return;
 
         let target: HTMLElement | null = (value != "") ? document.getElementById(value) : null;
-        if ((value != "") && (target == null)) throw "No HTMLElement on the page with such ID (" + value + ")";
+        if ((value != "") && (target == null)) throw new Error("No HTMLElement on the page with such ID (" + value + ")");
         if (this.UIContainer.parentNode != null)
         {
             this.UIContainer.parentNode.removeChild(this.UIContainer);

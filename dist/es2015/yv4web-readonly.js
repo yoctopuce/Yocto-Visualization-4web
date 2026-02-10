@@ -1,4 +1,4 @@
-/* Yocto-Visualization-4web (ES2015 read-only 2.1.10284) - www.yoctopuce.com */
+/* Yocto-Visualization-4web (ES2015 read-only 2.1.11843) - www.yoctopuce.com */
 
 // obj/rdonly/Renderer/YDataRendererCommon.js
 var Vector3 = class _Vector3 {
@@ -114,7 +114,7 @@ var Matrix3x3 = class _Matrix3x3 {
       return _Matrix3x3.newTranslateMatrix(-this.c, -this.f);
     let det = this.determinant;
     if (det == 0)
-      throw "matrix cannot be inverted";
+      throw new Error("matrix cannot be inverted");
     let detA = this.e * this.i - this.f * this.h;
     let detB = this.b * this.i - this.c * this.h;
     let detC = this.b * this.f - this.c * this.e;
@@ -140,7 +140,7 @@ var YEnum = class {
       if (p[i] == value)
         return container[value];
     }
-    throw "YEnum" + value + " is not a " + container + " value";
+    throw new Error("YEnum" + value + " is not a " + container + " value");
   }
   static siblings(container) {
     let res = [];
@@ -1058,7 +1058,7 @@ var GenericPanel = class _GenericPanel {
   }
   set borderthickness(value) {
     if (value < 0)
-      throw "Border thickness must be a positive value";
+      throw new Error("Border thickness must be a positive value");
     this._borderthickness = value;
     this._parentRenderer.clearCachedObjects();
     this._pen = null;
@@ -8649,6 +8649,11 @@ var Y_DETECT_ALL = Y_DETECT_USB | Y_DETECT_NET;
 var DEFAULT_DEVICE_LIST_VALIDITY_MS = 1e4;
 var DEFAULT_NETWORK_TIMEOUT_MS = 2e4;
 var YOCTO_CALIB_TYPE_OFS = 30;
+var NOTIFY_NETPKT_NAME = "0";
+var NOTIFY_NETPKT_CHILD = "2";
+var NOTIFY_NETPKT_FUNCNAME = "4";
+var NOTIFY_NETPKT_FUNCVAL = "5";
+var NOTIFY_NETPKT_FUNCNAMEYDX = "8";
 var NOTIFY_NETPKT_CONFCHGYDX = "s";
 var NOTIFY_NETPKT_FLUSHV2YDX = "t";
 var NOTIFY_NETPKT_FUNCV2YDX = "u";
@@ -9942,7 +9947,7 @@ var YDataSet = class {
           }
           dataRows = yield ii_0.get_dataRows();
           if (dataRows.length == 0) {
-            return yield this.get_progress();
+            return this.get_progress();
           }
           tim = streamStartTimeMs;
           fitv = Math.round((yield ii_0.get_firstDataSamplesInterval()) * 1e3);
@@ -10033,7 +10038,7 @@ var YDataSet = class {
       } else {
         this._summary = new YMeasure(0, 0, YAPI_INVALID_DOUBLE, YAPI_INVALID_DOUBLE, YAPI_INVALID_DOUBLE);
       }
-      return yield this.get_progress();
+      return this.get_progress();
     });
   }
   processMore(progress, data) {
@@ -10071,7 +10076,7 @@ var YDataSet = class {
       dataRows = yield stream.get_dataRows();
       this._progress = this._progress + 1;
       if (dataRows.length == 0) {
-        return yield this.get_progress();
+        return this.get_progress();
       }
       tim = Math.round((yield stream.get_realStartTimeUTC()) * 1e3);
       fitv = Math.round((yield stream.get_firstDataSamplesInterval()) * 1e3);
@@ -10111,7 +10116,7 @@ var YDataSet = class {
       if (this._bulkLoad > 0 && this._progress < this._streams.length) {
         stream = this._streams[this._progress];
         if (stream.imm_wasLoaded()) {
-          return yield this.get_progress();
+          return this.get_progress();
         }
         baseurl = stream.imm_get_baseurl();
         url = stream.imm_get_url();
@@ -10140,7 +10145,7 @@ var YDataSet = class {
           idx = idx + 1;
         }
       }
-      return yield this.get_progress();
+      return this.get_progress();
     });
   }
   get_privateDataStreams() {
@@ -10247,15 +10252,13 @@ var YDataSet = class {
    * @return an integer in the range 0 to 100 (percentage of completion).
    */
   get_progress() {
-    return __awaiter(this, void 0, void 0, function* () {
-      if (this._progress < 0) {
-        return 0;
-      }
-      if (this._progress >= this._streams.length) {
-        return 100;
-      }
-      return (1 + (1 + this._progress) * 98) / (1 + this._streams.length) >> 0;
-    });
+    if (this._progress < 0) {
+      return 0;
+    }
+    if (this._progress >= this._streams.length) {
+      return 100;
+    }
+    return (1 + (1 + this._progress) * 98) / (1 + this._streams.length) >> 0;
   }
   /**
    * Loads the next block of measures from the dataLogger, and updates
@@ -10612,7 +10615,7 @@ var YConsolidatedDataSet = class _YConsolidatedDataSet {
             measures = yield this._datasets[s].get_measures();
           }
           if (idx < measures.length) {
-            currnexttim = yield measures[idx].get_endTimeUTC();
+            currnexttim = measures[idx].get_endTimeUTC();
             this._nexttim[s] = currnexttim;
           }
         }
@@ -10634,7 +10637,7 @@ var YConsolidatedDataSet = class _YConsolidatedDataSet {
         if (this._nexttim[s] == nexttime) {
           idx = this._nextidx[s];
           measures = yield this._datasets[s].get_measures();
-          newvalue = yield measures[idx].get_averageValue();
+          newvalue = measures[idx].get_averageValue();
           datarec.push(newvalue);
           this._nexttim[s] = 0;
           this._nextidx[s] = idx + 1;
@@ -11790,7 +11793,9 @@ var YFunction = class _YFunction {
   }
   /**
    * Registers the callback function that is invoked on every change of advertised value.
-   * The callback is invoked only during the execution of ySleep or yHandleEvents.
+   * The callback is called once when it is registered, passing the current advertised value
+   * of the function, provided that it is not an empty string.
+   * The callback is then invoked only during the execution of ySleep or yHandleEvents.
    * This provides control over the time when the callback is triggered. For good responsiveness, remember to call
    * one of these two functions periodically. To unregister a callback, pass a null pointer as argument.
    *
@@ -11908,6 +11913,23 @@ var YFunction = class _YFunction {
   }
   _parserHelper() {
     return 0;
+  }
+  _is_valid_pass(passwd) {
+    let tmp;
+    if (passwd.length > YAPI.HASH_BUF_SIZE) {
+      tmp = "Password too long (max " + String(Math.round(YAPI.HASH_BUF_SIZE)) + " chars) :" + passwd;
+      this._throw(YAPI_INVALID_ARGUMENT, tmp);
+      return false;
+    }
+    if (passwd.indexOf("@") >= 0) {
+      this._throw(YAPI_INVALID_ARGUMENT, "Character @ is not allowed in password");
+      return false;
+    }
+    if (passwd.indexOf("/") >= 0) {
+      this._throw(YAPI_INVALID_ARGUMENT, "Character / is not allowed in password");
+      return false;
+    }
+    return true;
   }
   /**
    * Returns the next Function
@@ -13419,7 +13441,9 @@ var YModule = class _YModule extends YFunction {
   }
   /**
    * Registers the callback function that is invoked on every change of advertised value.
-   * The callback is invoked only during the execution of ySleep or yHandleEvents.
+   * The callback is called once when it is registered, passing the current advertised value
+   * of the function, provided that it is not an empty string.
+   * The callback is then invoked only during the execution of ySleep or yHandleEvents.
    * This provides control over the time when the callback is triggered. For good responsiveness, remember to call
    * one of these two functions periodically. To unregister a callback, pass a null pointer as argument.
    *
@@ -15200,7 +15224,9 @@ var YSensor = class _YSensor extends YFunction {
   }
   /**
    * Registers the callback function that is invoked on every change of advertised value.
-   * The callback is invoked only during the execution of ySleep or yHandleEvents.
+   * The callback is called once when it is registered, passing the current advertised value
+   * of the function, provided that it is not an empty string.
+   * The callback is then invoked only during the execution of ySleep or yHandleEvents.
    * This provides control over the time when the callback is triggered. For good responsiveness, remember to call
    * one of these two functions periodically. To unregister a callback, pass a null pointer as argument.
    *
@@ -16196,7 +16222,9 @@ var YDataLogger = class _YDataLogger extends YFunction {
   }
   /**
    * Registers the callback function that is invoked on every change of advertised value.
-   * The callback is invoked only during the execution of ySleep or yHandleEvents.
+   * The callback is called once when it is registered, passing the current advertised value
+   * of the function, provided that it is not an empty string.
+   * The callback is then invoked only during the execution of ySleep or yHandleEvents.
    * This provides control over the time when the callback is triggered. For good responsiveness, remember to call
    * one of these two functions periodically. To unregister a callback, pass a null pointer as argument.
    *
@@ -16827,6 +16855,7 @@ var YGenericHub = class _YGenericHub {
             let data = yield this._yapi.system_env.downloadfile(url, this._yapi);
             infoJson = JSON.parse(YAPI.imm_bin2str(data));
             if (infoJson) {
+              infoJson.stamp = YAPI.GetTickCount();
               if (infoJson.serialNumber) {
                 this.imm_setSerialNumber(infoJson.serialNumber);
               }
@@ -17581,6 +17610,9 @@ var YHttpEngine = class extends YHubEngine {
   // Internal method to perform a simple HTTP GET using a hub-relative URL
   tryFetch(relUrl) {
     return __awaiter(this, void 0, void 0, function* () {
+      if (relUrl.slice(0, 1) != "/") {
+        relUrl = "/" + relUrl;
+      }
       return new Promise((resolve, reject) => {
         this.imm_sendRequest("GET", relUrl, null, null, (responseText) => {
           resolve({ errorType: YAPI_SUCCESS, errorMsg: "", result: responseText });
@@ -17665,8 +17697,12 @@ var YHttpEngine = class extends YHubEngine {
           }
         }
         this._hub.imm_SetErr(errorType, errorMsg);
-        if ((errorType == YAPI_UNAUTHORIZED || errorType == YAPI_SSL_UNK_CERT) && !can_be_retry) {
-          this._hub.imm_commonDisconnect(tryOpenID, errorType, errorMsg);
+        if (!can_be_retry) {
+          if (errorType === YAPI_SSL_UNK_CERT) {
+            this._hub.imm_commonDisconnect(tryOpenID, errorType, errorMsg);
+          } else if (errorType === YAPI_UNAUTHORIZED && YAPI.GetTickCount() - this.infoJson.stamp <= 12e3) {
+            this._hub.imm_commonDisconnect(tryOpenID, errorType, errorMsg);
+          }
         }
         this._hub.imm_disconnectNow();
       });
@@ -17777,7 +17813,7 @@ var YWebSocketEngine = class extends YHubEngine {
         this._hub._yapi.imm_log("Opening websocket connection [" + tryOpenID + "]");
       }
       this._hub.imm_setCurrentConnID(tryOpenID);
-      let url = (this._runtime_urlInfo.imm_useSecureSocket() ? "wss://" : "ws://") + this._runtime_urlInfo.imm_getUrl(false, true, true);
+      let url = (this._runtime_urlInfo.imm_useSecureSocket() ? "wss://" : "ws://") + this._runtime_urlInfo.imm_getUrl(false, false, true);
       this.imm_webSocketOpen(url + "not.byn");
       this._hub.imm_setFirstArrivalCallback(true);
       if (!this.websocket) {
@@ -18876,93 +18912,66 @@ var YHub = class _YHub {
     this._ctx = obj_yapi;
     this._hubref = hubref;
   }
-  _getStrAttr_internal(attrName) {
-    return __awaiter(this, void 0, void 0, function* () {
-      let hub = this._ctx.getGenHub(this._hubref);
-      if (hub == null) {
-        return "";
-      }
-      switch (attrName) {
-        case "registeredUrl":
-          return hub.imm_getOriginalURL();
-        case "connectionUrl":
-          return hub.imm_getRootUrl();
-        case "serialNumber":
-          return hub.imm_getSerialNumber();
-        case "errorMessage":
-          return hub.get_errorMessage();
-        default:
-          return "";
-      }
-    });
-  }
-  _getIntAttr_internal(attrName) {
-    return __awaiter(this, void 0, void 0, function* () {
-      let hub = this._ctx.getGenHub(this._hubref);
-      if (attrName == "isInUse") {
-        return hub != null ? 1 : 0;
-      }
-      if (attrName == "connectionState") {
-        if (hub == null) {
-          return _YHub.UNREGISTERED;
-        }
-        return hub.imm_getConnectionState();
-      }
-      if (hub == null) {
-        return -1;
-      }
-      switch (attrName) {
-        case "isOnline":
-          return hub.imm_isOnline() ? 1 : 0;
-        case "isReadOnly":
-          return (yield hub.hasRwAccess()) ? 0 : 1;
-        case "networkTimeout":
-          return hub.imm_getNetworkTimeout();
-        case "errorType":
-          return hub.get_errorType();
-        default:
-          return -1;
-      }
-    });
-  }
-  _setIntAttr_internal(attrName, value) {
-    return __awaiter(this, void 0, void 0, function* () {
-      let hub = this._ctx.getGenHub(this._hubref);
-      if (hub != null && attrName == "networkTimeout") {
-        hub.imm_setNetworkTimeout(value);
-      }
-    });
-  }
-  get_knownUrls_internal() {
+  _imm_getStrAttr(attrName) {
     let hub = this._ctx.getGenHub(this._hubref);
-    if (hub != null) {
-      return hub.get_knownUrls();
+    if (hub == null) {
+      return "";
     }
-    return [];
+    switch (attrName) {
+      case "registeredUrl":
+        return hub.imm_getOriginalURL();
+      case "connectionUrl":
+        return hub.imm_getRootUrl();
+      case "serialNumber":
+        return hub.imm_getSerialNumber();
+      case "errorMessage":
+        return hub.get_errorMessage();
+      default:
+        return "";
+    }
   }
-  //--- (generated code: YHub implementation)
-  _getStrAttr(attrName) {
-    return __awaiter(this, void 0, void 0, function* () {
-      return yield this._getStrAttr_internal(attrName);
-    });
+  _imm_getIntAttr(attrName) {
+    let hub = this._ctx.getGenHub(this._hubref);
+    if (attrName == "isInUse") {
+      return hub != null ? 1 : 0;
+    }
+    if (attrName == "connectionState") {
+      if (hub == null) {
+        return _YHub.UNREGISTERED;
+      }
+      return hub.imm_getConnectionState();
+    }
+    if (hub == null) {
+      return -1;
+    }
+    switch (attrName) {
+      case "isOnline":
+        return hub.imm_isOnline() ? 1 : 0;
+      case "networkTimeout":
+        return hub.imm_getNetworkTimeout();
+      case "errorType":
+        return hub.get_errorType();
+      default:
+        return -1;
+    }
   }
   _getIntAttr(attrName) {
     return __awaiter(this, void 0, void 0, function* () {
-      return yield this._getIntAttr_internal(attrName);
+      if (attrName == "isReadOnly") {
+        let hub = this._ctx.getGenHub(this._hubref);
+        if (hub == null) {
+          return -1;
+        }
+        return (yield hub.hasRwAccess()) ? 0 : 1;
+      }
+      return this._imm_getIntAttr(attrName);
     });
   }
-  _setIntAttr(attrName, value) {
-    return __awaiter(this, void 0, void 0, function* () {
-      return yield this._setIntAttr_internal(attrName, value);
-    });
-  }
-  /**
-   * Returns the URL that has been used first to register this hub.
-   */
-  get_registeredUrl() {
-    return __awaiter(this, void 0, void 0, function* () {
-      return yield this._getStrAttr("registeredUrl");
-    });
+  _imm_setIntAttr(attrName, value) {
+    let hub = this._ctx.getGenHub(this._hubref);
+    if (hub != null && attrName == "networkTimeout") {
+      hub.imm_setNetworkTimeout(value);
+    }
   }
   /**
    * Returns all known URLs that have been used to register this hub.
@@ -18970,33 +18979,36 @@ var YHub = class _YHub {
    * are sharing the same serial number.
    */
   get_knownUrls() {
-    return __awaiter(this, void 0, void 0, function* () {
-      return yield this.get_knownUrls_internal();
-    });
+    let hub = this._ctx.getGenHub(this._hubref);
+    if (hub != null) {
+      return hub.get_knownUrls();
+    }
+    return [];
+  }
+  //--- (generated code: YHub implementation)
+  /**
+   * Returns the URL that has been used first to register this hub.
+   */
+  get_registeredUrl() {
+    return this._imm_getStrAttr("registeredUrl");
   }
   /**
    * Returns the URL currently in use to communicate with this hub.
    */
   get_connectionUrl() {
-    return __awaiter(this, void 0, void 0, function* () {
-      return yield this._getStrAttr("connectionUrl");
-    });
+    return this._imm_getStrAttr("connectionUrl");
   }
   /**
    * Returns the state of the connection with this hub. (TRYING, CONNECTED, RECONNECTING, ABORTED, UNREGISTERED)
    */
   get_connectionState() {
-    return __awaiter(this, void 0, void 0, function* () {
-      return yield this._getIntAttr("connectionState");
-    });
+    return this._imm_getIntAttr("connectionState");
   }
   /**
    * Returns the hub serial number, if the hub was already connected once.
    */
   get_serialNumber() {
-    return __awaiter(this, void 0, void 0, function* () {
-      return yield this._getStrAttr("serialNumber");
-    });
+    return this._imm_getStrAttr("serialNumber");
   }
   /**
    * Tells if this hub is still registered within the API.
@@ -19039,9 +19051,7 @@ var YHub = class _YHub {
    * @noreturn
    */
   set_networkTimeout(networkMsTimeout) {
-    return __awaiter(this, void 0, void 0, function* () {
-      yield this._setIntAttr("networkTimeout", networkMsTimeout);
-    });
+    this._imm_setIntAttr("networkTimeout", networkMsTimeout);
   }
   /**
    * Returns the network connection delay for this hub.
@@ -19052,9 +19062,7 @@ var YHub = class _YHub {
    * @return the network connection delay in milliseconds.
    */
   get_networkTimeout() {
-    return __awaiter(this, void 0, void 0, function* () {
-      return yield this._getIntAttr("networkTimeout");
-    });
+    return this._imm_getIntAttr("networkTimeout");
   }
   /**
    * Returns the numerical error code of the latest error with the hub.
@@ -19066,7 +19074,7 @@ var YHub = class _YHub {
    */
   get_errorType() {
     return __awaiter(this, void 0, void 0, function* () {
-      return yield this._getIntAttr("errorType");
+      return this._imm_getIntAttr("errorType");
     });
   }
   /**
@@ -19079,7 +19087,7 @@ var YHub = class _YHub {
    */
   get_errorMessage() {
     return __awaiter(this, void 0, void 0, function* () {
-      return yield this._getStrAttr("errorMessage");
+      return this._imm_getStrAttr("errorMessage");
     });
   }
   /**
@@ -19788,22 +19796,33 @@ var YAPIContext = class {
           if (notype == "@") {
             hub.notifPos = parseInt(ev.slice(5));
           } else {
-            switch (parseInt(notype)) {
-              case 0:
+            switch (notype) {
+              case NOTIFY_NETPKT_NAME:
                 parts = ev.slice(5).split(",");
                 if (parts.length > 2) {
                   let int_beacon = parseInt(parts[2]);
                   yield this.setBeaconChange(parts[0], int_beacon);
                 }
-              // no break on purpose
-              case 2:
-              // device plug/unplug
-              case 4:
-              // function name change
-              case 8:
                 hub.devListExpires = 0;
                 break;
-              case 5:
+              // no break on purpose
+              case NOTIFY_NETPKT_CHILD:
+                parts = ev.split(",");
+                if (parts[2] == "0") {
+                  let serial = parts[1];
+                  if (this._removalCallback) {
+                    let module = YModule.FindModuleInContext(this, serial + ".module");
+                    this._pendingCallbacks.push({ event: "-", serial, module });
+                  }
+                  this.imm_forgetDevice(this._devs[serial]);
+                }
+              // no break on purpose
+              case NOTIFY_NETPKT_FUNCNAME:
+              // function name change
+              case NOTIFY_NETPKT_FUNCNAMEYDX:
+                hub.devListExpires = 0;
+                break;
+              case NOTIFY_NETPKT_FUNCVAL:
                 parts = ev.slice(5).split(",");
                 if (parts.length > 2) {
                   value = parts[2].split("\0");
@@ -20991,10 +21010,10 @@ var YAPIContext = class {
       let rhub;
       rhub = this.nextHubInUseInternal(-1);
       while (!(rhub == null)) {
-        if ((yield rhub.get_serialNumber()) == id) {
+        if (rhub.get_serialNumber() == id) {
           return rhub;
         }
-        if ((yield rhub.get_registeredUrl()) == id) {
+        if (rhub.get_registeredUrl() == id) {
           return rhub;
         }
         rhub = rhub.nextHubInUse();
@@ -21027,7 +21046,7 @@ var YAPIContext = class {
   imm_GetAPIVersion() {
     return (
       /* version number patched automatically */
-      "2.1.10284"
+      "2.1.11843"
     );
   }
   /**
@@ -22761,8 +22780,8 @@ var YNetwork = class _YNetwork extends YFunction {
   set_userPassword(newval) {
     return __awaiter3(this, void 0, void 0, function* () {
       let rest_val;
-      if (newval.length > YAPI.HASH_BUF_SIZE) {
-        return this._throw(YAPI.INVALID_ARGUMENT, "Password too long :" + newval, YAPI.INVALID_ARGUMENT);
+      if (!this._is_valid_pass(newval)) {
+        return YAPI.INVALID_ARGUMENT;
       }
       rest_val = String(newval);
       return yield this._setAttr("userPassword", rest_val);
@@ -22805,8 +22824,8 @@ var YNetwork = class _YNetwork extends YFunction {
   set_adminPassword(newval) {
     return __awaiter3(this, void 0, void 0, function* () {
       let rest_val;
-      if (newval.length > YAPI.HASH_BUF_SIZE) {
-        return this._throw(YAPI.INVALID_ARGUMENT, "Password too long :" + newval, YAPI.INVALID_ARGUMENT);
+      if (!this._is_valid_pass(newval)) {
+        return YAPI.INVALID_ARGUMENT;
       }
       rest_val = String(newval);
       return yield this._setAttr("adminPassword", rest_val);
@@ -23548,7 +23567,9 @@ var YNetwork = class _YNetwork extends YFunction {
   }
   /**
    * Registers the callback function that is invoked on every change of advertised value.
-   * The callback is invoked only during the execution of ySleep or yHandleEvents.
+   * The callback is called once when it is registered, passing the current advertised value
+   * of the function, provided that it is not an empty string.
+   * The callback is then invoked only during the execution of ySleep or yHandleEvents.
    * This provides control over the time when the callback is triggered. For good responsiveness, remember to call
    * one of these two functions periodically. To unregister a callback, pass a null pointer as argument.
    *
@@ -23808,7 +23829,7 @@ var constants = class _constants {
   static get versionInfo() {
     return (
       /* version number patched automatically */
-      ["2.1.10284", "70284"]
+      ["2.1.11843", "71843"]
     );
   }
   static get buildVersion() {
@@ -24326,6 +24347,9 @@ var Hub = class _Hub {
   static encryptPassword(clearPassword) {
     return clearPassword == "" ? "" : _Hub.Encrypt(clearPassword, _Hub.loginCypherPassword);
   }
+  set_apiHub(hub) {
+    this._apiHub = hub;
+  }
   get hubType() {
     return this._hubType;
   }
@@ -24380,15 +24404,31 @@ var Hub = class _Hub {
   set path(value) {
     this._path = value;
   }
+  get_serialNumber() {
+    if (this._apiHub == null)
+      return "?";
+    return this._apiHub.get_serialNumber();
+  }
   ConnectionState() {
-    return __awaiter4(this, void 0, void 0, function* () {
-      if (this._apiHub != null) {
-        if ((yield this._apiHub.get_errorType()) != YAPI_SUCCESS) {
+    if (this._apiHub != null)
+      switch (this._apiHub.get_connectionState()) {
+        case this._apiHub.TRYING:
+          this._state = 1;
+          break;
+        case this._apiHub.CONNECTED:
+          this._state = 2;
+          break;
+        case this._apiHub.RECONNECTING:
+          this._state = 1;
+          break;
+        case this._apiHub.ABORTED:
           this._state = 3;
-        }
+          break;
+        case this._apiHub.UNREGISTERED:
+          this._state = 3;
+          break;
       }
-      return this._state;
-    });
+    return this._state;
   }
   ConnectionDescription() {
     return __awaiter4(this, void 0, void 0, function* () {
@@ -24473,7 +24513,12 @@ var Hub = class _Hub {
     return __awaiter4(this, void 0, void 0, function* () {
       let errmsg = new YErrorMsg();
       this._state = 1;
-      logForm.log("preregistering  " + this.get_obfuscatedURL());
+      let ofsUrl = this.get_obfuscatedURL();
+      logForm.log("preregistering  " + ofsUrl);
+      if (window.location.protocol.toString().toLowerCase() == "https:") {
+        if (ofsUrl.substring(0, 3).toLowerCase() == "ws:" || ofsUrl.substring(0, 5).toLowerCase() == "http:")
+          logForm.log("Warning: Host page is HTTPS, ws:// and http:// protocols are unlikely to work due to CORS rules.");
+      }
       let url = this.get_fullUrl();
       if ((yield YAPI.PreregisterHub(url, errmsg)) != YAPI_SUCCESS) {
         logForm.log("[!] preregistering  " + this.get_obfuscatedURL() + " failed (" + errmsg.msg + ")");
@@ -24533,6 +24578,21 @@ var Hub = class _Hub {
         fullurl = fullurl + ":" + _Hub.Decrypt(this._password, _Hub.loginCypherPassword);
       fullurl = fullurl + "@";
     }
+    fullurl = fullurl + this._addr;
+    if (this._port != "")
+      fullurl = fullurl + ":" + this._port;
+    else
+      fullurl = fullurl + ":4444";
+    fullurl = fullurl + "/";
+    if (this._path) {
+      fullurl = fullurl + this._path + "/";
+    }
+    return fullurl;
+  }
+  get_fullUrlNoCredentials() {
+    let fullurl = "";
+    if (this._protocol != "")
+      fullurl = this._protocol + "://";
     fullurl = fullurl + this._addr;
     if (this._port != "")
       fullurl = fullurl + ":" + this._port;
@@ -24657,7 +24717,7 @@ var AlarmSettings = class {
   }
   setDelay(value) {
     if (value < 0)
-      throw "delay must be a positive value";
+      throw new Error("delay must be a positive value");
     this.Delay = value;
   }
   getDelay() {
@@ -25192,7 +25252,7 @@ var CustomYSensor = class _CustomYSensor {
         this.previewDataCleanUp();
       for (let i = 0; i < this.previewMinData.length - 1; i++) {
         if (this.previewMinData[i].DateTime >= this.previewMinData[i + 1].DateTime) {
-          throw "Time-stamp inconsistency";
+          throw new Error("Time-stamp inconsistency");
         }
       }
       if (this.previewCurData.length > 1) {
@@ -25429,6 +25489,10 @@ var CustomYSensor = class _CustomYSensor {
       let olfreq = yield this.sensor.get_logFrequency();
       let orfreq = yield this.sensor.get_reportFrequency();
       let readOnly = yield this.sensor.isReadOnly();
+      let value = yield this.sensor.get_currentValue();
+      this._lastAvgValue = value;
+      this._lastMinValue = value;
+      this._lastMaxValue = value;
       let lfreq = olfreq;
       let rfreq = orfreq;
       let m = yield this.sensor.get_module();
@@ -25649,21 +25713,27 @@ var sensorsManager = class _sensorsManager {
   }
   // load config data  from XML config file
   static InitHubList(node) {
-    let nodes = node.get_childsByIndex();
-    for (let i = 0; i < nodes.length; i++) {
-      if (nodes[i].Name.toUpperCase() == "HUB") {
-        let h = Hub.HubFromXml(nodes[i]);
-        let alreadthere = false;
-        for (let j = 0; j < _sensorsManager._hubList.length; j++) {
-          if (h.get_connexionUrl() == _sensorsManager._hubList[j].get_connexionUrl())
-            alreadthere = true;
-        }
-        if (!alreadthere) {
-          _sensorsManager._hubList.push(h);
-          h.Connect().then();
+    return __awaiter4(this, void 0, void 0, function* () {
+      let nodes = node.get_childsByIndex();
+      let promises = [];
+      for (let i = 0; i < nodes.length; i++) {
+        if (nodes[i].Name.toUpperCase() == "HUB") {
+          let h = Hub.HubFromXml(nodes[i]);
+          let alreadthere = false;
+          for (let j = 0; j < _sensorsManager._hubList.length; j++) {
+            let url1 = h.get_connexionUrl();
+            let url2 = _sensorsManager._hubList[j].get_fullUrlNoCredentials();
+            if (url1 == url2)
+              alreadthere = true;
+          }
+          if (!alreadthere) {
+            _sensorsManager._hubList.push(h);
+            promises.push(h.Connect());
+          }
         }
       }
-    }
+      yield Promise.all(promises);
+    });
   }
   static get hubList() {
     return _sensorsManager._hubList;
@@ -26080,13 +26150,13 @@ var YWidget = class {
   }
   set relativeWidth(value) {
     if (value <= 0)
-      throw "Value must be strictly positive";
+      throw new Error("Value must be strictly positive");
     this._relativeWidth = value;
     this._Width = Math.round(value * this.parentWidth / 100);
   }
   set relativeHeight(value) {
     if (value <= 0)
-      throw "Value must be strictly positive";
+      throw new Error("Value must be strictly positive");
     this._relativeHeight = value;
     this._Height = Math.round(value * this.parentHeight / 100);
   }
@@ -26113,7 +26183,7 @@ var YWidget = class {
   }
   set Width(value) {
     if (value <= 0)
-      throw "Value must be strictly positive";
+      throw new Error("Value must be strictly positive");
     if (this._SizeIsRelative)
       this.relativeWidth = value;
     else
@@ -26132,7 +26202,7 @@ var YWidget = class {
   }
   set Height(value) {
     if (value <= 0)
-      throw "Value must be strictly positive";
+      throw new Error("Value must be strictly positive");
     if (this._SizeIsRelative)
       this.relativeHeight = value;
     else
@@ -26166,7 +26236,7 @@ var YWidget = class {
       return;
     let target = value != "" ? document.getElementById(value) : null;
     if (value != "" && target == null)
-      throw "No HTMLElement on the page with such ID (" + value + ")";
+      throw new Error("No HTMLElement on the page with such ID (" + value + ")");
     if (this.UIContainer.parentNode != null) {
       this.UIContainer.parentNode.removeChild(this.UIContainer);
     } else {
@@ -27995,7 +28065,7 @@ var GenericProperties = class _GenericProperties {
                         break;
                       default:
                         debugger;
-                        throw "unhandled target type : " + targetType + "(" + target.constructor.name + ")";
+                        throw new Error("unhandled target type : " + targetType + "(" + target.constructor.name + ")");
                     }
                   }
                 }
@@ -28235,7 +28305,7 @@ var GenericProperties = class _GenericProperties {
   //                                value = ((s == null) || (s instanceof YoctoVisualization.NullYSensor)) ? "NULL" : s.get_hardwareId();
   //                                break;
   //                            default:
-  //                                throw "XML generation : unhandled type (" + p.type + ")";
+  //                                throw new Error("XML generation : unhandled type (" + p.type + ")");
   //
   //                            }
   //                        }
@@ -34553,7 +34623,7 @@ var YWebPage = class _YWebPage {
         root = node;
     });
     if (root == null)
-      throw "No ROOT top node in XML data";
+      throw new Error("No ROOT top node in XML data");
     root.childNodes.forEach((node) => {
       if (node.nodeName.toUpperCase() == "SENSORS") {
         sensorsManager.setKnownSensors(new YXmlNode(node));
@@ -35121,6 +35191,10 @@ var YoctoHubFileHandler = class _YoctoHubFileHandler {
       }
     });
   }
+  disconnect() {
+    return __awaiter6(this, void 0, void 0, function* () {
+    });
+  }
   static start(defaultXmlConfigFileContents) {
     return __awaiter6(this, void 0, void 0, function* () {
       let dirpath = location.pathname;
@@ -35138,6 +35212,7 @@ var YoctoHubFileHandler = class _YoctoHubFileHandler {
       yield hubinfo.makeRequest();
       let filehandler = new _YoctoHubFileHandler(hubinfo);
       yield filehandler.init(defaultXmlConfigFileContents);
+      yield filehandler.disconnect();
       return filehandler;
     });
   }

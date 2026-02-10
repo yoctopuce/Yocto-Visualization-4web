@@ -60,6 +60,7 @@ export class HubEdit
     private static _passwordInput: HTMLInputElement;
     private static _thisIsEditing: boolean = false;
     private static _whenDone: HubEditDone | null = null;
+    private static _coreWarning : HTMLParagraphElement;
 
     private static fontSize: number = YoctoVisualization.constants.generalFontSize;
     public static get activeBorderColor(): string { return YoctoVisualization.constants.WindowInnerBorderColor;}
@@ -70,8 +71,11 @@ export class HubEdit
     public static get inactiveBackgroundColor(): string { return YoctoVisualization.constants.WindowBackgroundColor;}
 
     public static newHub(whenDone: HubEditDone | null)
-    {
-        HubEdit._currenthub = new YoctoVisualization.Hub(YoctoVisualization.HubType.REMOTEHUB, "ws", "", "", true, "", "", "")
+    {   let  protocol : string  = "ws"
+        if  (window.location.protocol.toString().toLowerCase()=="https:") protocol = "wss";
+
+
+        HubEdit._currenthub = new YoctoVisualization.Hub(YoctoVisualization.HubType.REMOTEHUB, protocol, "", "", true, "", "", "")
         HubEdit.show(HubEdit._currenthub);
         HubEdit._window.title = "New Connection"
         HubEdit._thisIsEditing = false;
@@ -88,16 +92,24 @@ export class HubEdit
         HubEdit._whenDone = whenDone;
     }
 
+    private static updateCorsWarning()
+    {   let state : string = "None"
+        if  (window.location.protocol.toString().toLowerCase()=="https:")
+            if ((HubEdit._protocolSelect.value == "ws") || (HubEdit._protocolSelect.value == "http"))
+              state = "";
+        HubEdit._coreWarning.style.display = state
+    }
+
     private static show(hub: YoctoVisualization.Hub)
     {
         if (HubEdit._window == null)
-        {
+        {   let h =   (window.location.protocol.toString().toLowerCase()=="https:") ? 300 : 280
             HubEdit._okButton = new YoctoVisualization.button("Ok", () => {HubEdit.okClicked()});
             HubEdit._cancelButton = new YoctoVisualization.button("Cancel", () => { HubEdit.hide()});
             let params: YoctoVisualization.newWindowParam = new YoctoVisualization.newWindowParam();
             params.positionType = YoctoVisualization.WindowPositionType.CENTERED
             params.width = Math.round(450 * YoctoVisualization.constants.generalSizeCoef);
-            params.height = Math.round(280 * YoctoVisualization.constants.generalSizeCoef);
+            params.height = Math.round(h * YoctoVisualization.constants.generalSizeCoef);
             params.isModal = true;
             params.closeIcon = false;
             params.title = "...";
@@ -150,7 +162,12 @@ export class HubEdit
             wssOption.value = "wss";
             HubEdit._protocolSelect.appendChild(wssOption);
 
+
+
+
             p.appendChild(HubEdit._protocolSelect);
+
+            HubEdit._protocolSelect.addEventListener("change", () => {HubEdit.updateCorsWarning()})
 
             span = document.createElement("SPAN") as HTMLSpanElement;
             span.style.marginLeft = "20px";
@@ -231,14 +248,27 @@ export class HubEdit
             p.innerText = "Important note: credentials are saved in the configuration file wich is easily accessible. Therefore, if hub is write-protected, it might be wise to use ReadOnly credentials here. When installed on a Yoctopuce hub, Yocto-Visualization (for web) will automatically ask for read/write credentials at save time if neccessary.";
             p.style.textAlign = "justify"
             HubEdit._contents.appendChild(p);
+
+            HubEdit._coreWarning  = document.createElement("P") as HTMLParagraphElement;
+            HubEdit._coreWarning.style.paddingTop = "0px";
+            HubEdit._coreWarning.style.marginTop = Math.round(3 * YoctoVisualization.constants.generalSizeCoef).toString() + "px";
+            HubEdit._coreWarning.style.lineHeight = Math.round(12 * YoctoVisualization.constants.generalSizeCoef).toString() + "px";
+            HubEdit._coreWarning.innerText = "Warning: If the host page is accessed though HTTPS, connecting to a hub though HTTP or WS is unlikely to work due to Cross-Origin Resource Sharing (CORS) rules";
+            HubEdit._coreWarning.style.textAlign = "justify"
+            HubEdit._coreWarning.style.display =  "None"
+            HubEdit._contents.appendChild(HubEdit._coreWarning);
+
+
+
+
         }
         HubEdit._protocolSelect.value = hub.protocol;
         HubEdit._addressInput.value = hub.addr;
         HubEdit._portInput.value = hub.port;
         HubEdit._pathInput.value = hub.path;
         HubEdit._usernameInput.value = hub.user;
-
         HubEdit._passwordInput.value = hub.encryptedPassword != "" ? HubEdit.FakePassword : "";
+        HubEdit.updateCorsWarning()
         HubEdit._window.show();
     }
 

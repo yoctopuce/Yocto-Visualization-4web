@@ -113,6 +113,7 @@ export class Hub
     private _previousURL: string = "";
     private _previousobfuscatedURL: string = "";
     private _apiHub : YoctoAPI.YHub |  null = null;
+    public set_apiHub(hub:YoctoAPI.YHub ) {this._apiHub = hub }
 
     private _hubType: HubType = HubType.REMOTEHUB;
     public get hubType(): HubType {return this._hubType;}
@@ -148,13 +149,24 @@ export class Hub
     public get path(): string { return this._path; }
     public set path(value: string) { this._path = value; }
 
+    public get_serialNumber()
+    { if (this._apiHub == null)  return "?";
+      return this._apiHub.get_serialNumber()
+
+
+    }
+
     private _state: HubState = HubState.NOTCONNECTED;
-    public async ConnectionState(): Promise<HubState>
+    public  ConnectionState(): HubState
      {  if (this._apiHub!=null)
-            if (await  this._apiHub.get_errorType() != YoctoAPI.YAPI_SUCCESS)
-            {   this._state = HubState.FAILURE;
-            }
-         return this._state
+         switch (  this._apiHub.get_connectionState())
+          {   case this._apiHub.TRYING:  this._state = HubState.CONNECTING ; break;
+              case this._apiHub.CONNECTED:  this._state = HubState.CONNECTED ; break;
+              case this._apiHub.RECONNECTING:  this._state = HubState.CONNECTING ; break;
+              case this._apiHub.ABORTED:  this._state = HubState.FAILURE ; break;
+              case this._apiHub.UNREGISTERED:  this._state = HubState.FAILURE ; break;
+         }
+        return this._state
 
     }
     public async ConnectionDescription(): Promise<string>
@@ -226,7 +238,14 @@ export class Hub
     {
         let errmsg: YoctoAPI.YErrorMsg = new YoctoAPI.YErrorMsg();
         this._state = HubState.CONNECTING;
-        YoctoVisualization.logForm.log("preregistering  " + this.get_obfuscatedURL());
+        let ofsUrl = this.get_obfuscatedURL();
+        YoctoVisualization.logForm.log("preregistering  " + ofsUrl);
+        if  (window.location.protocol.toString().toLowerCase()=="https:")
+         {  if  ((ofsUrl.substring(0,3).toLowerCase()=="ws:") || (ofsUrl.substring(0,5).toLowerCase()=="http:"))
+             YoctoVisualization.logForm.log("Warning: Host page is HTTPS, ws:// and http:// protocols are unlikely to work due to CORS rules.");
+         }
+
+
 //#ifndef READONLY
         if (!YoctoVisualization.YWebPage.readonly) YoctoVisualization.configForm.hubStateChanged(this)
 //#endif
@@ -321,6 +340,23 @@ export class Hub
 
     }
 
+    public get_fullUrlNoCredentials(): string
+    {
+        let fullurl: string = "";
+        if (this._protocol != "") fullurl = this._protocol + "://";
+
+        fullurl = fullurl + this._addr;
+        if (this._port != "") fullurl = fullurl + ":" + this._port; else fullurl = fullurl + ":4444"
+
+        fullurl = fullurl + "/";
+        if (this._path)
+        {
+            fullurl = fullurl + this._path + "/";
+        }
+        return fullurl;
+
+    }
+
     public get_connexionUrl(): string
     {
         let fullurl: string;
@@ -328,6 +364,7 @@ export class Hub
         fullurl = fullurl + this._addr;
         if (this._port != "") fullurl = fullurl + ":" + this._port; else fullurl = fullurl + ":4444";
         fullurl = fullurl + "/";
+
         return fullurl.toLowerCase();
     }
 
@@ -439,7 +476,7 @@ export class AlarmSettings
     public getValue(): number { return this.Value; }
     public setDelay(value: number)
     {
-        if (value < 0) throw "delay must be a positive value"
+        if (value < 0) throw new Error("delay must be a positive value")
         this.Delay = value;
     }
     public getDelay(): number { return this.Delay; }
@@ -1127,7 +1164,7 @@ export class CustomYSensor
         {
             if (this.previewMinData[i].DateTime >= this.previewMinData[i + 1].DateTime)
             {
-                throw "Time-stamp inconsistency";
+                throw new Error("Time-stamp inconsistency");
             }
         }
 
@@ -1469,6 +1506,11 @@ export class CustomYSensor
         let olfreq: string = await (<YoctoAPI.YSensor>this.sensor).get_logFrequency();
         let orfreq: string = await (<YoctoAPI.YSensor>this.sensor).get_reportFrequency();
         let readOnly : boolean = await (<YoctoAPI.YSensor>this.sensor).isReadOnly();
+        let value  : number =  await (<YoctoAPI.YSensor>this.sensor).get_currentValue();
+        this._lastAvgValue = value;
+        this._lastMinValue = value;
+        this._lastMaxValue = value;
+
         let lfreq: string = olfreq;
         let rfreq: string = orfreq;
         let m: YoctoAPI.YModule = await (<YoctoAPI.YSensor>this.sensor).get_module();
@@ -1701,26 +1743,32 @@ export class sensorsManager
         }
     }
     // load config data  from XML config file
-    public static InitHubList(node: YoctoVisualization.YXmlNode): void
+    public static async InitHubList(node: YoctoVisualization.YXmlNode): Promise<void>
     {
         let nodes: YoctoVisualization.YXmlNode[] = node.get_childsByIndex();
+        let promises: Promise<void>[] = [];
         for (let i: number = 0; i < nodes.length; i++)
-        {
+         {
             if (nodes[i].Name.toUpperCase() == "HUB")
             {
                 let h: Hub = Hub.HubFromXml(nodes[i]);
                 let alreadthere = false;
                 for (let j: number = 0; j < sensorsManager._hubList.length; j++)
-                {
-                    if (h.get_connexionUrl() == sensorsManager._hubList[j].get_connexionUrl()) alreadthere = true;
+                {   let url1: string  = h.get_connexionUrl()
+                    let url2:string   = sensorsManager._hubList[j].get_fullUrlNoCredentials()
+                    if (url1 == url2) alreadthere = true;
                 }
                 if (!alreadthere)
                 {
                     sensorsManager._hubList.push(h);
-                    h.Connect().then();
+                    promises.push(h.Connect());
                 }
             }
         }
+
+       
+        await Promise.all(promises)
+
 
     }
     public static get hubList(): YoctoVisualization.Hub[] {return sensorsManager._hubList}

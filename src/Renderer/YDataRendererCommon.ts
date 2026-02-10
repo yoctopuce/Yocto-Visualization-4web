@@ -249,7 +249,7 @@ export class Matrix3x3
         if (this.isTranslation) return Matrix3x3.newTranslateMatrix(-this.c, -this.f);
 
         let det: number = this.determinant;
-        if (det == 0) throw "matrix cannot be inverted"
+        if (det == 0) throw new Error("matrix cannot be inverted");
         let detA: number = this.e * this.i - this.f * this.h;
         let detB: number = this.b * this.i - this.c * this.h;
         let detC: number = this.b * this.f - this.c * this.e;
@@ -294,7 +294,7 @@ export class YEnum
         {
             if (p[i] == value) return container[value];
         }
-        throw "YEnum" + value + " is not a " + container + " value";
+        throw new Error("YEnum" + value + " is not a " + container + " value");
     }
 
     public static siblings(container: any)
@@ -1405,7 +1405,7 @@ export abstract class GenericPanel
 
     set borderthickness(value: number)
     {
-        if (value < 0) throw "Border thickness must be a positive value";
+        if (value < 0) throw new Error("Border thickness must be a positive value");
         this._borderthickness = value;
         this._parentRenderer.clearCachedObjects();
         this._pen = null;

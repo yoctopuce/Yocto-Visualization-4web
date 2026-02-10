@@ -121,11 +121,11 @@ export class Pako_deflate_option
                 if (stdKeys.indexOf(custKeys[i]) < 0)
                 {
                     debugger
-                    throw "Invalid Pako option name '" + custKeys[i] + "', check Pako_deflate_option class";
+                    throw new Error("Invalid Pako option name '" + custKeys[i] + "', check Pako_deflate_option class");
                 }
                 let srcType: string = typeof (Reflect.get(CustOption, custKeys[i]));
                 let trgtType: string = typeof (Reflect.get(StdOption, custKeys[i]));
-                if (srcType != trgtType) throw  "Invalid Pako type for option '" + custKeys[i] + "' (expected '" + trgtType + "', got '" + srcType + "')";
+                if (srcType != trgtType) throw  new Error("Invalid Pako type for option '" + custKeys[i] + "' (expected '" + trgtType + "', got '" + srcType + "')");
                 Reflect.set(StdOption, custKeys[i], Reflect.get(CustOption, custKeys[i]));
             }
         }

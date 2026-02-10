@@ -1,6 +1,6 @@
 /*********************************************************************
  *
- *  $Id: yocto_files.ts 68466 2025-08-19 17:31:45Z mvuilleu $
+ *  $Id: yocto_files.ts 71691 2026-02-02 06:59:29Z mvuilleu $
  *
  *  Implements the high-level API for FileRecord functions
  *
@@ -276,7 +276,9 @@ export class YFiles extends YFunction
 
     /**
      * Registers the callback function that is invoked on every change of advertised value.
-     * The callback is invoked only during the execution of ySleep or yHandleEvents.
+     * The callback is called once when it is registered, passing the current advertised value
+     * of the function, provided that it is not an empty string.
+     * The callback is then invoked only during the execution of ySleep or yHandleEvents.
      * This provides control over the time when the callback is triggered. For good responsiveness, remember to call
      * one of these two functions periodically. To unregister a callback, pass a null pointer as argument.
      *
@@ -493,14 +495,11 @@ export class YFiles extends YFunction
         let part: number;
         let res: number;
         sz = (content).length;
-        if (sz == 0) {
-            res = this._yapi.imm_bincrc(content,0,0);
-            return res;
-        }
 
         fsver = await this._getVersion();
         if (fsver < 40) {
             res = this._yapi.imm_bincrc(content,0,sz);
+            res = ((res & 0x7fffffff) - 2 * ((res >> 1) & 0x40000000));
             return res;
         }
         blkcnt = (((sz + 255) / 256) >> 0);
@@ -519,6 +518,7 @@ export class YFiles extends YFunction
             blkidx = blkidx + 1;
         }
         res = (this._yapi.imm_bincrc(meta,0,4 * blkcnt) ^ (<number> 0xffffffff));
+        res = ((res & 0x7fffffff) - 2 * ((res >> 1) & 0x40000000));
         return res;
     }
 

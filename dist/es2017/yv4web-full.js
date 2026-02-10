@@ -1,4 +1,4 @@
-/* Yocto-Visualization-4web (ES2017 full 2.1.10284) - www.yoctopuce.com */
+/* Yocto-Visualization-4web (ES2017 full 2.1.11843) - www.yoctopuce.com */
 
 // obj/full/Renderer/YDataRendererCommon.js
 var Vector3 = class _Vector3 {
@@ -114,7 +114,7 @@ var Matrix3x3 = class _Matrix3x3 {
       return _Matrix3x3.newTranslateMatrix(-this.c, -this.f);
     let det = this.determinant;
     if (det == 0)
-      throw "matrix cannot be inverted";
+      throw new Error("matrix cannot be inverted");
     let detA = this.e * this.i - this.f * this.h;
     let detB = this.b * this.i - this.c * this.h;
     let detC = this.b * this.f - this.c * this.e;
@@ -140,7 +140,7 @@ var YEnum = class {
       if (p[i] == value)
         return container[value];
     }
-    throw "YEnum" + value + " is not a " + container + " value";
+    throw new Error("YEnum" + value + " is not a " + container + " value");
   }
   static siblings(container) {
     let res = [];
@@ -1058,7 +1058,7 @@ var GenericPanel = class _GenericPanel {
   }
   set borderthickness(value) {
     if (value < 0)
-      throw "Border thickness must be a positive value";
+      throw new Error("Border thickness must be a positive value");
     this._borderthickness = value;
     this._parentRenderer.clearCachedObjects();
     this._pen = null;
@@ -8622,6 +8622,11 @@ var Y_DETECT_ALL = Y_DETECT_USB | Y_DETECT_NET;
 var DEFAULT_DEVICE_LIST_VALIDITY_MS = 1e4;
 var DEFAULT_NETWORK_TIMEOUT_MS = 2e4;
 var YOCTO_CALIB_TYPE_OFS = 30;
+var NOTIFY_NETPKT_NAME = "0";
+var NOTIFY_NETPKT_CHILD = "2";
+var NOTIFY_NETPKT_FUNCNAME = "4";
+var NOTIFY_NETPKT_FUNCVAL = "5";
+var NOTIFY_NETPKT_FUNCNAMEYDX = "8";
 var NOTIFY_NETPKT_CONFCHGYDX = "s";
 var NOTIFY_NETPKT_FLUSHV2YDX = "t";
 var NOTIFY_NETPKT_FUNCV2YDX = "u";
@@ -9878,7 +9883,7 @@ var YDataSet = class {
         }
         dataRows = await ii_0.get_dataRows();
         if (dataRows.length == 0) {
-          return await this.get_progress();
+          return this.get_progress();
         }
         tim = streamStartTimeMs;
         fitv = Math.round(await ii_0.get_firstDataSamplesInterval() * 1e3);
@@ -9969,7 +9974,7 @@ var YDataSet = class {
     } else {
       this._summary = new YMeasure(0, 0, YAPI_INVALID_DOUBLE, YAPI_INVALID_DOUBLE, YAPI_INVALID_DOUBLE);
     }
-    return await this.get_progress();
+    return this.get_progress();
   }
   async processMore(progress, data) {
     let stream;
@@ -10005,7 +10010,7 @@ var YDataSet = class {
     dataRows = await stream.get_dataRows();
     this._progress = this._progress + 1;
     if (dataRows.length == 0) {
-      return await this.get_progress();
+      return this.get_progress();
     }
     tim = Math.round(await stream.get_realStartTimeUTC() * 1e3);
     fitv = Math.round(await stream.get_firstDataSamplesInterval() * 1e3);
@@ -10045,7 +10050,7 @@ var YDataSet = class {
     if (this._bulkLoad > 0 && this._progress < this._streams.length) {
       stream = this._streams[this._progress];
       if (stream.imm_wasLoaded()) {
-        return await this.get_progress();
+        return this.get_progress();
       }
       baseurl = stream.imm_get_baseurl();
       url = stream.imm_get_url();
@@ -10074,7 +10079,7 @@ var YDataSet = class {
         idx = idx + 1;
       }
     }
-    return await this.get_progress();
+    return this.get_progress();
   }
   async get_privateDataStreams() {
     return this._streams;
@@ -10167,7 +10172,7 @@ var YDataSet = class {
    *
    * @return an integer in the range 0 to 100 (percentage of completion).
    */
-  async get_progress() {
+  get_progress() {
     if (this._progress < 0) {
       return 0;
     }
@@ -10518,7 +10523,7 @@ var YConsolidatedDataSet = class _YConsolidatedDataSet {
           measures = await this._datasets[s].get_measures();
         }
         if (idx < measures.length) {
-          currnexttim = await measures[idx].get_endTimeUTC();
+          currnexttim = measures[idx].get_endTimeUTC();
           this._nexttim[s] = currnexttim;
         }
       }
@@ -10540,7 +10545,7 @@ var YConsolidatedDataSet = class _YConsolidatedDataSet {
       if (this._nexttim[s] == nexttime) {
         idx = this._nextidx[s];
         measures = await this._datasets[s].get_measures();
-        newvalue = await measures[idx].get_averageValue();
+        newvalue = measures[idx].get_averageValue();
         datarec.push(newvalue);
         this._nexttim[s] = 0;
         this._nextidx[s] = idx + 1;
@@ -11647,7 +11652,9 @@ var YFunction = class _YFunction {
   }
   /**
    * Registers the callback function that is invoked on every change of advertised value.
-   * The callback is invoked only during the execution of ySleep or yHandleEvents.
+   * The callback is called once when it is registered, passing the current advertised value
+   * of the function, provided that it is not an empty string.
+   * The callback is then invoked only during the execution of ySleep or yHandleEvents.
    * This provides control over the time when the callback is triggered. For good responsiveness, remember to call
    * one of these two functions periodically. To unregister a callback, pass a null pointer as argument.
    *
@@ -11751,6 +11758,23 @@ var YFunction = class _YFunction {
   }
   _parserHelper() {
     return 0;
+  }
+  _is_valid_pass(passwd) {
+    let tmp;
+    if (passwd.length > YAPI.HASH_BUF_SIZE) {
+      tmp = "Password too long (max " + String(Math.round(YAPI.HASH_BUF_SIZE)) + " chars) :" + passwd;
+      this._throw(YAPI_INVALID_ARGUMENT, tmp);
+      return false;
+    }
+    if (passwd.indexOf("@") >= 0) {
+      this._throw(YAPI_INVALID_ARGUMENT, "Character @ is not allowed in password");
+      return false;
+    }
+    if (passwd.indexOf("/") >= 0) {
+      this._throw(YAPI_INVALID_ARGUMENT, "Character / is not allowed in password");
+      return false;
+    }
+    return true;
   }
   /**
    * Returns the next Function
@@ -13149,7 +13173,9 @@ var YModule = class _YModule extends YFunction {
   }
   /**
    * Registers the callback function that is invoked on every change of advertised value.
-   * The callback is invoked only during the execution of ySleep or yHandleEvents.
+   * The callback is called once when it is registered, passing the current advertised value
+   * of the function, provided that it is not an empty string.
+   * The callback is then invoked only during the execution of ySleep or yHandleEvents.
    * This provides control over the time when the callback is triggered. For good responsiveness, remember to call
    * one of these two functions periodically. To unregister a callback, pass a null pointer as argument.
    *
@@ -14813,7 +14839,9 @@ var YSensor = class _YSensor extends YFunction {
   }
   /**
    * Registers the callback function that is invoked on every change of advertised value.
-   * The callback is invoked only during the execution of ySleep or yHandleEvents.
+   * The callback is called once when it is registered, passing the current advertised value
+   * of the function, provided that it is not an empty string.
+   * The callback is then invoked only during the execution of ySleep or yHandleEvents.
    * This provides control over the time when the callback is triggered. For good responsiveness, remember to call
    * one of these two functions periodically. To unregister a callback, pass a null pointer as argument.
    *
@@ -15754,7 +15782,9 @@ var YDataLogger = class _YDataLogger extends YFunction {
   }
   /**
    * Registers the callback function that is invoked on every change of advertised value.
-   * The callback is invoked only during the execution of ySleep or yHandleEvents.
+   * The callback is called once when it is registered, passing the current advertised value
+   * of the function, provided that it is not an empty string.
+   * The callback is then invoked only during the execution of ySleep or yHandleEvents.
    * This provides control over the time when the callback is triggered. For good responsiveness, remember to call
    * one of these two functions periodically. To unregister a callback, pass a null pointer as argument.
    *
@@ -16353,6 +16383,7 @@ var YGenericHub = class _YGenericHub {
           let data = await this._yapi.system_env.downloadfile(url, this._yapi);
           infoJson = JSON.parse(YAPI.imm_bin2str(data));
           if (infoJson) {
+            infoJson.stamp = YAPI.GetTickCount();
             if (infoJson.serialNumber) {
               this.imm_setSerialNumber(infoJson.serialNumber);
             }
@@ -17083,6 +17114,9 @@ var YHttpEngine = class extends YHubEngine {
   }
   // Internal method to perform a simple HTTP GET using a hub-relative URL
   async tryFetch(relUrl) {
+    if (relUrl.slice(0, 1) != "/") {
+      relUrl = "/" + relUrl;
+    }
     return new Promise((resolve, reject) => {
       this.imm_sendRequest("GET", relUrl, null, null, (responseText) => {
         resolve({ errorType: YAPI_SUCCESS, errorMsg: "", result: responseText });
@@ -17165,8 +17199,12 @@ var YHttpEngine = class extends YHubEngine {
         }
       }
       this._hub.imm_SetErr(errorType, errorMsg);
-      if ((errorType == YAPI_UNAUTHORIZED || errorType == YAPI_SSL_UNK_CERT) && !can_be_retry) {
-        this._hub.imm_commonDisconnect(tryOpenID, errorType, errorMsg);
+      if (!can_be_retry) {
+        if (errorType === YAPI_SSL_UNK_CERT) {
+          this._hub.imm_commonDisconnect(tryOpenID, errorType, errorMsg);
+        } else if (errorType === YAPI_UNAUTHORIZED && YAPI.GetTickCount() - this.infoJson.stamp <= 12e3) {
+          this._hub.imm_commonDisconnect(tryOpenID, errorType, errorMsg);
+        }
       }
       this._hub.imm_disconnectNow();
     });
@@ -17273,7 +17311,7 @@ var YWebSocketEngine = class extends YHubEngine {
       this._hub._yapi.imm_log("Opening websocket connection [" + tryOpenID + "]");
     }
     this._hub.imm_setCurrentConnID(tryOpenID);
-    let url = (this._runtime_urlInfo.imm_useSecureSocket() ? "wss://" : "ws://") + this._runtime_urlInfo.imm_getUrl(false, true, true);
+    let url = (this._runtime_urlInfo.imm_useSecureSocket() ? "wss://" : "ws://") + this._runtime_urlInfo.imm_getUrl(false, false, true);
     this.imm_webSocketOpen(url + "not.byn");
     this._hub.imm_setFirstArrivalCallback(true);
     if (!this.websocket) {
@@ -18347,7 +18385,7 @@ var YHub = class _YHub {
     this._ctx = obj_yapi;
     this._hubref = hubref;
   }
-  async _getStrAttr_internal(attrName) {
+  _imm_getStrAttr(attrName) {
     let hub = this._ctx.getGenHub(this._hubref);
     if (hub == null) {
       return "";
@@ -18365,7 +18403,7 @@ var YHub = class _YHub {
         return "";
     }
   }
-  async _getIntAttr_internal(attrName) {
+  _imm_getIntAttr(attrName) {
     let hub = this._ctx.getGenHub(this._hubref);
     if (attrName == "isInUse") {
       return hub != null ? 1 : 0;
@@ -18382,8 +18420,6 @@ var YHub = class _YHub {
     switch (attrName) {
       case "isOnline":
         return hub.imm_isOnline() ? 1 : 0;
-      case "isReadOnly":
-        return await hub.hasRwAccess() ? 0 : 1;
       case "networkTimeout":
         return hub.imm_getNetworkTimeout();
       case "errorType":
@@ -18392,13 +18428,28 @@ var YHub = class _YHub {
         return -1;
     }
   }
-  async _setIntAttr_internal(attrName, value) {
+  async _getIntAttr(attrName) {
+    if (attrName == "isReadOnly") {
+      let hub = this._ctx.getGenHub(this._hubref);
+      if (hub == null) {
+        return -1;
+      }
+      return await hub.hasRwAccess() ? 0 : 1;
+    }
+    return this._imm_getIntAttr(attrName);
+  }
+  _imm_setIntAttr(attrName, value) {
     let hub = this._ctx.getGenHub(this._hubref);
     if (hub != null && attrName == "networkTimeout") {
       hub.imm_setNetworkTimeout(value);
     }
   }
-  get_knownUrls_internal() {
+  /**
+   * Returns all known URLs that have been used to register this hub.
+   * URLs are pointing to the same hub when the devices connected
+   * are sharing the same serial number.
+   */
+  get_knownUrls() {
     let hub = this._ctx.getGenHub(this._hubref);
     if (hub != null) {
       return hub.get_knownUrls();
@@ -18406,46 +18457,29 @@ var YHub = class _YHub {
     return [];
   }
   //--- (generated code: YHub implementation)
-  async _getStrAttr(attrName) {
-    return await this._getStrAttr_internal(attrName);
-  }
-  async _getIntAttr(attrName) {
-    return await this._getIntAttr_internal(attrName);
-  }
-  async _setIntAttr(attrName, value) {
-    return await this._setIntAttr_internal(attrName, value);
-  }
   /**
    * Returns the URL that has been used first to register this hub.
    */
-  async get_registeredUrl() {
-    return await this._getStrAttr("registeredUrl");
-  }
-  /**
-   * Returns all known URLs that have been used to register this hub.
-   * URLs are pointing to the same hub when the devices connected
-   * are sharing the same serial number.
-   */
-  async get_knownUrls() {
-    return await this.get_knownUrls_internal();
+  get_registeredUrl() {
+    return this._imm_getStrAttr("registeredUrl");
   }
   /**
    * Returns the URL currently in use to communicate with this hub.
    */
-  async get_connectionUrl() {
-    return await this._getStrAttr("connectionUrl");
+  get_connectionUrl() {
+    return this._imm_getStrAttr("connectionUrl");
   }
   /**
    * Returns the state of the connection with this hub. (TRYING, CONNECTED, RECONNECTING, ABORTED, UNREGISTERED)
    */
-  async get_connectionState() {
-    return await this._getIntAttr("connectionState");
+  get_connectionState() {
+    return this._imm_getIntAttr("connectionState");
   }
   /**
    * Returns the hub serial number, if the hub was already connected once.
    */
-  async get_serialNumber() {
-    return await this._getStrAttr("serialNumber");
+  get_serialNumber() {
+    return this._imm_getStrAttr("serialNumber");
   }
   /**
    * Tells if this hub is still registered within the API.
@@ -18481,8 +18515,8 @@ var YHub = class _YHub {
    * @param networkMsTimeout : the network connection delay in milliseconds.
    * @noreturn
    */
-  async set_networkTimeout(networkMsTimeout) {
-    await this._setIntAttr("networkTimeout", networkMsTimeout);
+  set_networkTimeout(networkMsTimeout) {
+    this._imm_setIntAttr("networkTimeout", networkMsTimeout);
   }
   /**
    * Returns the network connection delay for this hub.
@@ -18492,8 +18526,8 @@ var YHub = class _YHub {
    *
    * @return the network connection delay in milliseconds.
    */
-  async get_networkTimeout() {
-    return await this._getIntAttr("networkTimeout");
+  get_networkTimeout() {
+    return this._imm_getIntAttr("networkTimeout");
   }
   /**
    * Returns the numerical error code of the latest error with the hub.
@@ -18504,7 +18538,7 @@ var YHub = class _YHub {
    *         using the hub object
    */
   async get_errorType() {
-    return await this._getIntAttr("errorType");
+    return this._imm_getIntAttr("errorType");
   }
   /**
    * Returns the error message of the latest error with the hub.
@@ -18515,7 +18549,7 @@ var YHub = class _YHub {
    *         using the hub object
    */
   async get_errorMessage() {
-    return await this._getStrAttr("errorMessage");
+    return this._imm_getStrAttr("errorMessage");
   }
   /**
    * Returns the value of the userData attribute, as previously stored
@@ -19204,22 +19238,33 @@ var YAPIContext = class {
         if (notype == "@") {
           hub.notifPos = parseInt(ev.slice(5));
         } else {
-          switch (parseInt(notype)) {
-            case 0:
+          switch (notype) {
+            case NOTIFY_NETPKT_NAME:
               parts = ev.slice(5).split(",");
               if (parts.length > 2) {
                 let int_beacon = parseInt(parts[2]);
                 await this.setBeaconChange(parts[0], int_beacon);
               }
-            // no break on purpose
-            case 2:
-            // device plug/unplug
-            case 4:
-            // function name change
-            case 8:
               hub.devListExpires = 0;
               break;
-            case 5:
+            // no break on purpose
+            case NOTIFY_NETPKT_CHILD:
+              parts = ev.split(",");
+              if (parts[2] == "0") {
+                let serial = parts[1];
+                if (this._removalCallback) {
+                  let module = YModule.FindModuleInContext(this, serial + ".module");
+                  this._pendingCallbacks.push({ event: "-", serial, module });
+                }
+                this.imm_forgetDevice(this._devs[serial]);
+              }
+            // no break on purpose
+            case NOTIFY_NETPKT_FUNCNAME:
+            // function name change
+            case NOTIFY_NETPKT_FUNCNAMEYDX:
+              hub.devListExpires = 0;
+              break;
+            case NOTIFY_NETPKT_FUNCVAL:
               parts = ev.slice(5).split(",");
               if (parts.length > 2) {
                 value = parts[2].split("\0");
@@ -20337,10 +20382,10 @@ var YAPIContext = class {
     let rhub;
     rhub = this.nextHubInUseInternal(-1);
     while (!(rhub == null)) {
-      if (await rhub.get_serialNumber() == id) {
+      if (rhub.get_serialNumber() == id) {
         return rhub;
       }
-      if (await rhub.get_registeredUrl() == id) {
+      if (rhub.get_registeredUrl() == id) {
         return rhub;
       }
       rhub = rhub.nextHubInUse();
@@ -20370,7 +20415,7 @@ var YAPIContext = class {
   imm_GetAPIVersion() {
     return (
       /* version number patched automatically */
-      "2.1.10284"
+      "2.1.11843"
     );
   }
   /**
@@ -21967,8 +22012,8 @@ var YNetwork = class _YNetwork extends YFunction {
    */
   async set_userPassword(newval) {
     let rest_val;
-    if (newval.length > YAPI.HASH_BUF_SIZE) {
-      return this._throw(YAPI.INVALID_ARGUMENT, "Password too long :" + newval, YAPI.INVALID_ARGUMENT);
+    if (!this._is_valid_pass(newval)) {
+      return YAPI.INVALID_ARGUMENT;
     }
     rest_val = String(newval);
     return await this._setAttr("userPassword", rest_val);
@@ -22007,8 +22052,8 @@ var YNetwork = class _YNetwork extends YFunction {
    */
   async set_adminPassword(newval) {
     let rest_val;
-    if (newval.length > YAPI.HASH_BUF_SIZE) {
-      return this._throw(YAPI.INVALID_ARGUMENT, "Password too long :" + newval, YAPI.INVALID_ARGUMENT);
+    if (!this._is_valid_pass(newval)) {
+      return YAPI.INVALID_ARGUMENT;
     }
     rest_val = String(newval);
     return await this._setAttr("adminPassword", rest_val);
@@ -22685,7 +22730,9 @@ var YNetwork = class _YNetwork extends YFunction {
   }
   /**
    * Registers the callback function that is invoked on every change of advertised value.
-   * The callback is invoked only during the execution of ySleep or yHandleEvents.
+   * The callback is called once when it is registered, passing the current advertised value
+   * of the function, provided that it is not an empty string.
+   * The callback is then invoked only during the execution of ySleep or yHandleEvents.
    * This provides control over the time when the callback is triggered. For good responsiveness, remember to call
    * one of these two functions periodically. To unregister a callback, pass a null pointer as argument.
    *
@@ -23091,7 +23138,9 @@ var YFiles = class _YFiles extends YFunction {
   }
   /**
    * Registers the callback function that is invoked on every change of advertised value.
-   * The callback is invoked only during the execution of ySleep or yHandleEvents.
+   * The callback is called once when it is registered, passing the current advertised value
+   * of the function, provided that it is not an empty string.
+   * The callback is then invoked only during the execution of ySleep or yHandleEvents.
    * This provides control over the time when the callback is triggered. For good responsiveness, remember to call
    * one of these two functions periodically. To unregister a callback, pass a null pointer as argument.
    *
@@ -23283,13 +23332,10 @@ var YFiles = class _YFiles extends YFunction {
     let part;
     let res;
     sz = content.length;
-    if (sz == 0) {
-      res = this._yapi.imm_bincrc(content, 0, 0);
-      return res;
-    }
     fsver = await this._getVersion();
     if (fsver < 40) {
       res = this._yapi.imm_bincrc(content, 0, sz);
+      res = (res & 2147483647) - 2 * (res >> 1 & 1073741824);
       return res;
     }
     blkcnt = (sz + 255) / 256 >> 0;
@@ -23308,6 +23354,7 @@ var YFiles = class _YFiles extends YFunction {
       blkidx = blkidx + 1;
     }
     res = this._yapi.imm_bincrc(meta, 0, 4 * blkcnt) ^ 4294967295;
+    res = (res & 2147483647) - 2 * (res >> 1 & 1073741824);
     return res;
   }
   /**
@@ -23370,7 +23417,7 @@ var constants = class _constants {
   static get versionInfo() {
     return (
       /* version number patched automatically */
-      ["2.1.10284", "70284"]
+      ["2.1.11843", "71843"]
     );
   }
   static get buildVersion() {
@@ -23898,6 +23945,9 @@ var Hub = class _Hub {
   static encryptPassword(clearPassword) {
     return clearPassword == "" ? "" : _Hub.Encrypt(clearPassword, _Hub.loginCypherPassword);
   }
+  set_apiHub(hub) {
+    this._apiHub = hub;
+  }
   get hubType() {
     return this._hubType;
   }
@@ -23952,12 +24002,30 @@ var Hub = class _Hub {
   set path(value) {
     this._path = value;
   }
-  async ConnectionState() {
-    if (this._apiHub != null) {
-      if (await this._apiHub.get_errorType() != YAPI_SUCCESS) {
-        this._state = 3;
+  get_serialNumber() {
+    if (this._apiHub == null)
+      return "?";
+    return this._apiHub.get_serialNumber();
+  }
+  ConnectionState() {
+    if (this._apiHub != null)
+      switch (this._apiHub.get_connectionState()) {
+        case this._apiHub.TRYING:
+          this._state = 1;
+          break;
+        case this._apiHub.CONNECTED:
+          this._state = 2;
+          break;
+        case this._apiHub.RECONNECTING:
+          this._state = 1;
+          break;
+        case this._apiHub.ABORTED:
+          this._state = 3;
+          break;
+        case this._apiHub.UNREGISTERED:
+          this._state = 3;
+          break;
       }
-    }
     return this._state;
   }
   async ConnectionDescription() {
@@ -24040,7 +24108,12 @@ var Hub = class _Hub {
   async Connect() {
     let errmsg = new YErrorMsg();
     this._state = 1;
-    logForm.log("preregistering  " + this.get_obfuscatedURL());
+    let ofsUrl = this.get_obfuscatedURL();
+    logForm.log("preregistering  " + ofsUrl);
+    if (window.location.protocol.toString().toLowerCase() == "https:") {
+      if (ofsUrl.substring(0, 3).toLowerCase() == "ws:" || ofsUrl.substring(0, 5).toLowerCase() == "http:")
+        logForm.log("Warning: Host page is HTTPS, ws:// and http:// protocols are unlikely to work due to CORS rules.");
+    }
     if (!YWebPage.readonly)
       configForm.hubStateChanged(this);
     let url = this.get_fullUrl();
@@ -24106,6 +24179,21 @@ var Hub = class _Hub {
         fullurl = fullurl + ":" + _Hub.Decrypt(this._password, _Hub.loginCypherPassword);
       fullurl = fullurl + "@";
     }
+    fullurl = fullurl + this._addr;
+    if (this._port != "")
+      fullurl = fullurl + ":" + this._port;
+    else
+      fullurl = fullurl + ":4444";
+    fullurl = fullurl + "/";
+    if (this._path) {
+      fullurl = fullurl + this._path + "/";
+    }
+    return fullurl;
+  }
+  get_fullUrlNoCredentials() {
+    let fullurl = "";
+    if (this._protocol != "")
+      fullurl = this._protocol + "://";
     fullurl = fullurl + this._addr;
     if (this._port != "")
       fullurl = fullurl + ":" + this._port;
@@ -24240,7 +24328,7 @@ var AlarmSettings = class {
   }
   setDelay(value) {
     if (value < 0)
-      throw "delay must be a positive value";
+      throw new Error("delay must be a positive value");
     this.Delay = value;
   }
   getDelay() {
@@ -24764,7 +24852,7 @@ var CustomYSensor = class _CustomYSensor {
       this.previewDataCleanUp();
     for (let i = 0; i < this.previewMinData.length - 1; i++) {
       if (this.previewMinData[i].DateTime >= this.previewMinData[i + 1].DateTime) {
-        throw "Time-stamp inconsistency";
+        throw new Error("Time-stamp inconsistency");
       }
     }
     if (this.previewCurData.length > 1) {
@@ -24993,6 +25081,10 @@ var CustomYSensor = class _CustomYSensor {
     let olfreq = await this.sensor.get_logFrequency();
     let orfreq = await this.sensor.get_reportFrequency();
     let readOnly = await this.sensor.isReadOnly();
+    let value = await this.sensor.get_currentValue();
+    this._lastAvgValue = value;
+    this._lastMinValue = value;
+    this._lastMaxValue = value;
     let lfreq = olfreq;
     let rfreq = orfreq;
     let m = await this.sensor.get_module();
@@ -25205,22 +25297,26 @@ var sensorsManager = class _sensorsManager {
     }
   }
   // load config data  from XML config file
-  static InitHubList(node) {
+  static async InitHubList(node) {
     let nodes = node.get_childsByIndex();
+    let promises = [];
     for (let i = 0; i < nodes.length; i++) {
       if (nodes[i].Name.toUpperCase() == "HUB") {
         let h = Hub.HubFromXml(nodes[i]);
         let alreadthere = false;
         for (let j = 0; j < _sensorsManager._hubList.length; j++) {
-          if (h.get_connexionUrl() == _sensorsManager._hubList[j].get_connexionUrl())
+          let url1 = h.get_connexionUrl();
+          let url2 = _sensorsManager._hubList[j].get_fullUrlNoCredentials();
+          if (url1 == url2)
             alreadthere = true;
         }
         if (!alreadthere) {
           _sensorsManager._hubList.push(h);
-          h.Connect().then();
+          promises.push(h.Connect());
         }
       }
     }
+    await Promise.all(promises);
   }
   static get hubList() {
     return _sensorsManager._hubList;
@@ -25810,13 +25906,13 @@ var YWidget = class _YWidget {
   }
   set relativeWidth(value) {
     if (value <= 0)
-      throw "Value must be strictly positive";
+      throw new Error("Value must be strictly positive");
     this._relativeWidth = value;
     this._Width = Math.round(value * this.parentWidth / 100);
   }
   set relativeHeight(value) {
     if (value <= 0)
-      throw "Value must be strictly positive";
+      throw new Error("Value must be strictly positive");
     this._relativeHeight = value;
     this._Height = Math.round(value * this.parentHeight / 100);
   }
@@ -25843,7 +25939,7 @@ var YWidget = class _YWidget {
   }
   set Width(value) {
     if (value <= 0)
-      throw "Value must be strictly positive";
+      throw new Error("Value must be strictly positive");
     if (this._SizeIsRelative)
       this.relativeWidth = value;
     else
@@ -25863,7 +25959,7 @@ var YWidget = class _YWidget {
   }
   set Height(value) {
     if (value <= 0)
-      throw "Value must be strictly positive";
+      throw new Error("Value must be strictly positive");
     if (this._SizeIsRelative)
       this.relativeHeight = value;
     else
@@ -25898,7 +25994,7 @@ var YWidget = class _YWidget {
       return;
     let target = value != "" ? document.getElementById(value) : null;
     if (value != "" && target == null)
-      throw "No HTMLElement on the page with such ID (" + value + ")";
+      throw new Error("No HTMLElement on the page with such ID (" + value + ")");
     if (this.UIContainer.parentNode != null) {
       this.UIContainer.parentNode.removeChild(this.UIContainer);
     } else {
@@ -27627,7 +27723,7 @@ var GenericProperties = class _GenericProperties {
                         break;
                       default:
                         debugger;
-                        throw "unhandled target type : " + targetType + "(" + target.constructor.name + ")";
+                        throw new Error("unhandled target type : " + targetType + "(" + target.constructor.name + ")");
                     }
                   }
                 }
@@ -27857,7 +27953,7 @@ var GenericProperties = class _GenericProperties {
                   value = s == null || s instanceof NullYSensor ? "NULL" : s.get_hardwareId();
                   break;
                 default:
-                  throw "XML generation : unhandled type (" + p.type + ")";
+                  throw new Error("XML generation : unhandled type (" + p.type + ")");
               }
             }
             res = res + this.indent(2 * deep) + "<" + p.name + ' value="' + value + '"/>\n';
@@ -36746,7 +36842,7 @@ var configForm = class _configForm {
     for (let i = 1; i < _configForm._Hubtable.childElementCount; i++) {
       if (_configForm._Hubtable.childNodes[i]["YHUB"] == source) {
         _configForm._Hubtable.childNodes[i].childNodes[2].innerText = await source.ConnectionDescription() + srvNotification;
-        switch (await source.ConnectionState()) {
+        switch (source.ConnectionState()) {
           case 2:
             _configForm._Hubtable.childNodes[i].childNodes[0].innerHTML = ressources.OkIcon((1.2 * _configForm.fontSize).toString(), true, false, false, false, " ");
             break;
@@ -36819,7 +36915,7 @@ var configForm = class _configForm {
       _configForm.HublineSelected(HubtableTR);
     });
     let HubtableTD = document.createElement("TD");
-    switch (await hub.ConnectionState()) {
+    switch (hub.ConnectionState()) {
       case 2:
         HubtableTD.innerHTML = ressources.OkIcon((1.2 * _configForm.fontSize).toString(), true, false, false, false, " ");
         break;
@@ -37557,7 +37653,10 @@ var HubEdit = class _HubEdit {
     return constants.WindowBackgroundColor;
   }
   static newHub(whenDone) {
-    _HubEdit._currenthub = new Hub(2, "ws", "", "", true, "", "", "");
+    let protocol = "ws";
+    if (window.location.protocol.toString().toLowerCase() == "https:")
+      protocol = "wss";
+    _HubEdit._currenthub = new Hub(2, protocol, "", "", true, "", "", "");
     _HubEdit.show(_HubEdit._currenthub);
     _HubEdit._window.title = "New Connection";
     _HubEdit._thisIsEditing = false;
@@ -37570,8 +37669,17 @@ var HubEdit = class _HubEdit {
     _HubEdit._thisIsEditing = true;
     _HubEdit._whenDone = whenDone;
   }
+  static updateCorsWarning() {
+    let state = "None";
+    if (window.location.protocol.toString().toLowerCase() == "https:") {
+      if (_HubEdit._protocolSelect.value == "ws" || _HubEdit._protocolSelect.value == "http")
+        state = "";
+    }
+    _HubEdit._coreWarning.style.display = state;
+  }
   static show(hub) {
     if (_HubEdit._window == null) {
+      let h = window.location.protocol.toString().toLowerCase() == "https:" ? 300 : 280;
       _HubEdit._okButton = new button("Ok", () => {
         _HubEdit.okClicked();
       });
@@ -37581,7 +37689,7 @@ var HubEdit = class _HubEdit {
       let params = new newWindowParam();
       params.positionType = 1;
       params.width = Math.round(450 * constants.generalSizeCoef);
-      params.height = Math.round(280 * constants.generalSizeCoef);
+      params.height = Math.round(h * constants.generalSizeCoef);
       params.isModal = true;
       params.closeIcon = false;
       params.title = "...";
@@ -37623,6 +37731,9 @@ var HubEdit = class _HubEdit {
       wssOption.value = "wss";
       _HubEdit._protocolSelect.appendChild(wssOption);
       p.appendChild(_HubEdit._protocolSelect);
+      _HubEdit._protocolSelect.addEventListener("change", () => {
+        _HubEdit.updateCorsWarning();
+      });
       span = document.createElement("SPAN");
       span.style.marginLeft = "20px";
       span.innerText = "Address:";
@@ -37691,6 +37802,14 @@ var HubEdit = class _HubEdit {
       p.innerText = "Important note: credentials are saved in the configuration file wich is easily accessible. Therefore, if hub is write-protected, it might be wise to use ReadOnly credentials here. When installed on a Yoctopuce hub, Yocto-Visualization (for web) will automatically ask for read/write credentials at save time if neccessary.";
       p.style.textAlign = "justify";
       _HubEdit._contents.appendChild(p);
+      _HubEdit._coreWarning = document.createElement("P");
+      _HubEdit._coreWarning.style.paddingTop = "0px";
+      _HubEdit._coreWarning.style.marginTop = Math.round(3 * constants.generalSizeCoef).toString() + "px";
+      _HubEdit._coreWarning.style.lineHeight = Math.round(12 * constants.generalSizeCoef).toString() + "px";
+      _HubEdit._coreWarning.innerText = "Warning: If the host page is accessed though HTTPS, connecting to a hub though HTTP or WS is unlikely to work due to Cross-Origin Resource Sharing (CORS) rules";
+      _HubEdit._coreWarning.style.textAlign = "justify";
+      _HubEdit._coreWarning.style.display = "None";
+      _HubEdit._contents.appendChild(_HubEdit._coreWarning);
     }
     _HubEdit._protocolSelect.value = hub.protocol;
     _HubEdit._addressInput.value = hub.addr;
@@ -37698,6 +37817,7 @@ var HubEdit = class _HubEdit {
     _HubEdit._pathInput.value = hub.path;
     _HubEdit._usernameInput.value = hub.user;
     _HubEdit._passwordInput.value = hub.encryptedPassword != "" ? _HubEdit.FakePassword : "";
+    _HubEdit.updateCorsWarning();
     _HubEdit._window.show();
   }
   static hide() {
@@ -38042,12 +38162,12 @@ var Pako_deflate_option = class _Pako_deflate_option {
       for (let i = 0; i < custKeys.length; i++) {
         if (stdKeys.indexOf(custKeys[i]) < 0) {
           debugger;
-          throw "Invalid Pako option name '" + custKeys[i] + "', check Pako_deflate_option class";
+          throw new Error("Invalid Pako option name '" + custKeys[i] + "', check Pako_deflate_option class");
         }
         let srcType = typeof Reflect.get(CustOption, custKeys[i]);
         let trgtType = typeof Reflect.get(StdOption, custKeys[i]);
         if (srcType != trgtType)
-          throw "Invalid Pako type for option '" + custKeys[i] + "' (expected '" + trgtType + "', got '" + srcType + "')";
+          throw new Error("Invalid Pako type for option '" + custKeys[i] + "' (expected '" + trgtType + "', got '" + srcType + "')");
         Reflect.set(StdOption, custKeys[i], Reflect.get(CustOption, custKeys[i]));
       }
     }
@@ -42430,7 +42550,7 @@ var YWebPage = class _YWebPage {
         root = node;
     });
     if (root == null)
-      throw "No ROOT top node in XML data";
+      throw new Error("No ROOT top node in XML data");
     root.childNodes.forEach((node) => {
       if (node.nodeName.toUpperCase() == "SENSORS") {
         sensorsManager.setKnownSensors(new YXmlNode(node));
@@ -43037,6 +43157,13 @@ var YoctoHubFileHandler = class _YoctoHubFileHandler {
     this.fileSystemReady = false;
     await this.findSourceFileSystem(defaultXmlConfigFileContents);
   }
+  async disconnect() {
+    if (this.fileSystem == null)
+      return;
+    let m = await this.fileSystem.get_module();
+    let url = await m.get_url();
+    await YAPI.UnregisterHub(url);
+  }
   static async start(defaultXmlConfigFileContents) {
     let dirpath = location.pathname;
     let defport = "80";
@@ -43053,6 +43180,7 @@ var YoctoHubFileHandler = class _YoctoHubFileHandler {
     await hubinfo.makeRequest();
     let filehandler = new _YoctoHubFileHandler(hubinfo);
     await filehandler.init(defaultXmlConfigFileContents);
+    await filehandler.disconnect();
     return filehandler;
   }
   get xmlConfigData() {
@@ -43105,12 +43233,12 @@ var YoctoHubFileHandler = class _YoctoHubFileHandler {
         this.FileSystemAccessDenied = true;
         return;
       }
-      throw "YV4F ERROR: Unable to register Hub " + this.info.get_hubUrl() + "(" + errorMsg + "), save will not work.";
+      throw new Error("YV4F ERROR: Unable to register Hub " + this.info.get_hubUrl() + "(" + errorMsg + "), save will not work.");
     }
     let fs = YFiles.FirstFiles();
     if (fs == null) {
       this.fileSystemReady = true;
-      throw "YV4F ERROR: No file system found on Hub " + this.info.get_hubUrl() + ", save will not work.";
+      throw new Error("YV4F ERROR: No file system found on Hub " + this.info.get_hubUrl() + ", save will not work.");
     }
     while (fs != null) {
       if (await fs.get_serialNumber() == this.info.serial) {
@@ -43123,7 +43251,6 @@ var YoctoHubFileHandler = class _YoctoHubFileHandler {
     while (fs != null) {
       let m = await fs.get_module();
       let url2 = await m.get_url();
-      console.log("URL = (" + url2 + ")");
       let p = url2.indexOf("://");
       if (p >= 0)
         url2 = url2.slice(p + 3);
@@ -43139,7 +43266,7 @@ var YoctoHubFileHandler = class _YoctoHubFileHandler {
       fs = fs.nextFiles();
     }
     this.fileSystemReady = true;
-    throw "YV4F ERROR: No file system matching Hub " + this.info.get_hubUrl() + " found, save will not work.";
+    throw new Error("YV4F ERROR: No file system matching Hub " + this.info.get_hubUrl() + " found, save will not work.");
   }
   async registerSourceFileSystem(fs) {
     this.fileSystem = fs;
@@ -43157,9 +43284,9 @@ var YoctoHubFileHandler = class _YoctoHubFileHandler {
   async configChangeCallback(m) {
     if (this.fileSystem == null) {
       let urlSignature = this.info.addr + ":" + this.info.port.toString() + "/" + this.info.path + (this.info.path != "" ? "/" : "");
+      if (urlSignature.startsWith("www."))
+        urlSignature = urlSignature.substring(4);
       let sourceUrl = await m.get_url();
-      console.log("urlSignature=" + urlSignature);
-      console.log("sourceUrl=" + sourceUrl);
       if (sourceUrl.length > urlSignature.length && sourceUrl.substring(sourceUrl.length - urlSignature.length) == urlSignature) {
         let fs = YFiles.FindFiles(await m.get_serialNumber() + ".files");
         if (await fs.isOnline())

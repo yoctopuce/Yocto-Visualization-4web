@@ -1841,9 +1841,9 @@ export class YV4W_installer
         let parser: DOMParser = new DOMParser()
         let doc: XMLDocument = parser.parseFromString(xmlData, "application/xml")
         let rootNode: ChildNode | null = this.findChild(doc, "ROOT");
-        if (rootNode == null) throw "No root node in config file."
+        if (rootNode == null) throw new Error("No root node in config file.");
         let configNode: ChildNode | null = this.findChild(rootNode, "Config");
-        if (configNode == null) throw "No config node in config file."
+        if (configNode == null) throw new Error("No config node in config file.");
         let Hubs: ChildNode | null = this.findChild(configNode, "Hubs");
         let HubSection: string;
         if (Hubs == null)
@@ -1883,8 +1883,8 @@ export class YV4W_installer
             HubSection += "  ";
             let indexStart: number = xmlData.indexOf(startTag);
             let indexStop: number = xmlData.indexOf(endTag);
-            if (indexStart < 0) throw "Cannot locate Hubs start tag in provided  config file";
-            if (indexStop < 0) throw "Cannot locate Hubs end tag in provided  config file";
+            if (indexStart < 0) throw new Error("Cannot locate Hubs start tag in provided  config file");
+            if (indexStop < 0) throw new Error("Cannot locate Hubs end tag in provided  config file");
             xmlData = xmlData.substr(0, indexStart) + HubSection + xmlData.substr(indexStop)
 
         }
@@ -2165,12 +2165,12 @@ export class YV4W_installer
             replace1 = altreplace1;
             p = contents.indexOf(signature1);
         }
-        if (p < 0) throw "Operation failed: cannot find the [" + signature1 + "] import signature in " + page.fs_filename;
+        if (p < 0) throw new Error("Operation failed: cannot find the [" + signature1 + "] import signature in " + page.fs_filename);
         contents = contents.substr(0, p) + replace1 + contents.substr(p + signature1.length);
         if (signature2 != "")
         {
             p = contents.indexOf(signature2);
-            if (p < 0) throw "Operation failed: cannot find the [" + signature2 + "] signature parameter in " + page.fs_filename;
+            if (p < 0) throw new Error("Operation failed: cannot find the [" + signature2 + "] signature parameter in " + page.fs_filename);
             contents = contents.substr(0, p) + replace2 + contents.substr(p + signature2.length);
         }
         this.uploadpage(log, page, contents);
@@ -2194,7 +2194,7 @@ export class YV4W_installer
       })
       status.innerText = 'done';
 
-      if (success != YoctoAPI.YAPI_SUCCESS) throw "Upload failed (Error" + success.toString() + ").";
+      if (success != YoctoAPI.YAPI_SUCCESS) throw new Error("Upload failed (Error" + success.toString() + ").");
 
     }
 
@@ -2221,7 +2221,7 @@ export class YV4W_installer
                     status.innerText = Math.round(100 * curr / total).toString() + "%"
                 })
                 status.innerText = 'done';
-                if (success != YoctoAPI.YAPI_SUCCESS) throw "Upload failed! (Error" + success.toString() + ")";
+                if (success != YoctoAPI.YAPI_SUCCESS) throw new Error("Upload failed! (Error" + success.toString() + ")");
                 status = log('Deleting ' + this._webPageinstances[i].fs_filename);
                 await (<YoctoAPI.YFiles>this._currentfs).remove(this._webPageinstances[i].fs_filename);
                 status.innerText = "done."
@@ -2240,7 +2240,7 @@ export class YV4W_installer
                     status.innerText = Math.round(100 * curr / total).toString() + "%"
                 })
                 status.innerText = 'done';
-                if (success != YoctoAPI.YAPI_SUCCESS) throw "Upload failed!! (Error" + success.toString() + ")";
+                if (success != YoctoAPI.YAPI_SUCCESS) throw new Error("Upload failed!! (Error" + success.toString() + ")");
                 status = log('Deleting ' + this._webPageinstances[i].http_filename);
                 await (<YoctoAPI.YFiles>this._currentfs).remove(this._webPageinstances[i].http_filename);
 
@@ -2398,7 +2398,7 @@ export class YV4W_installer
         {
             status.innerText = Math.round(100 * curr / total).toString() + "%"
         })
-        if (success != YoctoAPI.YAPI_SUCCESS) throw "Upload failed. (Error" + success.toString() + ").";
+        if (success != YoctoAPI.YAPI_SUCCESS) throw new Error("Upload failed. (Error" + success.toString() + ").");
         status.innerText = 'done.';
     }
 
@@ -2480,7 +2480,7 @@ export class YV4W_installer
         {
             status.innerText = Math.round(100 * curr / total).toString() + "%"
         })
-        if (success != YoctoAPI.YAPI_SUCCESS) throw "Upload failed (Error" + success.toString() + ")";
+        if (success != YoctoAPI.YAPI_SUCCESS) throw new Error("Upload failed (Error" + success.toString() + ")");
         status.innerText = 'done.';
         status = log('Configuring hub');
         let url = this._currentHubLink_protocol + "://" + this._applicationURL;

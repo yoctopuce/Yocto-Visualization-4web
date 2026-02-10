@@ -1,6 +1,6 @@
 /*********************************************************************
  *
- * $Id: yocto_api.ts 69243 2025-09-24 10:20:47Z seb $
+ * $Id: yocto_api.ts 71691 2026-02-02 06:59:29Z mvuilleu $
  *
  * High-level programming interface, common to all modules
  *
@@ -1890,7 +1890,7 @@ export class YDataSet
                 }
                 dataRows = await ii_0.get_dataRows();
                 if (dataRows.length == 0) {
-                    return await this.get_progress();
+                    return this.get_progress();
                 }
                 tim = streamStartTimeMs;
                 fitv = Math.round(await ii_0.get_firstDataSamplesInterval() * 1000);
@@ -1981,7 +1981,7 @@ export class YDataSet
         } else {
             this._summary = new YMeasure(0.0, 0.0, YAPI_INVALID_DOUBLE, YAPI_INVALID_DOUBLE, YAPI_INVALID_DOUBLE);
         }
-        return await this.get_progress();
+        return this.get_progress();
     }
 
     async processMore(progress: number, data: Uint8Array): Promise<number>
@@ -2020,7 +2020,7 @@ export class YDataSet
         dataRows = await stream.get_dataRows();
         this._progress = this._progress + 1;
         if (dataRows.length == 0) {
-            return await this.get_progress();
+            return this.get_progress();
         }
         tim = Math.round(await stream.get_realStartTimeUTC() * 1000);
         fitv = Math.round(await stream.get_firstDataSamplesInterval() * 1000);
@@ -2062,7 +2062,7 @@ export class YDataSet
         if ((this._bulkLoad > 0) && (this._progress < this._streams.length)) {
             stream = this._streams[this._progress];
             if (stream.imm_wasLoaded()) {
-                return await this.get_progress();
+                return this.get_progress();
             }
             baseurl = stream.imm_get_baseurl();
             url = stream.imm_get_url();
@@ -2091,7 +2091,7 @@ export class YDataSet
                 idx = idx + 1;
             }
         }
-        return await this.get_progress();
+        return this.get_progress();
     }
 
     async get_privateDataStreams(): Promise<YDataStream[]>
@@ -2201,7 +2201,7 @@ export class YDataSet
      *
      * @return an integer in the range 0 to 100 (percentage of completion).
      */
-    async get_progress(): Promise<number>
+    get_progress(): number
     {
         if (this._progress < 0) {
             return 0;
@@ -2601,7 +2601,7 @@ export class YConsolidatedDataSet
                     measures = await this._datasets[s].get_measures();
                 }
                 if (idx < measures.length) {
-                    currnexttim = await measures[idx].get_endTimeUTC();
+                    currnexttim = measures[idx].get_endTimeUTC();
                     this._nexttim[s] = currnexttim;
                 }
             }
@@ -2626,7 +2626,7 @@ export class YConsolidatedDataSet
             if (this._nexttim[s] == nexttime) {
                 idx = this._nextidx[s];
                 measures = await this._datasets[s].get_measures();
-                newvalue = await measures[idx].get_averageValue();
+                newvalue = measures[idx].get_averageValue();
                 datarec.push(newvalue);
                 this._nexttim[s] = 0.0;
                 this._nextidx[s] = idx + 1;
@@ -4060,7 +4060,9 @@ export class YFunction
 
     /**
      * Registers the callback function that is invoked on every change of advertised value.
-     * The callback is invoked only during the execution of ySleep or yHandleEvents.
+     * The callback is called once when it is registered, passing the current advertised value
+     * of the function, provided that it is not an empty string.
+     * The callback is then invoked only during the execution of ySleep or yHandleEvents.
      * This provides control over the time when the callback is triggered. For good responsiveness, remember to call
      * one of these two functions periodically. To unregister a callback, pass a null pointer as argument.
      *
@@ -4180,6 +4182,25 @@ export class YFunction
     _parserHelper(): number
     {
         return 0;
+    }
+
+    _is_valid_pass(passwd: string): boolean
+    {
+        let tmp: string;
+        if ((passwd).length > YAPI.HASH_BUF_SIZE) {
+            tmp = 'Password too long (max ' + String(Math.round(YAPI.HASH_BUF_SIZE)) + ' chars) :' + passwd;
+            this._throw(YAPI_INVALID_ARGUMENT, tmp);
+            return false;
+        }
+        if ((passwd).indexOf('@') >=0) {
+            this._throw(YAPI_INVALID_ARGUMENT, 'Character @ is not allowed in password');
+            return false;
+        }
+        if ((passwd).indexOf('/') >=0) {
+            this._throw(YAPI_INVALID_ARGUMENT, 'Character / is not allowed in password');
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -5824,7 +5845,9 @@ export class YModule extends YFunction
 
     /**
      * Registers the callback function that is invoked on every change of advertised value.
-     * The callback is invoked only during the execution of ySleep or yHandleEvents.
+     * The callback is called once when it is registered, passing the current advertised value
+     * of the function, provided that it is not an empty string.
+     * The callback is then invoked only during the execution of ySleep or yHandleEvents.
      * This provides control over the time when the callback is triggered. For good responsiveness, remember to call
      * one of these two functions periodically. To unregister a callback, pass a null pointer as argument.
      *
@@ -7695,7 +7718,9 @@ export class YSensor extends YFunction
 
     /**
      * Registers the callback function that is invoked on every change of advertised value.
-     * The callback is invoked only during the execution of ySleep or yHandleEvents.
+     * The callback is called once when it is registered, passing the current advertised value
+     * of the function, provided that it is not an empty string.
+     * The callback is then invoked only during the execution of ySleep or yHandleEvents.
      * This provides control over the time when the callback is triggered. For good responsiveness, remember to call
      * one of these two functions periodically. To unregister a callback, pass a null pointer as argument.
      *
@@ -8813,7 +8838,9 @@ export class YDataLogger extends YFunction
 
     /**
      * Registers the callback function that is invoked on every change of advertised value.
-     * The callback is invoked only during the execution of ySleep or yHandleEvents.
+     * The callback is called once when it is registered, passing the current advertised value
+     * of the function, provided that it is not an empty string.
+     * The callback is then invoked only during the execution of ySleep or yHandleEvents.
      * This provides control over the time when the callback is triggered. For good responsiveness, remember to call
      * one of these two functions periodically. To unregister a callback, pass a null pointer as argument.
      *
@@ -9633,6 +9660,7 @@ export class YGenericHub
                     let data: Uint8Array = await this._yapi.system_env.downloadfile(url, this._yapi);
                     infoJson = JSON.parse(YAPI.imm_bin2str(data));
                     if (infoJson) {
+                        infoJson.stamp = YAPI.GetTickCount();
                         if (infoJson.serialNumber) {
                             this.imm_setSerialNumber(infoJson.serialNumber);
                         }
@@ -10482,6 +10510,9 @@ export class YHttpEngine extends YHubEngine
     // Internal method to perform a simple HTTP GET using a hub-relative URL
     async tryFetch(relUrl: string): Promise<YConditionalResult>
     {
+        if (relUrl.slice(0,1) != '/') {
+            relUrl = '/' + relUrl;
+        }
         return new Promise<YConditionalResult>((resolve, reject): void => {
             this.imm_sendRequest('GET', relUrl, null, null,
                 (responseText: string): void => {
@@ -10579,9 +10610,14 @@ export class YHttpEngine extends YHubEngine
                     }
                 }
                 this._hub.imm_SetErr(errorType, errorMsg);
-                if ((errorType == YAPI_UNAUTHORIZED || errorType == YAPI_SSL_UNK_CERT) && !can_be_retry) {
-                    // this is a fatal failure, no need to retry
-                    this._hub.imm_commonDisconnect(tryOpenID, errorType, errorMsg);
+                if (!can_be_retry) {
+                    if (errorType === YAPI_SSL_UNK_CERT) {
+                        // this is a fatal failure, no need to retry
+                        this._hub.imm_commonDisconnect(tryOpenID, errorType, errorMsg);
+                    } else if(errorType === YAPI_UNAUTHORIZED && YAPI.GetTickCount() - this.infoJson.stamp <= 12000) {
+                        // this is a fatal failure, no need to retry
+                        this._hub.imm_commonDisconnect(tryOpenID, errorType, errorMsg);
+                    }
                 }
                 this._hub.imm_disconnectNow();
             }
@@ -10819,7 +10855,7 @@ export abstract class YWebSocketEngine extends YHubEngine
             this._hub._yapi.imm_log('Opening websocket connection [' + tryOpenID + ']');
         }
         this._hub.imm_setCurrentConnID(tryOpenID);
-        let url = (this._runtime_urlInfo.imm_useSecureSocket() ? "wss://" : "ws://") + this._runtime_urlInfo.imm_getUrl(false, true, true);
+        let url = (this._runtime_urlInfo.imm_useSecureSocket() ? "wss://" : "ws://") + this._runtime_urlInfo.imm_getUrl(false, false, true);
         this.imm_webSocketOpen(url + 'not.byn');
         this._hub.imm_setFirstArrivalCallback(true)
         if (!this.websocket) {
@@ -12092,9 +12128,8 @@ export class YHub
         this._hubref = hubref;
     }
 
-    private async _getStrAttr_internal(attrName: string): Promise<string>
+    private _imm_getStrAttr(attrName: string): string
     {
-
         let hub: YGenericHub | null = this._ctx.getGenHub(this._hubref);
         if (hub == null) {
             return "";
@@ -12112,7 +12147,8 @@ export class YHub
             return "";
         }
     }
-    private async _getIntAttr_internal(attrName: string): Promise<number>
+
+    private _imm_getIntAttr(attrName: string): number
     {
         let hub: YGenericHub | null = this._ctx.getGenHub(this._hubref);
         if (attrName == "isInUse") {
@@ -12131,8 +12167,6 @@ export class YHub
         switch (attrName) {
         case "isOnline":
             return hub.imm_isOnline() ? 1 : 0;
-        case "isReadOnly":
-            return await hub.hasRwAccess() ? 0 : 1;
         case "networkTimeout":
             return hub.imm_getNetworkTimeout();
         case "errorType":
@@ -12141,7 +12175,20 @@ export class YHub
             return -1;
         }
     }
-    private async _setIntAttr_internal(attrName: string, value: number): Promise<void>
+
+    private async _getIntAttr(attrName: string): Promise<number>
+    {
+        if (attrName == "isReadOnly") {
+            let hub: YGenericHub | null = this._ctx.getGenHub(this._hubref);
+            if (hub == null) {
+                return -1;
+            }
+            return await hub.hasRwAccess() ? 0 : 1;
+        }
+        return this._imm_getIntAttr(attrName);
+    }
+
+    private _imm_setIntAttr(attrName: string, value: number): void
     {
         let hub: YGenericHub | null = this._ctx.getGenHub(this._hubref);
         if (hub != null && attrName == "networkTimeout") {
@@ -12149,7 +12196,12 @@ export class YHub
         }
     }
 
-    get_knownUrls_internal(): string[]
+    /**
+     * Returns all known URLs that have been used to register this hub.
+     * URLs are pointing to the same hub when the devices connected
+     * are sharing the same serial number.
+     */
+    get_knownUrls(): string[]
     {
         let hub: YGenericHub | null = this._ctx.getGenHub(this._hubref);
         if (hub != null) {
@@ -12160,61 +12212,36 @@ export class YHub
 
     //--- (generated code: YHub implementation)
 
-    async _getStrAttr(attrName: string): Promise<string>
-    {
-        return await this._getStrAttr_internal(attrName);
-    }
-
-    async _getIntAttr(attrName: string): Promise<number>
-    {
-        return await this._getIntAttr_internal(attrName);
-    }
-
-    async _setIntAttr(attrName: string, value: number): Promise<void>
-    {
-        return await this._setIntAttr_internal(attrName, value);
-    }
-
     /**
      * Returns the URL that has been used first to register this hub.
      */
-    async get_registeredUrl(): Promise<string>
+    get_registeredUrl(): string
     {
-        return await this._getStrAttr('registeredUrl');
-    }
-
-    /**
-     * Returns all known URLs that have been used to register this hub.
-     * URLs are pointing to the same hub when the devices connected
-     * are sharing the same serial number.
-     */
-    async get_knownUrls(): Promise<string[]>
-    {
-        return await this.get_knownUrls_internal();
+        return this._imm_getStrAttr('registeredUrl');
     }
 
     /**
      * Returns the URL currently in use to communicate with this hub.
      */
-    async get_connectionUrl(): Promise<string>
+    get_connectionUrl(): string
     {
-        return await this._getStrAttr('connectionUrl');
+        return this._imm_getStrAttr('connectionUrl');
     }
 
     /**
      * Returns the state of the connection with this hub. (TRYING, CONNECTED, RECONNECTING, ABORTED, UNREGISTERED)
      */
-    async get_connectionState(): Promise<number>
+    get_connectionState(): number
     {
-        return await this._getIntAttr('connectionState');
+        return this._imm_getIntAttr('connectionState');
     }
 
     /**
      * Returns the hub serial number, if the hub was already connected once.
      */
-    async get_serialNumber(): Promise<string>
+    get_serialNumber(): string
     {
-        return await this._getStrAttr('serialNumber');
+        return this._imm_getStrAttr('serialNumber');
     }
 
     /**
@@ -12257,9 +12284,9 @@ export class YHub
      * @param networkMsTimeout : the network connection delay in milliseconds.
      * @noreturn
      */
-    async set_networkTimeout(networkMsTimeout: number): Promise<void>
+    set_networkTimeout(networkMsTimeout: number): void
     {
-        await this._setIntAttr('networkTimeout', networkMsTimeout);
+        this._imm_setIntAttr('networkTimeout', networkMsTimeout);
     }
 
     /**
@@ -12270,9 +12297,9 @@ export class YHub
      *
      * @return the network connection delay in milliseconds.
      */
-    async get_networkTimeout(): Promise<number>
+    get_networkTimeout(): number
     {
-        return await this._getIntAttr('networkTimeout');
+        return this._imm_getIntAttr('networkTimeout');
     }
 
     /**
@@ -12285,7 +12312,7 @@ export class YHub
      */
     async get_errorType(): Promise<number>
     {
-        return await this._getIntAttr('errorType');
+        return this._imm_getIntAttr('errorType');
     }
 
     /**
@@ -12298,7 +12325,7 @@ export class YHub
      */
     async get_errorMessage(): Promise<string>
     {
-        return await this._getStrAttr('errorMessage');
+        return this._imm_getStrAttr('errorMessage');
     }
 
     /**
@@ -13142,20 +13169,32 @@ export class YAPIContext
                     hub.notifPos = parseInt(ev.slice(5));
                 } else {
                     // noinspection FallThroughInSwitchStatementJS
-                    switch (parseInt(notype)) {
-                    case 0: // device name change, or arrival
+                    switch (notype) {
+                    case NOTIFY_NETPKT_NAME: // device name change, or arrival
                         parts = ev.slice(5).split(',');
                         if (parts.length > 2) {
                             let int_beacon = parseInt(parts[2]);
                             await this.setBeaconChange(parts[0], int_beacon);
                         }
-                        // no break on purpose
-                    case 2: // device plug/unplug
-                    case 4: // function name change
-                    case 8: // function name change (ydx)
                         hub.devListExpires = 0;
                         break;
-                    case 5: // function value (long notification)
+                        // no break on purpose
+                    case NOTIFY_NETPKT_CHILD: // device plug/unplug
+                        parts = ev.split(",");
+                        if (parts[2] =='0'){
+                            let serial =parts[1];
+                            if (this._removalCallback) {
+                                let module = YModule.FindModuleInContext(this, serial + '.module');
+                                this._pendingCallbacks.push({event: '-', serial: serial, module: module});
+                            }
+                            this.imm_forgetDevice(this._devs[serial]);
+                        }
+                        // no break on purpose
+                    case NOTIFY_NETPKT_FUNCNAME: // function name change
+                    case NOTIFY_NETPKT_FUNCNAMEYDX: // function name change (ydx)
+                        hub.devListExpires = 0;
+                        break;
+                    case NOTIFY_NETPKT_FUNCVAL: // function value (long notification)
                         parts = ev.slice(5).split(',');
                         if (parts.length > 2) {
                             value = parts[2].split('\0');
@@ -14434,10 +14473,10 @@ export class YAPIContext
         let rhub: YHub | null;
         rhub = this.nextHubInUseInternal(-1);
         while (!(rhub == null)) {
-            if (await rhub.get_serialNumber() == id) {
+            if (rhub.get_serialNumber() == id) {
                 return rhub;
             }
-            if (await rhub.get_registeredUrl() == id) {
+            if (rhub.get_registeredUrl() == id) {
                 return rhub;
             }
             rhub = rhub.nextHubInUse();
@@ -14470,7 +14509,7 @@ export class YAPIContext
 
     imm_GetAPIVersion(): string
     {
-        return /* version number patched automatically */'2.1.10284';
+        return /* version number patched automatically */'2.1.11843';
     }
 
     /**
