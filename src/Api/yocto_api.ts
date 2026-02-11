@@ -14509,7 +14509,7 @@ export class YAPIContext
 
     imm_GetAPIVersion(): string
     {
-        return /* version number patched automatically */'2.1.11843';
+        return /* version number patched automatically */'2.1.11867';
     }
 
     /**

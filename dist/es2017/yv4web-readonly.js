@@ -1,4 +1,4 @@
-/* Yocto-Visualization-4web (ES2017 read-only 2.1.11843) - www.yoctopuce.com */
+/* Yocto-Visualization-4web (ES2017 read-only 2.1.11867) - www.yoctopuce.com */
 
 // obj/rdonly/Renderer/YDataRendererCommon.js
 var Vector3 = class _Vector3 {
@@ -20415,7 +20415,7 @@ var YAPIContext = class {
   imm_GetAPIVersion() {
     return (
       /* version number patched automatically */
-      "2.1.11843"
+      "2.1.11867"
     );
   }
   /**
@@ -22973,7 +22973,7 @@ var constants = class _constants {
   static get versionInfo() {
     return (
       /* version number patched automatically */
-      ["2.1.11843", "71843"]
+      ["2.1.11867", "71867"]
     );
   }
   static get buildVersion() {
