@@ -1,4 +1,4 @@
-/* Yocto-Visualization-4web (ES2017 read-only 2.1.11867) - www.yoctopuce.com */
+/* Yocto-Visualization-4web (ES2017 read-only 2.1.11973) - www.yoctopuce.com */
 
 // obj/rdonly/Renderer/YDataRendererCommon.js
 var Vector3 = class _Vector3 {
@@ -20415,7 +20415,7 @@ var YAPIContext = class {
   imm_GetAPIVersion() {
     return (
       /* version number patched automatically */
-      "2.1.11867"
+      "2.1.11973"
     );
   }
   /**
@@ -20592,7 +20592,7 @@ var YAPIContext = class {
       }
     }
     if (url === "usb") {
-      return this.imm_setErr(errmsg, YAPI_NOT_SUPPORTED, "Use the VirtualHub on 127.0.0.1 to access USB devices", YAPI_NOT_SUPPORTED);
+      return this.imm_setErr(errmsg, YAPI_NOT_SUPPORTED, "Use the VirtualHub on 127.0.0.1 to access local USB devices", YAPI_NOT_SUPPORTED);
     }
     let urlInfo = new _YY_UrlInfo(url);
     let hub = this.imm_getHub(urlInfo);
@@ -22973,7 +22973,7 @@ var constants = class _constants {
   static get versionInfo() {
     return (
       /* version number patched automatically */
-      ["2.1.11867", "71867"]
+      ["2.1.11973", "71973"]
     );
   }
   static get buildVersion() {

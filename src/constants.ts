@@ -44,7 +44,7 @@ export class constants
 {
     public static get versionInfo(): string[]
     {
-        return /* version number patched automatically */['2.1.11867','71867'];
+        return /* version number patched automatically */['2.1.11973','71973'];
     }
     public static get buildVersion(): string
     {

@@ -1,6 +1,6 @@
 /*********************************************************************
  *
- * $Id: yocto_api.ts 71691 2026-02-02 06:59:29Z mvuilleu $
+ * $Id: yocto_api.ts 71971 2026-02-13 13:17:19Z mvuilleu $
  *
  * High-level programming interface, common to all modules
  *
@@ -14509,7 +14509,7 @@ export class YAPIContext
 
     imm_GetAPIVersion(): string
     {
-        return /* version number patched automatically */'2.1.11867';
+        return /* version number patched automatically */'2.1.11973';
     }
 
     /**
@@ -14707,7 +14707,7 @@ export class YAPIContext
             }
         }
         if (url === "usb") {
-            return this.imm_setErr(errmsg, YAPI_NOT_SUPPORTED, 'Use the VirtualHub on 127.0.0.1 to access USB devices', YAPI_NOT_SUPPORTED);
+            return this.imm_setErr(errmsg, YAPI_NOT_SUPPORTED, 'Use the VirtualHub on 127.0.0.1 to access local USB devices', YAPI_NOT_SUPPORTED);
         }
         let urlInfo: _YY_UrlInfo = new _YY_UrlInfo(url);
         let hub: YGenericHub | null = this.imm_getHub(urlInfo);

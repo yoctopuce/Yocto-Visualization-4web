@@ -3,7 +3,7 @@
 // from yocto_api.d.ts
 /*********************************************************************
  *
- * $Id: yocto_api.ts 71691 2026-02-02 06:59:29Z mvuilleu $
+ * $Id: yocto_api.ts 71971 2026-02-13 13:17:19Z mvuilleu $
  *
  * High-level programming interface, common to all modules
  *
